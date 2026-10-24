@@ -13,7 +13,7 @@ SCRIPT: Final[dict[str, str]] = {
     "closed_place": "The store is closed right now. Let's go back to bed and go in the morning.",
     "comfort": "You're home. You're safe. I'm right here.",
     "goodnight": "Good night, {person}. I love you.",
-    "visitor_open": "Hi, you've reached the {caregiver} household. Can I help you?",
+    "visitor_open": "Hi, you've reached the {family} household. Can I help you?",
     "visitor_reply": "Thank you. I'll let the family know you're here.",
     "visitor_bye": "Thanks for coming by. Have a good night.",
 }
@@ -26,7 +26,10 @@ _TIME = re.compile(r"\b\d{1,2}(:\d{2})?\s?(am|pm)\b", re.IGNORECASE)
 
 def fill(template: str, hh: Household) -> str:
     """Substitute the person's short name and the caregiver's name."""
-    return template.format(person=hh.person_name, caregiver=hh.caregiver_name)
+    family = (
+        hh.person_full_name.split()[-1] if hh.person_full_name and " " in hh.person_full_name else hh.caregiver_name
+    )
+    return template.format(person=hh.person_name, caregiver=hh.caregiver_name, family=family)
 
 
 def validate(line: str) -> tuple[bool, str]:
