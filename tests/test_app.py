@@ -123,3 +123,14 @@ def test_door_restart_ends_conversation(client: TestClient) -> None:
     assert api.store.inc.state.value == "CONVERSATION"
     client.post("/door/telemetry", json={"event": "door_started"})
     assert api.store.inc.state.value == "RETURNED"
+
+
+def test_reentry_soon_after_greeting_does_not_regreet(client: TestClient) -> None:
+    from nightfall import api
+
+    client.post("/event", json={"kind": "person_enter"})
+    client.post("/event", json={"kind": "person_lost"})
+    client.post("/event", json={"kind": "person_back"})
+    client.post("/event", json={"kind": "person_enter"})
+    lines = [e["text"] for e in api.store.log if e.get("type") == "speak"]
+    assert lines[0].startswith("Hi ") and not lines[-1].startswith("Hi ") and "still dark" in lines[-1]

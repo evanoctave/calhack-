@@ -61,12 +61,13 @@ Adult children in Orange County caring for a parent with dementia at home overni
 
 Laptop webcam to an indoor RTSP camera; browser coco-ssd to an on-device model; SQLite-free in-memory store to Postgres; the Apify run nightly per home; Twilio behind the same `Notifier` interface (built and tested, disabled on a trial account); consented voice clone per caregiver with a neutral-voice persona switch; HIPAA posture: the brief is caregiver-entered data, not clinical records.
 
-## Measured (fill in at the table)
+## Measured (Oct 24, laptop + iPhone, `scripts/timings.py`)
 
 | Metric | Target | Measured |
 |---|---|---|
-| person enters frame to first spoken word | under 2 s (cached audio) | |
-| person leaves frame to phone ring | under 10 s (3 s lost + 5 s wait in demo) | |
-| ring to brief open on a phone | under 30 s | |
+| person enters frame to first spoken word | under 2 s (cached audio) | 0.03 s median, 5 runs |
+| person leaves frame to phone ring | under 10 s (1.5 s lost + door wait) | 3.3 s median, 5 runs (demo door wait 3 s) |
+| ring to family on the line hearing the brief | under 30 s | 3.4 s median, 5 runs (real Twilio call) |
+| person speaks at the door to next line | under 5 s | about 3 s (Claude 1.4-2.3 s + Cartesia ~1 s) |
 | Moss query | under 50 ms warm | 0.00 s measured |
 | Cartesia line, uncached | about 1.8 s | 1.75 s measured |

@@ -57,6 +57,7 @@ class Store:
         self.voice_source: str = "clone" if os.environ.get("VOICE_IS_CLONE") == "1" else "stock"
         self.voice_name: str = os.environ.get("VOICE_NAME", "")
         self.night_mode: bool = True
+        self.last_open_at: Any = None  # when the door last said its opening line
         self.quiet_until: Any = None  # after a family member says he's safe, re-entries don't restart the door
         self.hub = Hub()
         notifier = (

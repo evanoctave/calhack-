@@ -116,19 +116,20 @@ python, fastapi, asyncio, javascript, html, css, tensorflow.js, coco-ssd, face-a
 
 | Metric | Target | Measured |
 |---|---|---|
-| Person enters frame to first spoken word | under 2 s (cached audio) | **TODO** |
-| Person leaves frame to phone ring | under 10 s (3 s lost + 5 s wait in demo) | **TODO** |
-| Ring to brief open on a phone | under 30 s | **TODO** |
+| Person enters frame to first spoken word | under 2 s (cached audio) | 0.03 s median, 5 runs (pre-synthesized line) |
+| Person leaves frame to phone ring | under 10 s (1.5 s lost + door wait) | 3.3 s median, 5 runs (3.24-3.47 s; demo door wait 3 s, production 20 s) |
+| Ring to the family on the line hearing the brief | under 30 s | 3.4 s median, 5 runs (real Twilio call, answer included) |
+| Person speaks at the door to the next line | under 5 s | about 3 s (Claude 1.4-2.3 s + Cartesia 0.9-1.1 s) |
 | Cartesia line, uncached | about 1.8 s | 1.75 s |
 | Moss query, warm | under 50 ms | under 10 ms (reads 0.00 s) |
 
 ## Why we fit each track
 
-**Best Use of Cartesia.** Cartesia Sonic speaks every word at the door and every line of the call agent. Door lines are pre-synthesized at boot and cached by hash, so the redirect starts without waiting on the network (`nightfall/voice.py`, `integrations/cartesia.py`). The caregiver app records voice samples and clones the caregiver's voice (`/voice/clone` in `nightfall/api_app.py`), because a redirect works when it is the daughter's voice. **TODO:** record and switch to a real cloned voice before the demo; the door currently uses a stock voice.
+**Best Use of Cartesia.** Cartesia Sonic speaks every word at the door and every line of the call agent. Door lines are pre-synthesized at boot and cached by hash, so the redirect starts without waiting on the network (`nightfall/voice.py`, `integrations/cartesia.py`). The caregiver app records voice samples and clones the caregiver's voice (`/voice/clone` in `nightfall/api_app.py`), because a redirect works when it is the daughter's voice. The demo door speaks in a real clone of the caregiver's voice made from 30 seconds of recordings in the app, and the family call uses a neutral assistant voice by design.
 
 **Anthropic: Claude for Public Benefit.** Claude has three bounded jobs: writing the next redirect line inside a template, turning the exit frame into enumerated clothing fields, and answering the relative's questions from a fact sheet (`nightfall/llm.py`, `nightfall/call_agent.py`). It never decides anything. Every line passes a validator and a medication-name check or falls back to a script, and `docs/TRACKS.md` lists each way Claude could go wrong and what stops it. Named community: adult children in Orange County caring for a parent with dementia at home overnight, without paid help.
 
-**Microsoft: Built for the Real World.** Nightfall has a named customer (family caregivers of a parent with dementia at home overnight) and a measured loop (exit to ring, ring to brief). It runs on hardware people already own. The production path in `docs/TRACKS.md` covers RTSP cameras, on-device models, Postgres and a HIPAA posture where the brief is caregiver-entered data. **TODO:** fill in the measured timings.
+**Microsoft: Built for the Real World.** Nightfall has a named customer (family caregivers of a parent with dementia at home overnight) and a measured loop (exit to ring, ring to brief). It runs on hardware people already own. The production path in `docs/TRACKS.md` covers RTSP cameras, on-device models, Postgres and a HIPAA posture where the brief is caregiver-entered data. Measured over five runs: exit to a real phone ringing in 3.3 s, the family hearing the brief 3.4 s after the ring (`scripts/timings.py`).
 
 **Best Use of Apify.** The product runs our own Actor at address setup (`nightfall/api_setup.py`, `integrations/apify.py`). The Actor calls Apify's Google Maps Scraper for 24-hour places with phones and hours, merges them with OpenStreetMap hazards, and caches the result, so the 2 AM search map has real phone numbers to call first.
 

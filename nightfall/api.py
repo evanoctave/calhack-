@@ -330,7 +330,7 @@ async def reset() -> dict[str, Any]:
     if store.inc is not None:
         await store.runner.cancel(store.inc.id)
     store.inc, store.frames, store.briefs = None, {}, {}
-    store.quiet_until = None
+    store.quiet_until = store.last_open_at = None
     store.log.clear()
     store.history, store.frame_bytes = [], {}
     store.takeover_by, store.call_911_sent, store.latest_frame = None, False, b""

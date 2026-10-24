@@ -22,12 +22,22 @@ def emit(store: Store, obj: dict[str, Any]) -> None:
     store.hub.publish("dashboard", obj)
 
 
+REGREET_S = 90.0
+
+
 async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident) -> None:
     """Execute every action named by a transition, in order."""
     for a in tr.actions:
         if a == "speak:open":
-            store.history = []
-            await _speak(store, fill(SCRIPT["open"], store.hh), "script")
+            # Back out at the door soon after the last greeting: carry on (cached "again" line, no wait)
+            # rather than replaying "Hi Dad, it's ..." from the top.
+            recent = store.last_open_at is not None and (store.now() - store.last_open_at).total_seconds() < REGREET_S
+            if recent and store.history:
+                await _speak(store, fill(SCRIPT["again"], store.hh), "script")
+            else:
+                store.history = []
+                await _speak(store, fill(SCRIPT["open"], store.hh), "script")
+            store.last_open_at = store.now()
         elif a == "speak:again":
             if store.takeover_by:
                 emit(store, {"type": "takeover_skip", "by": store.takeover_by})

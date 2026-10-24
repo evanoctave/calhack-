@@ -119,7 +119,7 @@ async def door_telemetry(body: TelemetryIn) -> dict[str, Any]:
         from nightfall import engine
         from nightfall.api import _step
 
-        store.quiet_until = None
+        store.quiet_until = store.last_open_at = None
         if store.inc is not None and store.inc.state in (
             engine.State.CONVERSATION,
             engine.State.DOOR_OPEN,
