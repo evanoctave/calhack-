@@ -6,7 +6,7 @@ function renderSamples() {
   if (!S) return; const v = S.voice; let n = 0;
   $("v-samples").innerHTML = Object.entries(SAMPLE_LINES).map(([k, [title, line]], i) => { const has = v.samples[k]; if (has) n++;
     return `<div class="row big"><div><span class="k">${title}</span><span class="sub2">"${esc(line.replace("Sarah", S.household.caregiver_name))}"</span><span class="sub2">${has ? "Recorded" : "Not recorded"}</span></div>
-      <div style="text-align:right;white-space:nowrap"><span class="small muted">Sample ${i + 1}</span><br>${has ? `<a class="back" onclick="playSample('${k}')">Play</a> · ` : ""}<a class="back" onclick="pickSample('${k}')">${has ? "Redo" : "Record"}</a></div></div>`; }).join("");
+      <div style="text-align:right;white-space:nowrap"><span class="small muted">Sample ${i + 1}</span><br>${has ? `<a class="act" onclick="playSample('${k}')">Play</a> · ` : ""}<a class="act" onclick="pickSample('${k}')">${has ? "Redo" : "Record"}</a></div></div>`; }).join("");
   $("v-count").textContent = n + " sample" + (n === 1 ? "" : "s");
   $("v-clone").disabled = n === 0; $("v-clone").textContent = v.source === "clone" ? "Re-create family AI voice" : "Create family AI voice";
   $("v-ready").hidden = v.source !== "clone"; $("v-readyt").textContent = (v.name || S.household.caregiver_name) + "'s AI voice is ready";

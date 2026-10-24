@@ -81,7 +81,7 @@ function render() {
   // brief
   $("b-name").textContent = h.person_full_name + (h.person_age ? ", " + h.person_age : "");
   $("b-seen").textContent = "Last seen at home · " + (inc && inc.exited_at ? hhmm(inc.exited_at) : "—");
-  $("b-loc").textContent = inc && inc.state === "RETURNED" ? "Back inside" : "Current location unknown"; $("b-loc").style.color = inc && inc.state === "RETURNED" ? "var(--ok)" : "var(--danger)";
+  $("b-loc").textContent = inc && inc.state === "RETURNED" ? "Back inside" : "Current location unknown"; $("b-loc").style.color = inc && inc.state === "RETURNED" ? "var(--safe)" : "var(--alarm)";
   const c = inc && inc.clothing; const pending = c && c.source === "pending";
   $("b-wear").textContent = c ? (pending ? "Describing…" : c.confidence < 0.4 ? "See photo" : cap(c.top_color + " " + c.top_type)) : "—";
   $("b-wear2").textContent = c && !pending && c.confidence >= 0.4 ? cap(c.bottom_color + " " + c.bottom_type) + (c.footwear !== "unknown" ? ", " + c.footwear : "") : "—";
@@ -103,7 +103,7 @@ function render() {
 let serverOffset = 0;
 function tickCountdown() {
   if (!S) return; const inc = S.incident; const show = inc && inc.state === "DOOR_OPEN" && inc.door_opened_at;
-  ["h", "a"].forEach(k => { const el = $(k + "-cd"); if (!el) return; el.hidden = !show; if (!show) return;
+  ["h", "a"].forEach(k => { const el = $(k + "-cd"); if (!el) return; el.hidden = !show; if (!show) return; el.style.setProperty("--cd", S.door_wait_s + "s");
     const left = Math.max(0, (new Date(inc.door_opened_at).getTime() + S.door_wait_s * 1000 - (Date.now() + serverOffset)) / 1000);
     $(k + "-cdt").textContent = "Out of view · this phone rings in " + left.toFixed(1) + " s"; $(k + "-cds").textContent = "Back in frame cancels it."; });
 }
@@ -130,16 +130,17 @@ async function loadBrief(link) {
   $("sr-call").innerHTML = b.call_first.slice(0, 5).map(p => `<div class="row"><div><span class="k">${esc(p.name)}</span><span class="sub2">${p.distance_mi} mi${p.open_now === true ? " · open" : ""}</span></div><span class="v">${p.phone ? `<a href="tel:${esc(p.phone.replace(/[^\d+]/g, ""))}">${esc(p.phone)}</a>` : ""}</span></div>`).join("");
   if ($("s-search").classList.contains("on")) renderMap();
 }
+function tok(name) { const el = document.createElement("i"); el.style.color = `var(${name})`; document.body.appendChild(el); const c = getComputedStyle(el).color; el.remove(); return c; }
 function renderMap() {
-  if (!window.L || !S) return; const h = S.household, b = window.B;
+  if (!window.L || !S) return; const h = S.household, b = window.B; const ACC = tok("--accent"), HAZ = tok("--alarm"), OK = tok("--safe"), BG = tok("--bg");
   if (!mapObj) { mapObj = L.map("map", {zoomControl: false, attributionControl: false}); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(mapObj); }
   if (mapLayer) mapLayer.remove(); mapLayer = L.layerGroup().addTo(mapObj); mapObj.setView([h.home.lat, h.home.lng], 14);
-  L.circle([h.home.lat, h.home.lng], {radius: h.radius_mi * 1609.34, color: "#2d6cdf", weight: 1, dashArray: "4 4", fillOpacity: .04}).addTo(mapLayer);
-  L.circleMarker([h.home.lat, h.home.lng], {radius: 7, color: "#2d6cdf", fillColor: "#2d6cdf", fillOpacity: 1}).addTo(mapLayer);
+  L.circle([h.home.lat, h.home.lng], {radius: h.radius_mi * 1609.34, color: ACC, weight: 1, dashArray: "4 4", fillOpacity: .05}).addTo(mapLayer);
+  L.circleMarker([h.home.lat, h.home.lng], {radius: 7, color: ACC, fillColor: ACC, fillOpacity: 1}).addTo(mapLayer);
   const route = [[h.home.lat, h.home.lng], ...h.familiar_places.map(p => [p.lat, p.lng])];
-  L.polyline(route, {color: "#2d6cdf", dashArray: "6 6", weight: 2}).addTo(mapLayer);
-  h.familiar_places.forEach(p => L.circleMarker([p.lat, p.lng], {radius: 6, color: "#2d6cdf", fillColor: "#fff", fillOpacity: 1}).addTo(mapLayer).bindPopup(esc(p.name)));
-  if (b) { b.hazards.slice(0, 6).forEach(p => L.circleMarker([p.lat, p.lng], {radius: 6, color: "#c62828", fillOpacity: .7}).addTo(mapLayer).bindPopup(esc(p.name))); b.call_first.slice(0, 6).forEach(p => L.circleMarker([p.lat, p.lng], {radius: 6, color: "#1f8a4c", fillOpacity: .7}).addTo(mapLayer).bindPopup(esc(p.name))); }
+  L.polyline(route, {color: ACC, dashArray: "6 6", weight: 2}).addTo(mapLayer);
+  h.familiar_places.forEach(p => L.circleMarker([p.lat, p.lng], {radius: 6, color: ACC, fillColor: BG, fillOpacity: 1, weight: 2}).addTo(mapLayer).bindPopup(esc(p.name)));
+  if (b) { b.hazards.slice(0, 6).forEach(p => L.circleMarker([p.lat, p.lng], {radius: 6, color: HAZ, fillColor: HAZ, fillOpacity: .8, weight: 1}).addTo(mapLayer).bindPopup(esc(p.name))); b.call_first.slice(0, 6).forEach(p => L.circleMarker([p.lat, p.lng], {radius: 6, color: OK, fillColor: OK, fillOpacity: .8, weight: 1}).addTo(mapLayer).bindPopup(esc(p.name))); }
   setTimeout(() => mapObj.invalidateSize(), 100);
 }
 function copyPolice() { const t = $("b-police").textContent; (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { $("b-copied").textContent = "copied"; }).catch(() => { $("b-copied").textContent = "select and copy"; }); }
