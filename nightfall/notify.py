@@ -94,8 +94,11 @@ class TwilioNotifier:
             result = "called"
             try:
                 await asyncio.to_thread(twilio.create_call, m.phone, f"{self._public}/twiml/{incident_id}/{m.id}")
-                await asyncio.to_thread(twilio.send_sms, m.phone, f"{message} {self._link(incident_id, m.id)}")
             except Exception as e:  # noqa: BLE001
                 print(f"twilio fallback: {e}")
                 result = f"sse only: {e}"
+            try:  # US texts need carrier (A2P) registration; a failed text never undoes the call
+                await asyncio.to_thread(twilio.send_sms, m.phone, f"{message} {self._link(incident_id, m.id)}")
+            except Exception as e:  # noqa: BLE001
+                print(f"twilio sms skipped: {e}")
             self._sse._record({"type": "ring", "tier": tier, "members": [m.name], "source": "twilio", "result": result})
