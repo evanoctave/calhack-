@@ -1,12 +1,22 @@
 # Nightfall
 
-Night-exit guardian for people with dementia living at home. When someone heads for the door at
-2 AM, Nightfall talks them back to bed in a familiar voice. If they leave anyway, the camera keeps
-the frame of what they were wearing, the family phone tree rings in order, and every phone gets a
-missing-person brief: photo, clothing, medications, a 1.5-mile map with hazards and open-all-night
-places to call first, and the local non-emergency number.
+**Life Alert inside a doorbell camera, for families keeping a parent with dementia at home.**
 
-Cal Hacks 13.0. Docs: `docs/ARCHITECTURE.md` (devices, modules, services), `docs/API.md` (every route and WebSocket), `docs/RUNBOOK.md` (demo day), `docs/VOICE.md`, `docs/TRACKS.md`, `docs/DECISIONS.md`. Spec: `NIGHTFALL-MASTER-PROMPT.md`.
+Six in ten people with dementia will wander. Half of those not found within 24 hours are seriously hurt or die
+(Alzheimer's Association figures). Tonight, a caregiver's first fifteen minutes go to finding a photo, remembering
+what Dad was wearing, and guessing which way he went.
+
+Nightfall is a door device and a phone app. When he heads for the door at 2 AM it talks him back to bed in his
+daughter's voice. If he leaves anyway, her phone rings within seconds with what he is wearing, which way he went,
+a map of the dangers and the open-all-night places nearby, a live feed of the door, and a button to speak through
+it in her own voice. A neighbor at the door gets a doorbell chime and a polite greeting instead. A red HELP button
+on the door rings the family at any hour.
+
+Who it is for, what we would build next, and how it makes money: `docs/PRODUCT.md`.
+How it works: `docs/ARCHITECTURE.md`. Every route: `docs/API.md`. Demo day: `docs/RUNBOOK.md`.
+Why it decides the way it does: `docs/DECISIONS.md`, `docs/TRACKS.md`. Voice: `docs/VOICE.md`.
+
+Built at Cal Hacks 13.0 (UC Berkeley), October 2026.
 
 ## Run
 
