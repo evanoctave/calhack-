@@ -63,3 +63,22 @@ def test_unknown_clothing_is_not_read_as_see_photo() -> None:
 def test_responding_with_a_question_answers_it() -> None:
     r = call_agent.handle(hh, make_brief(), "Sarah", "Okay, I'm on my way. What was he wearing?")
     assert r.intent == "responding" and r.ack and "navy hoodie" in r.say
+
+
+def test_all_clear_phrases_ack_and_stop_calls() -> None:
+    for said in (
+        "ok got it thanks",
+        "I got it",
+        "all good",
+        "it's okay, he's fine",
+        "false alarm",
+        "you can stop calling",
+    ):
+        r = call_agent.handle(hh, make_brief(), "Sarah", said)
+        assert r.intent == "ack" and r.ack and r.done, said
+    assert call_agent.handle(hh, make_brief(), "Sarah", "thanks, bye").intent == "bye"
+
+
+def test_got_it_on_my_way_is_responding_not_found() -> None:
+    assert call_agent.handle(hh, make_brief(), "Sarah", "got it, I'm on my way").intent == "responding"
+    assert call_agent.handle(hh, make_brief(), "Sarah", "I'm heading back, I got him").intent == "ack"

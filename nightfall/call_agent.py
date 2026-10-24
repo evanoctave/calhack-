@@ -15,12 +15,19 @@ from nightfall.integrations import anthropic_llm
 from nightfall.script import BANNED
 
 ACK: Final = re.compile(
-    r"\b(got him|got her|found (him|her|them)|i have (him|her)|i'?ve got|he'?s (here|home|safe|with me)|she'?s (here|home|safe))\b",
+    r"\b(got him|got her|found (him|her|them)|i have (him|her)|i'?ve got|i got (it|this|him|her)|got it|"
+    r"he'?s (here|home|safe|with me|ok(ay)?|fine|good|back)|she'?s (here|home|safe|with me|ok(ay)?|fine|good|back)|"
+    r"(all|we'?re|it'?s|everything'?s) (good|fine|ok(ay)?)|all set|false alarm|never ?mind|"
+    r"(you can )?stop calling|no need to call|i'?ll take it from here)\b",
     re.IGNORECASE,
 )
 RESPONDING: Final = re.compile(
     r"\b(on my way|i'?m (going|coming|heading|leaving|out)|i'?ll (go|look|find|check|head)|going (to look|out|now)|"
     r"heading (out|over)|leaving now|i'?m on it|i'?ll handle)\b",
+    re.IGNORECASE,
+)
+FOUND: Final = re.compile(
+    r"\b(got (him|her)|found (him|her|them)|i have (him|her)|(he|she)'?s (here|home|safe|with me|back))\b",
     re.IGNORECASE,
 )
 REPEAT: Final = re.compile(r"\b(repeat|again|say that|what did you say)\b", re.IGNORECASE)
@@ -97,7 +104,7 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
     t = text.strip()
     if not t:
         return Reply("I did not catch that. Say I've got him, or ask me where to look.", "silence")
-    if ACK.search(t):
+    if ACK.search(t) and not (RESPONDING.search(t) and not FOUND.search(t)):  # "got it, on my way" = responding
         return Reply(
             f"Thank you. I am telling the rest of the family {hh.person_name} is safe. Goodbye.", "ack", True, True
         )
