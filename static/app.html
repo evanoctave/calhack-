@@ -46,7 +46,7 @@
   <h1 id="h-title">Night watch is on</h1><p class="sub" id="h-greet">Good evening, Sarah</p>
   <div id="h-notice" class="ok-card" hidden style="margin:0 0 12px"><b id="h-noticet">Mike stepped out</b><span id="h-notices">No alert. The door asked, and a household member answered.</span></div>
   <div id="h-cd" class="banner" hidden style="margin:0 0 12px"><b id="h-cdt">Out of view</b><div id="h-cds" class="small"></div></div>
-  <div class="hero" style="height:200px"><img id="h-feed" alt="front door camera" style="display:none"><div class="door" id="h-door"></div><div class="line"></div></div>
+  <div class="hero" style="height:200px"><img id="h-feed" class="feed-live" alt="front door camera" style="display:none;width:100%;height:100%;object-fit:cover"><div class="door" id="h-door"></div><div class="line"></div></div>
   <p class="cap" id="h-feedcap">Front door camera · connecting…</p>
   <div style="display:flex;gap:8px" class="mt"><button class="rec" id="h-live" onclick="liveToggle('h-live','h-livestat')">Talk</button><button class="rec" id="h-listen" style="background:var(--accent-bg);color:var(--accent)" onclick="listenToggle('h-listen')">Listen</button></div>
   <p class="cap" id="h-livestat">Talk: your voice plays on the door speaker live. Listen: hear the door microphone on this phone.</p>
@@ -112,7 +112,7 @@
 <section id="s-respond" class="screen">
   <div class="topline"><a class="back" onclick="go('alert')">‹ Alert</a><span class="tag">On the line</span></div>
   <h1>You're on the line</h1><p class="sub" id="r-sub">Nightfall is talking to Robert at the door.</p>
-  <img id="r-feed" class="feed" alt="live door camera"><p class="cap" id="r-feedcap">Live camera at the door</p>
+  <img id="r-feed" class="feed feed-live" alt="live door camera"><p class="cap" id="r-feedcap">Live camera at the door</p>
   <div class="card mt" id="r-monitor" style="padding:12px 18px"><span class="small muted">Agent monitoring</span><div id="r-monitortxt" style="font-weight:500">Watching the door</div></div>
   <div class="label">Nightfall agent</div>
   <div class="card" style="padding:14px 18px"><div id="r-say" class="muted">Connecting…</div>
@@ -141,7 +141,7 @@
 <div id="visitor" hidden style="position:fixed;inset:0;background:linear-gradient(180deg,#16284a,#0f1d33);color:#fff;z-index:55;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center">
   <div style="font-size:14px;opacity:.8;margin-bottom:8px">Nightfall · doorbell</div><div style="font-size:28px;font-weight:700">Someone's at the door</div>
   <div id="vis-said" style="margin:10px 0;opacity:.9;min-height:22px"></div>
-  <img id="vis-feed" class="feed" style="max-width:360px;margin:8px 0 16px" alt="door camera">
+  <img id="vis-feed" class="feed feed-live" style="max-width:360px;margin:8px 0 16px" alt="door camera">
   <div style="display:flex;gap:8px;width:100%;max-width:360px"><button class="rec" id="vis-talk" onclick="liveToggle('vis-talk','vis-stat')">Talk</button><button class="rec" id="vis-listen" style="background:rgba(127,167,255,.25);color:#fff" onclick="listenToggle('vis-listen')">Listen</button></div>
   <p class="cap" id="vis-stat" style="color:#cdd8ea">Nightfall greeted them in the assistant voice. Talk to answer the door yourself.</p>
   <button class="btn" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.3)" onclick="dismissVisitor()">Not now</button></div>

@@ -94,7 +94,7 @@ async function runCommand(c) {
   if (c.cmd === "say_test") speak("This is the Nightfall door speaker.");
 }
 async function sos() { await post("/event", {kind: "sos"}); showSpeak("Nightfall", "Calling the family now."); refresh(); }
-async function startDoor() { $("start").classList.add("hidden"); try { const c = new (window.AudioContext || window.webkitAudioContext)(); await c.resume(); const a = new Audio("/voice/silence.wav"); a.volume = 0.01; await a.play().catch(() => {}); } catch (e) {} tele("door_started", navigator.userAgent.slice(0, 60)); startCam(); doorConnect(); micConnect(); }
+async function startDoor() { $("start").classList.add("hidden"); try { const c = new (window.AudioContext || window.webkitAudioContext)(); await c.resume(); const a = new Audio("/voice/silence.wav"); a.volume = 0.01; await a.play().catch(() => {}); } catch (e) {} tele("door_started", navigator.userAgent.slice(0, 60)); startCam(); doorConnect(); micConnect(); videoConnect(); }
 // Live voice from the phone (PCM over /ws/door)
 const Spk = {ws: null, ctx: null, t: 0};
 function doorConnect() {
@@ -128,6 +128,23 @@ async function micUpdate() {
     Mic.src.connect(Mic.proc); Mic.proc.connect(Mic.ctx.destination); tele("door_mic_on", "listeners " + Mic.listeners);
   }
   if (!want && Mic.proc) { try { Mic.proc.disconnect(); Mic.src.disconnect(); } catch (e) {} Mic.proc = null; Mic.src = null; tele("door_mic_off", ""); }
+}
+// Live video -> phones: separate 20 fps loop on a small canvas, only while a phone watches.
+const Vid = {ws: null, watchers: 0, timer: null, canvas: null, ctx: null, busy: false, sent: 0};
+function videoConnect() {
+  const proto = location.protocol === "https:" ? "wss" : "ws"; const ws = new WebSocket(`${proto}://${location.host}/ws/video-in`); ws.binaryType = "arraybuffer"; Vid.ws = ws;
+  ws.onmessage = ev => { if (typeof ev.data === "string") { const m = JSON.parse(ev.data); if (m.type === "watchers") { Vid.watchers = m.count; videoUpdate(); } } };
+  ws.onclose = () => { Vid.ws = null; setTimeout(videoConnect, 2000); };
+}
+function videoUpdate() {
+  const want = Vid.watchers > 0;
+  if (want && !Vid.timer) { Vid.canvas = Vid.canvas || Object.assign(document.createElement("canvas"), {width: 400, height: 300}); Vid.ctx = Vid.canvas.getContext("2d"); Vid.timer = setInterval(videoTick, 50); tele("video_on", "watchers " + Vid.watchers); }
+  if (!want && Vid.timer) { clearInterval(Vid.timer); Vid.timer = null; tele("video_off", ""); }
+}
+function videoTick() {
+  const v = document.getElementById("cam"); if (!v || !v.videoWidth || Vid.busy || !Vid.ws || Vid.ws.readyState !== 1 || Vid.ws.bufferedAmount > 200000) return;
+  Vid.busy = true; Vid.ctx.drawImage(v, 0, 0, 400, 300);
+  Vid.canvas.toBlob(b => { Vid.busy = false; if (b && Vid.ws && Vid.ws.readyState === 1) { b.arrayBuffer().then(buf => Vid.ws.send(buf)); Vid.sent++; } }, "image/jpeg", 0.55);
 }
 fetch("/health").then(r => r.json()).then(h => { const live = Object.keys(h.mock).filter(k => !h.mock[k]); $("integ").textContent = live.length ? "live: " + live.join(", ") : "mock mode"; });
 refresh(); setInterval(refresh, 5000);

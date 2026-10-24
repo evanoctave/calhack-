@@ -44,3 +44,16 @@ def test_door_mic_relay(client: TestClient) -> None:
             assert phone.receive_bytes() == b"\x02\x00" * 512
         assert door.receive_json() == {"type": "listeners", "count": 0}
     assert doormic.door is None and not doormic.listeners
+
+
+def test_video_relay(client: TestClient) -> None:
+    from nightfall.api_live import video
+
+    with client.websocket_connect("/ws/video-in") as door:
+        assert door.receive_json() == {"type": "watchers", "count": 0}
+        with client.websocket_connect("/ws/video/TM-SARAH") as phone:
+            assert door.receive_json() == {"type": "watchers", "count": 1}
+            door.send_bytes(b"\xff\xd8" + b"\x00" * 100)
+            assert phone.receive_bytes().startswith(b"\xff\xd8")
+        assert door.receive_json() == {"type": "watchers", "count": 0}
+    assert video.door is None and not video.watchers

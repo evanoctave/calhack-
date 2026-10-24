@@ -167,3 +167,81 @@ async def ws_door(ws: WebSocket) -> None:
     finally:
         live.listeners.discard(ws)
         await asyncio.sleep(0)
+
+
+class VideoHub:
+    """Door camera -> every phone watching. JPEG frames as binary messages; the door streams only while watched."""
+
+    def __init__(self) -> None:
+        self.watchers: dict[WebSocket, str] = {}
+        self.door: WebSocket | None = None
+        self.frames = 0
+
+    async def broadcast(self, data: bytes) -> None:
+        for ws in list(self.watchers):
+            try:
+                await ws.send_bytes(data)
+            except Exception:  # noqa: BLE001
+                self.watchers.pop(ws, None)
+
+    async def tell_door(self) -> None:
+        if self.door is not None:
+            try:
+                await self.door.send_json({"type": "watchers", "count": len(self.watchers)})
+            except Exception:  # noqa: BLE001
+                self.door = None
+
+
+video = VideoHub()
+
+
+@router.websocket("/ws/video-in")
+async def ws_video_in(ws: WebSocket) -> None:
+    """Door page pushes JPEG frames; receives {"type":"watchers","count":n}. Also refreshes the polled frame."""
+    if ws.headers.get("cf-connecting-ip"):
+        await ws.close(code=4403)
+        return
+    await ws.accept()
+    video.door = ws
+    await video.tell_door()
+    store = _store()
+    import time as _time
+
+    try:
+        while True:
+            msg = await ws.receive()
+            if msg.get("type") == "websocket.disconnect":
+                break
+            data = msg.get("bytes")
+            if data and len(data) <= 200 * 1024:
+                video.frames += 1
+                await video.broadcast(data)
+                if video.frames % 10 == 0:
+                    store.latest_frame, store.latest_frame_at = data, _time.time()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if video.door is ws:
+            video.door = None
+
+
+@router.websocket("/ws/video/{member_id}")
+async def ws_video(ws: WebSocket, member_id: str) -> None:
+    """Phone side: receives the live door video."""
+    store = _store()
+    if store.hh.member(member_id) is None:
+        await ws.close(code=4403)
+        return
+    await ws.accept()
+    video.watchers[ws] = member_id
+    await video.tell_door()
+    try:
+        while True:
+            msg = await ws.receive()
+            if msg.get("type") == "websocket.disconnect":
+                break
+    except WebSocketDisconnect:
+        pass
+    finally:
+        video.watchers.pop(ws, None)
+        await video.tell_door()

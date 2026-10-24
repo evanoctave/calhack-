@@ -109,10 +109,9 @@ function notice(t, sub) { $("h-noticet").textContent = t; $("h-notices").textCon
 async function doorCmd(c) { const r = await post("/door/command", c); if (!r.ok) alert(r.detail || "command failed"); }
 async function enrollCmd(label) { const name = $("h-enrollname").value.trim(); if (!name) { alert("Type the name first"); return; } await doorCmd({cmd: "enroll", label, name}); $("h-enrollname").value = ""; setTimeout(loadEnrolled, 2500); }
 async function loadEnrolled() { try { const f = (await (await fetch("/enroll")).json()).faces; $("h-enrolled").textContent = f.length ? f.map(x => x.name + (x.label === "person" ? " (watched)" : "")).join(", ") : "none"; } catch (e) {} }
-let homeFeed = null;
-function startHomeFeed() { if (homeFeed) return; homeFeed = setInterval(() => { const u = "/cam/latest.jpg?t=" + Date.now(); const p = new Image(); p.onload = () => { const img = $("h-feed"); img.src = u; img.style.display = "block"; $("h-door").style.display = "none"; $("h-feedcap").textContent = "Front door camera · live"; }; p.onerror = () => { $("h-feedcap").textContent = "Front door camera · no frame (start the door screen on the laptop)"; }; p.src = u; }, 1000); }
+function startHomeFeed() { feedStart(); }
 let visFeed = null;
-function showVisitor(said) { $("vis-said").textContent = said || ""; $("visitor").hidden = false; if (!visFeed) visFeed = setInterval(() => { const u = "/cam/latest.jpg?t=" + Date.now(); const p = new Image(); p.onload = () => { $("vis-feed").src = u; }; p.src = u; }, 500); }
+function showVisitor(said) { $("vis-said").textContent = said || ""; $("visitor").hidden = false; feedStart(); }
 function hideVisitor() { $("visitor").hidden = true; if (visFeed) { clearInterval(visFeed); visFeed = null; } if (Listen.on) listenStop(); }
 function dismissVisitor() { $("visitor").dataset.dismissed = "1"; hideVisitor(); setTimeout(() => { delete $("visitor").dataset.dismissed; }, 120000); }
 function chime() { try { const c = new (window.AudioContext || window.webkitAudioContext)(); const t = c.currentTime; [[659, 0], [523, 0.35]].forEach(([f, d]) => { const o = c.createOscillator(), g = c.createGain(); o.frequency.value = f; g.gain.setValueAtTime(0.25, t + d); g.gain.exponentialRampToValueAtTime(0.001, t + d + 0.6); o.connect(g); g.connect(c.destination); o.start(t + d); o.stop(t + d + 0.6); }); } catch (e) {} if (navigator.vibrate) navigator.vibrate(200); }
@@ -150,7 +149,7 @@ function openBrief() { go("brief"); }
 async function respond() { if (!incident) return; await post("/ack", {incident_id: incident, member_id: member}); await post("/answer", {incident_id: incident, member_id: member}); await refresh(); }
 async function gotHim() { if (!incident) return; await post("/ack", {incident_id: incident, member_id: member}); await refresh(); go("brief"); }
 async function answerCall() { enableSound(); stopRing(); if (incident) post("/answer", {incident_id: incident, member_id: member}); go("respond"); openingLine(); }
-function startFeed() { if (feedTimer) return; feedTimer = setInterval(() => { const u = "/cam/latest.jpg?t=" + Date.now(); const p = new Image(); p.onload = () => { $("r-feed").src = u; $("r-feedcap").textContent = "Live camera at the door"; }; p.onerror = () => { $("r-feedcap").textContent = "No live frame yet. Enable the camera on the laptop dashboard."; }; p.src = u; }, 500); }
+function startFeed() { feedStart(); }
 function enableSound() { if (soundOn) return; soundOn = true; try { const a = $("ring"); a.src = ringDataUrl(); a.load(); a.volume = 1; a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {}); } catch (e) {} try { speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch (e) {} }
 function armPhone() { enableSound(); $("arm").hidden = true; try { localStorage.setItem("nf-armed", "1"); } catch (e) {} }
 let rungFor = ""; let lastRingMsg = "";

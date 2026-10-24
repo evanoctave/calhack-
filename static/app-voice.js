@@ -88,3 +88,14 @@ function listenToggle(btnId) {
   ws.onclose = () => { if (Listen.on) { Listen.on = false; btn.classList.remove("on"); btn.textContent = "Listen"; } };
 }
 function listenStop() { Listen.on = false; try { Listen.ws && Listen.ws.close(); } catch (e) {} Listen.ws = null; }
+
+// Live video from the door (JPEG frames over /ws/video). Paints into every element with class "feed-live".
+const Feed = {ws: null, on: false, url: null, frames: 0, lastAt: 0, poll: null};
+function feedStart() {
+  if (Feed.on) return; Feed.on = true;
+  const proto = location.protocol === "https:" ? "wss" : "ws"; const ws = new WebSocket(`${proto}://${location.host}/ws/video/${member}`); ws.binaryType = "arraybuffer"; Feed.ws = ws;
+  ws.onmessage = ev => { if (typeof ev.data === "string") return; const blob = new Blob([ev.data], {type: "image/jpeg"}); const u = URL.createObjectURL(blob); document.querySelectorAll("img.feed-live").forEach(img => { img.src = u; img.style.display = "block"; }); if (Feed.url) URL.revokeObjectURL(Feed.url); Feed.url = u; Feed.frames++; Feed.lastAt = Date.now(); feedCaption("live · " + (Feed.frames % 20 === 0 ? "20 fps" : "20 fps")); };
+  ws.onclose = () => { Feed.on = false; Feed.ws = null; setTimeout(() => { if (!Feed.on) feedStart(); }, 2000); };
+  if (!Feed.poll) Feed.poll = setInterval(() => { if (Date.now() - Feed.lastAt > 2500) { const u = "/cam/latest.jpg?t=" + Date.now(); const p = new Image(); p.onload = () => { document.querySelectorAll("img.feed-live").forEach(img => { img.src = u; img.style.display = "block"; }); feedCaption("live · slow link"); }; p.onerror = () => feedCaption("no frame (start the door screen on the laptop)"); p.src = u; } }, 1500);
+}
+function feedCaption(t) { ["h-feedcap", "r-feedcap"].forEach(id => { const el = $(id); if (el) el.textContent = "Front door camera · " + t; }); const d = $("h-door"); if (d && Feed.lastAt) d.style.display = "none"; }
