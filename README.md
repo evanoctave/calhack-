@@ -2,9 +2,9 @@
 
 **Life Alert inside a doorbell camera, for families keeping a parent with dementia at home.**
 
-> "It was very hard taking care of my grandmother. It was hard seeing her memory diminish, and knowing that I couldn't take care of her. I couldn't get her to understand why she couldn't do things, and we just couldn't connect anymore. I didn't have what I needed. There is nothing you can say or do that would connect with them, because they're in a different world. That's why, when you see the Silver Alerts, they're broadcast around the entire neighborhood, telling everyone to look for them, because there's no other way unless someone is watching them constantly, at all times. Assistance is required, especially to balance everything else I have to do."
->
-> Evan's mother, who cared for her grandmother with dementia
+**quote**
+"Well, uhm yeah it was very hard taking care of my grandmother, uhm, it was very hard wait, ok because what i wanna say is like it was hard seeing her you know her memory and all that diminish and it was very hard knowing that i couldnt take care of her and i couldnt get her to understand why she couldnt do things or why she couldnt do dfferent things and we just couldnt connect anymore. I didn't have what I needed. There is nothing you can say or do that would connect with them becuase they're in a different world, theres no more comprehension here. Like me and you im the one thats sending communication and youre giving it back to me. thats why when you see the silver alerts around the neighborhood, they're broadcasted around the entire neighborhood. They're telling everyone to look for them because theres no other way unless someone is watching them constantly at all times. assistance is required, especially to balance everything else I have to do"
+
 
 Six in ten people with dementia will wander. Half of those not found within 24 hours are seriously hurt or die
 (Alzheimer's Association figures). Tonight, a caregiver's first fifteen minutes go to finding a photo, remembering
