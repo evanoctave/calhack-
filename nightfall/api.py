@@ -221,6 +221,9 @@ async def ack(body: AckIn) -> dict[str, Any]:
 async def tree(body: TreeIn) -> dict[str, Any]:
     if not 1 <= body.tier <= 3:
         raise HTTPException(422, "tier must be 1..3")
+    existing = next((t for t in store.hh.tree if t.name.strip().lower() == body.name.strip().lower()), None)
+    if existing is not None:
+        return {"member_id": existing.id, "phone_url": f"{PUBLIC_URL}/phone.html#{existing.id}", "existing": True}
     m = TreeMember(id=f"TM-{secrets.token_hex(3)}", name=body.name, phone=body.phone, tier=body.tier)
     store.hh = store.hh.with_member(m)
     _emit(store, {"type": "tree", "member": m.__dict__})

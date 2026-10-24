@@ -18,7 +18,13 @@ async function resolveMember() {
   if (!st.household.tree.some(m => m.id === id)) { const r = await post("/tree", {name: want, phone: "web", tier: 1}); id = r.member_id; try { localStorage.setItem("nf-member-" + want, id); } catch (e) {} }
   member = id;
 }
-async function refresh() { S = await (await fetch("/app/state?member=" + encodeURIComponent(member))).json(); render(); }
+let es = null;
+function connect() { if (es) es.close(); es = sse("/sse/phone/" + member, onEvent); }
+async function refresh() {
+  S = await (await fetch("/app/state?member=" + encodeURIComponent(member))).json();
+  if (!S.household.tree.some(m => m.id === member)) { const old = member; await resolveMember(); if (member !== old) { connect(); S = await (await fetch("/app/state?member=" + encodeURIComponent(member))).json(); } }
+  render();
+}
 function hhmm(iso) { return iso ? new Date(iso).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"}) : "—"; }
 function render() {
   const h = S.household, inc = S.incident; incident = inc && inc.state !== "CLOSED" ? inc.id : null;
@@ -125,6 +131,6 @@ function onEvent(e) {
   if (e.type === "brief_updated" || e.type === "deadline" || e.type === "call_911_option" || e.type === "takeover") refresh();
 }
 (async function main() {
-  await resolveMember(); await refresh(); sse("/sse/phone/" + member, onEvent); setInterval(refresh, 4000);
+  await resolveMember(); await refresh(); connect(); setInterval(refresh, 4000);
   show(location.hash.slice(1) || (S.household.person_full_name ? "home" : "profile"));
 })();

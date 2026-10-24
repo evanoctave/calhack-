@@ -1,7 +1,7 @@
 // Person detection in the browser (TensorFlow.js coco-ssd), ring buffer, live relay to phones.
 // Events: person_enter (3 consecutive hits after absence), person_lost (absent LOST_S), person_back.
 const Cam = {model: null, video: null, canvas: null, ctx: null, overlay: null, octx: null, ring: [], personFrames: [],
-             present: false, hits: 0, misses: 0, lastEvent: "", lostMs: 1500, lastSeenAt: 0, relayAt: 0, busy: false, on: false, heights: [], awayAt: 0, face: null, faceMisses: 0, faceTick: 0, facing: ""};
+             present: false, hits: 0, misses: 0, lastEvent: "", lostMs: 1500, lastSeenAt: 0, relayAt: 0, busy: false, on: false, heights: [], awayAt: 0, face: null, faceMisses: 0, faceTick: 0, facing: "", awaySince: 0, awayLostSent: false, awayHoldMs: 5000};
 
 function camStatus(t) { const el = document.getElementById("camstat"); if (el) el.textContent = t; }
 
@@ -36,7 +36,7 @@ async function camTick() {
     drawBoxes(boxes, present);
     if (present && blob) { Cam.personFrames.push(blob); if (Cam.personFrames.length > 3) Cam.personFrames.shift(); }
     const now = Date.now();
-    if (present) { Cam.hits++; Cam.lastSeenAt = now; trackAway(boxes, now); await checkFace(true, now); } else { Cam.hits = 0; Cam.heights = []; Cam.faceMisses = 0; }
+    if (present) { Cam.hits++; Cam.lastSeenAt = now; trackAway(boxes, now); await checkFace(true, now); } else { Cam.hits = 0; Cam.heights = []; Cam.faceMisses = 0; Cam.awaySince = 0; Cam.awayLostSent = false; }
     if (!Cam.present && Cam.hits >= 2) { Cam.present = true; await onEnter(); }
     if (Cam.present && now - Cam.lastSeenAt >= Cam.lostMs) { Cam.present = false; await onLost(); }
     if (blob && now - Cam.relayAt > 400 && window.lastState && window.lastState.incident && !["CLOSED"].includes(window.lastState.incident.state)) {
@@ -72,8 +72,9 @@ async function checkFace(present, now) {
   let faces = []; try { faces = await Cam.face.estimateFaces(Cam.canvas, {flipHorizontal: false}); } catch (e) { return; }
   Cam.facing = faces.length ? "facing camera" : "turned away";
   const t = document.getElementById("persontxt"); if (t) t.textContent = "person in frame · " + Cam.facing;
-  if (faces.length) { Cam.faceMisses = 0; return; }
-  Cam.faceMisses++;
+  if (faces.length) { Cam.faceMisses = 0; Cam.awaySince = 0; if (Cam.awayLostSent) { Cam.awayLostSent = false; sendBack("turned back to the camera"); } return; }
+  Cam.faceMisses++; if (!Cam.awaySince) Cam.awaySince = now;
+  if (!Cam.awayLostSent && now - Cam.awaySince >= Cam.awayHoldMs) { Cam.awayLostSent = true; camStatus("still heading out after " + Math.round(Cam.awayHoldMs / 1000) + " s: exit clock starts"); post("/event", {kind: "person_lost", payload: {source: "face", reason: "turned away, not responding"}}).then(() => window.refresh && refresh()); }
   if (Cam.faceMisses >= 2 && now - Cam.awayAt > 15000) {
     const st = window.lastState && window.lastState.incident ? window.lastState.incident.state : "";
     if (!["CONVERSATION", "DOOR_OPEN", "ESCALATING"].includes(st)) { Cam.awayAt = now; camStatus("turned away from the camera: voice starts"); post("/event", {kind: "person_enter", payload: {source: "face", reason: "turned away"}}).then(() => window.refresh && refresh()); }
@@ -85,6 +86,7 @@ function trackAway(boxes, now) {
   if (Cam.heights.length < 4) return; const first = Cam.heights[0][1];
   if (h < first * 0.85 && now - Cam.awayAt > 15000) { Cam.awayAt = now; camStatus("moving away from the camera: voice starts"); const st = window.lastState && window.lastState.incident ? window.lastState.incident.state : ""; if (!["CONVERSATION", "DOOR_OPEN", "ESCALATING"].includes(st)) post("/event", {kind: "person_enter", payload: {source: "coco-ssd", reason: "moving away"}}).then(() => window.refresh && refresh()); }
 }
+function sendBack(reason) { const st = window.lastState && window.lastState.incident ? window.lastState.incident.state : ""; if (["DOOR_OPEN", "ESCALATING"].includes(st)) post("/event", {kind: "person_back", payload: {source: "face", reason}}).then(() => window.refresh && refresh()); }
 async function onEnter() {
   const st = window.lastState && window.lastState.incident ? window.lastState.incident.state : "";
   const kind = ["DOOR_OPEN", "ESCALATING"].includes(st) ? "person_back" : "person_enter";
