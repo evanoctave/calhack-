@@ -6,6 +6,7 @@ Frozen dataclasses so the engine cannot mutate the tree mid-incident. Loaded fro
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field, replace
 from datetime import time
 from pathlib import Path
@@ -65,10 +66,15 @@ def in_window(t: time, start: time, end: time) -> bool:
     return t >= start or t < end
 
 
+def phone_env(member_id: str) -> str:
+    """Real numbers live in .env (PHONE_TM_SARAH=+1...), never in the tracked household file."""
+    return "PHONE_" + member_id.replace("-", "_").upper()
+
+
 def load(path: str | Path) -> Household:
     """Load and validate data/household.json."""
     raw: dict[str, Any] = json.loads(Path(path).read_text())
-    tree = tuple(TreeMember(**m) for m in raw["tree"])
+    tree = tuple(TreeMember(**{**m, "phone": os.environ.get(phone_env(m["id"]), m["phone"])}) for m in raw["tree"])
     tiers = sorted({m.tier for m in tree})
     if not tiers or tiers[0] != 1 or tiers != list(range(1, len(tiers) + 1)):
         raise ValueError("tree tiers must be contiguous from 1")

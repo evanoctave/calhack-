@@ -19,7 +19,7 @@ def test_live_relay(client: TestClient) -> None:
     with client.websocket_connect("/ws/door") as door:
         assert door.receive_json()["on"] is False
         with client.websocket_connect("/ws/talk/TM-SARAH") as talk:
-            assert door.receive_json() == {"type": "live", "on": True, "by": "Sarah"}
+            assert door.receive_json() == {"type": "live", "on": True, "by": api.store.hh.tree[0].name}
             talk.send_bytes(b"\x00\x01" * 1024)
             assert door.receive_bytes() == b"\x00\x01" * 1024
             assert client.get("/app/state").json()["live_by"] == "TM-SARAH"

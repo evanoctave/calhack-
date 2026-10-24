@@ -86,3 +86,14 @@ def test_samples_and_mock_clone(client: TestClient) -> None:
 
 def test_app_page_served(client: TestClient) -> None:
     assert "Night watch" in client.get("/app").text
+
+
+def test_caregiver_rename_renames_tree_member(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from nightfall import api_app
+
+    monkeypatch.setattr(api_app, "_persist_household", lambda hh: None)
+    before = client.get("/app/state?member=TM-SARAH").json()["household"]["caregiver_name"]
+    client.post("/profile", json={"caregiver_name": "Evan"})
+    hh = api_app._store().hh
+    assert hh.caregiver_name == "Evan" and hh.tree[0].name == "Evan" and hh.tree[1].name == "Mike"
+    client.post("/profile", json={"caregiver_name": before})

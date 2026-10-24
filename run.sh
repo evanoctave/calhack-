@@ -17,7 +17,7 @@ case "${1:-serve}" in
     echo "places:    ${PLACES_FILE:-data/places.marina.json}"
     echo "door:      http://localhost:${PORT:-8000}   (laptop = doorbell camera + speaker)"
     echo "admin:     http://localhost:${PORT:-8000}/dashboard.html"
-    echo "phone app: $PUBLIC_URL/app?me=Sarah"
+    echo "phone app: $PUBLIC_URL/app?me=Evan"
     echo "phone:     $PUBLIC_URL/phone.html#TM-SARAH"
     exec $PY -m uvicorn nightfall.api:app --host 0.0.0.0 --port "${PORT:-8000}" ;;
   test) MOCK=1 exec $PY -m pytest -q ;;

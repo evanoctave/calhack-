@@ -26,7 +26,7 @@ def test_frame_relay_and_takeover(client: TestClient) -> None:
     r = client.post("/say", json={"member_id": "TM-SARAH", "text": "Dad, it's me. Come inside."}).json()
     assert r["ok"] and r["audio"]["mode"] == "browser_tts"
     log = client.get("/state").json()["log"]
-    assert any(e.get("line_source") == "human:Sarah" for e in log)
+    assert any(e.get("line_source") == f"human:{api.store.hh.tree[0].name}" for e in log)
     assert client.post("/takeover", json={"member_id": "TM-SARAH", "on": False}).json()["takeover_by"] is None
 
 

@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from starlette.datastructures import UploadFile
 
 from nightfall import llm, voice
+from nightfall.household import phone_env
 from nightfall.integrations import cartesia
 from nightfall.store import ROOT
 
@@ -185,7 +186,12 @@ async def profile(body: ProfileIn) -> dict[str, Any]:
     changes = {k: v for k, v in body.model_dump().items() if v is not None and k != "address"}
     if "person_age" in changes and not 0 <= changes["person_age"] <= 120:
         raise HTTPException(422, "age out of range")
+    old_name = store.hh.caregiver_name
     store.hh = replace(store.hh, **changes)
+    if changes.get("caregiver_name") and changes["caregiver_name"] != old_name:
+        # the caregiver is also a care-circle member; keep the ring and the call agent on the new name
+        tree = [replace(m, name=changes["caregiver_name"]) if m.name == old_name else m for m in store.hh.tree]
+        store.hh = replace(store.hh, tree=tuple(tree))
     geo: dict[str, Any] = {}
     if body.address and body.address.strip() and body.address.strip() != store.hh.address:
         from nightfall.api_setup import AddressIn, setup_address
@@ -218,7 +224,9 @@ def _persist_household(hh: Any) -> None:
                 "address": hh.address,
                 "home_lat": hh.home_lat,
                 "home_lng": hh.home_lng,
-                "tree": [m.__dict__ for m in hh.tree],
+                "tree": [
+                    {**m.__dict__, "phone": "web"} if os.environ.get(phone_env(m.id)) else m.__dict__ for m in hh.tree
+                ],
             }
         )
         path.write_text(json.dumps(d, indent=2) + "\n")
