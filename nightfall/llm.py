@@ -74,7 +74,7 @@ def next_line(hh: Household, history: Sequence[tuple[str, str]], hits: Sequence[
         out = anthropic_llm.complete(
             PERSONA_SYSTEM.format(caregiver=hh.caregiver_name, person=hh.person_name),
             f"{mem}\nConversation so far:\n{convo}\nNext line:",
-            max_tokens=80,
+            max_tokens=600,
         )
         line = out.strip().strip('"').splitlines()[0] if out.strip() else ""
         line = line.replace(" — ", ", ").replace("—", ", ").replace("–", ", ").replace("’", "'").strip()
@@ -102,7 +102,7 @@ def describe_clothing(jpeg: bytes | None) -> dict[str, Any]:
             bottoms=sorted(briefmod.BOTTOMS),
             footwear=sorted(briefmod.FOOTWEAR),
         )
-        out = anthropic_llm.complete(sys_prompt, "Describe the clothing. JSON only.", image_jpeg=jpeg, max_tokens=200)
+        out = anthropic_llm.complete(sys_prompt, "Describe the clothing. JSON only.", image_jpeg=jpeg, max_tokens=800)
         m = re.search(r"\{.*\}", out, re.DOTALL)
         raw = json.loads(m.group(0)) if m else {}
         return briefmod.coerce_clothing({**raw, "source": "anthropic"})
@@ -124,7 +124,7 @@ def brief_prose(fields: dict[str, Any]) -> str:
             "Rewrite the following as two plain sentences for a family member searching at night. Keep every fact, "
             "add nothing, no digits other than the time given.",
             tmpl,
-            max_tokens=120,
+            max_tokens=600,
         )
         if 20 < len(out) < 300 and not any(b in out.lower() for b in BANNED):
             return out

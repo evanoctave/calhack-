@@ -100,7 +100,7 @@ async def app_state(member: str = "") -> dict[str, Any]:
                 "reasons": list(inc.verdict().reasons),
             },
             "emergency": _emergency(store, inc),
-            "brief_link": store.link(inc.id, member) if member and inc.id in store.briefs else "",
+            "brief_link": store.link(inc.id, member) if member and hh.member(member) and inc.id in store.briefs else "",
             "exit_frame": (store.frames.get(inc.id) or [""])[-1],
             "clothing_line": store.briefs[inc.id]["clothing_line"] if inc.id in store.briefs else "",
             "clothing": store.briefs[inc.id]["clothing"] if inc.id in store.briefs else None,
@@ -351,10 +351,12 @@ async def voice_preview(body: PreviewIn) -> dict[str, Any]:
     """Claude writes a fresh redirect line for the situation; the current (cloned) voice speaks it."""
     store = _store()
     hits = [h["text"] for h in await store.memory.search(body.situation, 2)]
-    line, source = llm.next_line(store.hh, [("system", "Hi Dad, it's me."), ("person", body.situation[:200])], hits)
+    line, source = await asyncio.to_thread(
+        llm.next_line, store.hh, [("system", "Hi Dad, it's me."), ("person", body.situation[:200])], hits
+    )
     return {
         "text": line,
         "line_source": source,
-        "audio": voice.say(line, store.hh.persona),
+        "audio": await asyncio.to_thread(voice.say, line, store.hh.persona),
         "sample_lines": SAMPLE_LINES,
     }

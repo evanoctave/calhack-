@@ -7,6 +7,7 @@ dashboard; a recorded clip is relayed as-is. Rejected: WebRTC (too many moving p
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import time
 from pathlib import Path
@@ -95,7 +96,7 @@ async def door_command(body: CommandIn) -> dict[str, Any]:
     store.hub.publish("dashboard", obj)
     from nightfall.actions import emit
 
-    emit(store, {"type": "command", "cmd": body.cmd, "name": body.name, "edge": body.edge, "label": body.label})
+    emit(store, {"type": "command_log", "cmd": body.cmd, "name": body.name, "edge": body.edge, "label": body.label})
     return {"ok": True}
 
 
@@ -155,7 +156,7 @@ async def say(body: SayIn) -> dict[str, Any]:
     from nightfall.actions import emit
 
     store.history.append(("system", text))
-    ref = voice.say(text, store.hh.persona)
+    ref = await asyncio.to_thread(voice.say, text, store.hh.persona)
     emit(
         store,
         {

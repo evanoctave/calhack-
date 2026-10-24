@@ -56,7 +56,7 @@ async def setup_address(body: AddressIn) -> dict[str, Any]:
         print(f"overpass fallback: {e}")
         hz = []
     store.hh = replace(store.hh, home_lat=lat, home_lng=lng, radius_mi=body.radius_mi)
-    keep = [p for p in store.places if p["category"] not in places.HAZARD_CATS] if not body.google else []
+    keep = [p for p in store.places if p["category"] not in places.HAZARD_CATS]
     store.places = hz + keep
     _status.update({"address": name, "hazards": len(hz), "open": len(keep), "error": "", "lat": lat, "lng": lng})
     if body.google and apify.enabled():
@@ -82,7 +82,7 @@ async def _run_apify(lat: float, lng: float, radius_mi: float) -> None:
         _status["apify"] = "cancelled"
         raise
     except Exception as e:  # noqa: BLE001
-        _status.update({"apify": "failed", "error": str(e)[:200]})
+        _status.update({"apify": "failed", "error": type(e).__name__})
     store.hub.publish("dashboard", {"type": "setup", "apify": _status["apify"], "open": _status["open"]})
 
 

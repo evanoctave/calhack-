@@ -17,7 +17,7 @@ NIGHTWEAR_FEET: Final = frozenset({"barefoot", "slippers", "socks"})
 _AIR: Final = re.compile(
     r"\b(air|smoke|cigarette|trash|garbage|dog|walk the|mail|car|uber|lyft|work shift|night shift)\b", re.IGNORECASE
 )
-_SELF: Final = re.compile(r"\b(it'?s|this is|i'?m|i am)\s+([A-Z][a-z]+)\b")
+_SELF: Final = re.compile(r"\b(it'?s|this is|i'?m|i am)\s+([A-Za-z]+)\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)

@@ -76,7 +76,43 @@ def test_other_person_leaving_speaks_only() -> None:
     step(inc, Event("features", at(1), {"identity": "other", "attire_night": True}))
     step(inc, Event("person_lost", at(3)))
     tr = step(inc, Event("tick", at(3 + engine.DOOR_WAIT_S)))
-    assert inc.state == State.ESCALATING and "notify:watch_only" in tr.actions and "start_escalation" not in tr.actions
+    assert inc.state == State.WATCHING and "notify:watch_only" in tr.actions and "start_escalation" not in tr.actions
+    step(inc, Event("features", at(10), {"identity": "match"}))
+    assert inc.state == State.ESCALATING, "identity firming up to the monitored person starts the ladder"
+
+
+def test_known_other_leaving_is_not_a_wander() -> None:
+    inc = Incident("INC-1")
+    step(inc, Event("person_enter", at(0)))
+    step(inc, Event("features", at(1), {"identity": "other"}))
+    step(inc, Event("person_lost", at(3), {"direction": "exit"}))
+    tr = step(inc, Event("tick", at(3 + engine.DOOR_WAIT_S)))
+    assert inc.state == State.CLOSED and "notify:stand_down" in tr.actions and "start_escalation" not in tr.actions
+
+
+def test_homecoming_never_rings() -> None:
+    inc = Incident("INC-1")
+    tr = step(inc, Event("person_lost", at(0), {"direction": "entry", "identity": "match"}))
+    assert (
+        inc.state == State.ARMED_IDLE
+        and "start_escalation" not in tr.actions
+        and "capture_exit_frames" not in tr.actions
+    )
+
+
+def test_person_back_after_ack() -> None:
+    inc = Incident("INC-1")
+    step(inc, Event("person_enter", at(0)))
+    step(inc, Event("person_lost", at(3)))
+    step(inc, Event("tick", at(3 + engine.DOOR_WAIT_S)))
+    step(inc, Event("ack", at(30), {"member_id": "TM-SARAH"}))
+    tr = step(inc, Event("person_back", at(60)))
+    assert inc.state == State.RETURNED and "notify:returned" in tr.actions
+
+
+def test_checkin_is_case_insensitive() -> None:
+    assert parse_checkin("it's mike", NAMES, "Dad") == ("self_other", "mike")
+    assert parse_checkin("It's Mike", NAMES, "Dad")[0] == "self_other"
 
 
 def test_unknown_identity_still_rings() -> None:

@@ -24,12 +24,21 @@ ROOT = Path(__file__).resolve().parent.parent
 PUBLIC_URL = os.environ.get("PUBLIC_URL") or "http://127.0.0.1:8000"
 
 
+def places_file() -> Path:
+    """PLACES_FILE wins; else the setup page's live cache if present; else the SF Marina fixture."""
+    env = os.environ.get("PLACES_FILE")
+    if env:
+        return Path(env)
+    custom = ROOT / "data" / "places.custom.live.json"
+    return custom if custom.exists() else ROOT / "data" / "places.marina.json"
+
+
 class Store:
     """All mutable demo state."""
 
     def __init__(self) -> None:
         self.hh: Household = load(ROOT / "data" / "household.json")
-        self.places = briefmod.load_places(os.environ.get("PLACES_FILE") or ROOT / "data" / "places.marina.json")
+        self.places = briefmod.load_places(places_file())
         self.memory = Memory(self.hh)
         self.inc: engine.Incident | None = None
         self.log: list[dict[str, Any]] = []

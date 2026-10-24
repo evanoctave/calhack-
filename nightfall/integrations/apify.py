@@ -32,7 +32,8 @@ def google_places(
     }
     r = httpx.post(
         f"{BASE}/acts/{ACTOR}/run-sync-get-dataset-items",
-        params={"token": os.environ["APIFY_TOKEN"], "timeout": int(timeout_s), "format": "json"},
+        params={"timeout": int(timeout_s), "format": "json"},
+        headers={"Authorization": f"Bearer {os.environ['APIFY_TOKEN']}"},
         json=body,
         timeout=timeout_s + 30,
     )

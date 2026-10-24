@@ -86,6 +86,7 @@ function testSpeaker() { playAtDoor({url: "", text: "This is the Nightfall door 
 document.addEventListener("click", () => { if (pending) { const e = pending; pending = null; playAtDoor(e); } }, true);
 sse("/sse/dashboard", e => {
   if (e.type === "speak") playAtDoor(e);
+  if (e.type === "exit_frames_request") postFrames(e.incident_id);
   if (e.type === "command") runCommand(e);
   if (e.type === "live") { Cur.live = !!e.on; if (e.on) cutAudio("family went live"); }
   if (e.type === "takeover" || e.type === "live") { $("livepill").classList.toggle("on", !!e.on); if (e.on) $("livepill").textContent = (e.type === "live" ? "LIVE · " : "TAKEOVER · ") + e.by; }

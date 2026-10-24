@@ -10,13 +10,13 @@ Pages and scripts are served with `Cache-Control: no-store`. Anything arriving t
 | GET | `/health` | | `{ok, mock:{cartesia, anthropic, apify, twilio, moss}, now, night_mode}` |
 | GET | `/state` | | `{household, now, night_mode, ladder, door_wait_s, incident{id,state,door_opened_at,exited_at,deadline_at,acked_by}, log[], rings[]}` |
 | POST | `/arm` | `{on}` | `{night_mode}` |
-| POST | `/event` | `{kind, payload?}` kinds: `person_enter person_lost person_back features stand_down reply{text} motion door_open door_close person_seen{inside} tick close sos` | `{incident_id, from, to, rule, detail, actions}` |
+| POST | `/event` | `{kind, payload?}` (`ack` is rejected here, use `/ack`) kinds: `person_enter person_lost person_back features stand_down reply{text} motion door_open door_close person_seen{inside} tick close sos` | `{incident_id, from, to, rule, detail, actions}` |
 | POST | `/ack` | `{incident_id, member_id}` | `{ok, acked_by, first}` (403 non-member, 404) |
 | POST | `/tree` | `{name, phone:"web"|E.164, tier}` | `{member_id, phone_url, existing?}` idempotent by name |
 | GET | `/brief/{token}` | | Brief JSON (404 bad, 410 expired) |
-| GET | `/sse/dashboard` | | `state speak ring brief_ready exit_frames_request tree arm reset memory features stand_down watch_only call takeover live answered clothing voice command door visitor* home sos call_911_option returned` |
+| GET | `/sse/dashboard` | | `state speak ring takeover_skip live door setup command command_log brief_ready exit_frames_request tree arm reset memory features stand_down watch_only call takeover live answered clothing voice command door visitor* home sos call_911_option returned` |
 | GET | `/sse/phone/{member_id}` | | `ring{message,link,tier} acked returned brief_updated deadline call_911_option takeover stand_down watch_only visitor visitor_said visitor_left home sos` |
-| POST | `/reset` | | `{ok}` reseeds household, keeps faces |
+| POST | `/reset` | | `{ok}` reloads data/household.json (judge members added through the app's profile save persist there), keeps faces, rebuilds memory |
 
 Event payload fields the detector may send: `identity` (match/other/unknown), `direction` (exit/entry/unknown), `heading` (left/right/away/toward/unknown), `attire_night`, `checkin`/`who` (set by the server from a reply), `source`, `reason`.
 
@@ -59,7 +59,7 @@ Event payload fields the detector may send: `identity` (match/other/unknown), `d
 
 ## Voice agent (api_voice.py)
 
-`POST /twiml/{inc}/{member}` and `…/turn` (Twilio), `GET /agent/opening/{inc}/{member}`, `POST /agent/turn {incident_id, member_id, text}`, `POST /answer`, `POST /voice/select {voice_id, speed, emotion}`, `GET /voice/current`, `GET /voice/{sha}.wav`.
+`POST /twiml/{inc}/{member}` and `…/turn` (Twilio), `GET /agent/opening/{inc}/{member}`, `POST /agent/turn {incident_id, member_id, text}`, `POST /answer`, `GET /clips/{name}`, `POST /voice/select {voice_id, speed, emotion}`, `GET /voice/current`, `GET /voice/{sha}.wav`.
 
 ## Setup and enrollment
 
@@ -79,5 +79,6 @@ Event payload fields the detector may send: `identity` (match/other/unknown), `d
 
 `ARMED_IDLE -person_enter-> CONVERSATION -person_lost-> DOOR_OPEN -(DOOR_WAIT_S)-> ESCALATING -ack-> ACKED -close-> CLOSED`
 `ARMED_IDLE -person_lost-> DOOR_OPEN` (speaks and starts the clock in one step). `DOOR_OPEN|ESCALATING -person_back-> RETURNED`.
-`* -stand_down-> RETURNED` (care-circle member identified). `ARMED_IDLE -person_enter{direction:entry}-> VISITOR` (or `home` notice when recognized) `-person_lost-> CLOSED`.
-`* -sos-> ESCALATING` (HELP). `ESCALATING -(exit + 15 min)-> EXHAUSTED`. A fresh approach supersedes RETURNED/ACKED/EXHAUSTED and watch-only incidents.
+`CONVERSATION|DOOR_OPEN|ESCALATING|WATCHING -stand_down-> RETURNED` (care-circle member identified). `ARMED_IDLE -person_enter{direction:entry}-> VISITOR` (or `home` notice when recognized) `-person_lost-> CLOSED`.
+`ARMED_IDLE|CONVERSATION|DOOR_OPEN|RETURNED|VISITOR|WATCHING -sos-> ESCALATING` (HELP). `ESCALATING -(exit + 15 min)-> EXHAUSTED`.
+At exit the R11 band decides: ignore → CLOSED with `stand_down`; speak_only → `WATCHING` (brief, no ladder, no 911 timers; a later face match starts the ladder); escalate → ESCALATING. `ACKED|EXHAUSTED|WATCHING -person_back-> RETURNED`. A fresh approach supersedes RETURNED/ACKED/EXHAUSTED/WATCHING.

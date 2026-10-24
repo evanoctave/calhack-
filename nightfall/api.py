@@ -81,13 +81,15 @@ class ArmIn(BaseModel):
 
 async def _step(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
     async with store.lock:
-        done = (engine.State.CLOSED, engine.State.RETURNED, engine.State.ACKED, engine.State.EXHAUSTED)
-        fresh = kind in ("motion", "person_enter", "door_open", "sos")
-        watch_only = (
-            store.inc is not None
-            and store.inc.state == engine.State.ESCALATING
-            and store.inc.verdict().action != "escalate"
+        done = (
+            engine.State.CLOSED,
+            engine.State.RETURNED,
+            engine.State.ACKED,
+            engine.State.EXHAUSTED,
+            engine.State.WATCHING,
         )
+        fresh = kind in ("motion", "person_enter", "door_open", "sos")
+        watch_only = False
         if (
             store.inc is None
             or store.inc.state == engine.State.CLOSED
@@ -146,26 +148,30 @@ async def _warm_memory() -> None:
 async def _ticker() -> None:
     while True:
         await asyncio.sleep(0.5)
-        inc = store.inc
-        if inc is not None and inc.state in (
-            engine.State.CONVERSATION,
-            engine.State.DOOR_OPEN,
-            engine.State.ESCALATING,
-        ):
-            await _step("tick", {})
-        if (
-            inc is not None
-            and inc.exited_at is not None
-            and not store.call_911_sent
-            and inc.state in (engine.State.ESCALATING, engine.State.ACKED, engine.State.EXHAUSTED)
-            and (store.now() - inc.exited_at).total_seconds() >= CALL_911_S
-        ):
-            store.call_911_sent = True
-            for m in store.hh.tree:
-                store.hub.publish(
-                    f"phone:{m.id}", {"type": "call_911_option", "incident_id": inc.id, "out_of_view_s": CALL_911_S}
-                )
-            _emit(store, {"type": "call_911_option", "incident_id": inc.id})
+        try:
+            inc = store.inc
+            if inc is not None and inc.state in (
+                engine.State.CONVERSATION,
+                engine.State.DOOR_OPEN,
+                engine.State.ESCALATING,
+            ):
+                await _step("tick", {})
+            if (
+                inc is not None
+                and inc.exited_at is not None
+                and not store.call_911_sent
+                and inc.acked_by is None
+                and inc.state in (engine.State.ESCALATING, engine.State.EXHAUSTED)
+                and (store.now() - inc.exited_at).total_seconds() >= CALL_911_S
+            ):
+                store.call_911_sent = True
+                for m in store.hh.tree:
+                    store.hub.publish(
+                        f"phone:{m.id}", {"type": "call_911_option", "incident_id": inc.id, "out_of_view_s": CALL_911_S}
+                    )
+                _emit(store, {"type": "call_911_option", "incident_id": inc.id})
+        except Exception as e:  # noqa: BLE001
+            print(f"ticker: {type(e).__name__}: {e}")
 
 
 @app.get("/health")
@@ -300,10 +306,22 @@ async def reset() -> dict[str, Any]:
     store.clothing.clear()
     store.runner.rings.clear()
     store.hh = load(ROOT / "data" / "household.json")
-    store.places = briefmod.load_places(os.environ.get("PLACES_FILE") or ROOT / "data" / "places.marina.json")
+    from nightfall.store import places_file
+
+    store.places = briefmod.load_places(places_file())
     from nightfall.memory import Memory
 
+    old_memory = store.memory
     store.memory = Memory(store.hh)
+    for t in store.vision_tasks.values():
+        t.cancel()
+    store.vision_tasks.clear()
+    store.takeover_explicit, store.latest_frame_at = False, 0.0
+    try:
+        await old_memory.close()
+    except Exception as e:  # noqa: BLE001
+        print(f"memory close: {e}")
+    store.memory_task = asyncio.create_task(_warm_memory())
     store.hub.publish("dashboard", {"type": "reset"})
     return {"ok": True}
 

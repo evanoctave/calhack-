@@ -22,3 +22,4 @@ for key in (
 ):
     os.environ.pop(key, None)
 os.environ["PUBLIC_URL"] = "http://127.0.0.1:8000"
+os.environ["PLACES_FILE"] = str(ROOT / "data" / "places.marina.json")

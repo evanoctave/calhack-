@@ -38,7 +38,7 @@ async function camTick() {
     if (present && blob) { Cam.personFrames.push(blob); if (Cam.personFrames.length > 3) Cam.personFrames.shift(); }
     const now = Date.now();
     if (present) { Cam.hits++; Cam.lastSeenAt = now; trackAway(boxes, now); await checkFace(true, now); await identify(now); } else { Cam.hits = 0; Cam.heights = []; Cam.faceMisses = 0; Cam.awaySince = 0; Cam.awayLostSent = false; }
-    if (!Cam.present && Cam.hits >= 2) { Cam.present = true; camTele("person_present", boxes.map(b => Math.round(b.bbox[3]) + "px " + Math.round(b.score * 100) + "%").join(",")); await onEnter(); }
+    if (!Cam.present && Cam.hits >= 2) { Cam.present = true; Cam.presentSince = now; camTele("person_present", boxes.map(b => Math.round(b.bbox[3]) + "px " + Math.round(b.score * 100) + "%").join(",")); await onEnter(); }
     if (Cam.present && now - Cam.lastSeenAt >= Cam.lostMs) { Cam.present = false; camTele("person_absent", "no person for " + Cam.lostMs + " ms"); await onLost(); }
     const active = window.lastState && window.lastState.incident && !["CLOSED", "RETURNED", "ACKED"].includes(window.lastState.incident.state);
     if (blob && now - Cam.relayAt > (active ? 400 : 1000)) {
@@ -77,7 +77,7 @@ async function checkFace(present, now) {
   if (faces.length) { Cam.faceMisses = 0; Cam.awaySince = 0; if (Cam.awayLostSent) { Cam.awayLostSent = false; sendBack("turned back to the camera"); } return; }
   Cam.faceMisses++; if (!Cam.awaySince) Cam.awaySince = now;
   if (!Cam.awayLostSent && now - Cam.awaySince >= Cam.awayHoldMs) { Cam.awayLostSent = true; camStatus("still heading out after " + Math.round(Cam.awayHoldMs / 1000) + " s: exit clock starts"); post("/event", {kind: "person_lost", payload: {source: "face", reason: "turned away, not responding", heading: heading() === "unknown" ? "away" : heading()}}).then(() => window.refresh && refresh()); }
-  if (Cam.faceMisses >= 2 && now - Cam.awayAt > 15000) {
+  if (Cam.faceMisses >= 2 && now - Cam.awayAt > 15000 && now - (Cam.presentSince || 0) < 20000) {
     const st = window.lastState && window.lastState.incident ? window.lastState.incident.state : "";
     if (!["CONVERSATION", "DOOR_OPEN", "ESCALATING"].includes(st)) { Cam.awayAt = now; camStatus("turned away from the camera: voice starts"); post("/event", {kind: "person_enter", payload: {source: "face", reason: "turned away"}}).then(() => window.refresh && refresh()); }
   }
@@ -92,6 +92,7 @@ function heading() {
   return Math.abs(dx) > 15 ? (dx < 0 ? "left" : "right") : "unknown";
 }
 function trackAway(boxes, now) {
+  if (!boxes.length) return;
   const big = boxes.reduce((m, b) => b.bbox[3] > m.bbox[3] ? b : m, boxes[0]);
   const pt = {t: now, cx: big.bbox[0] + big.bbox[2] / 2, cy: big.bbox[1] + big.bbox[3] / 2, h: big.bbox[3]}; if (!Door.first) Door.first = pt; Cam.track.push(pt); Cam.track = Cam.track.filter(p => now - p.t < 2000);
   const h = Math.max(...boxes.map(b => b.bbox[3])); Cam.heights.push([now, h]); Cam.heights = Cam.heights.filter(([t]) => now - t < 1200);

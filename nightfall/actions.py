@@ -27,7 +27,7 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
     for a in tr.actions:
         if a == "speak:open":
             store.history = []
-            _speak(store, fill(SCRIPT["open"], store.hh), "script")
+            await _speak(store, fill(SCRIPT["open"], store.hh), "script")
         elif a == "speak:again":
             if store.takeover_by:
                 emit(store, {"type": "takeover_skip", "by": store.takeover_by})
@@ -38,8 +38,8 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
                 store.history.append(("person", reply))
                 hits = [h["text"] for h in await store.memory.search(reply, 2)]
                 emit(store, {"type": "memory", "query": reply, "hits": hits, "source": store.memory.source})
-            line, source = llm.next_line(store.hh, store.history, hits)
-            _speak(store, line, source)
+            line, source = await asyncio.to_thread(llm.next_line, store.hh, store.history, hits)
+            await _speak(store, line, source)
         elif a == "notify:stand_down":
             who = inc.checkin_who or ("another person" if inc.identity == "other" else "someone")
             for m in store.hh.tree:
@@ -54,7 +54,7 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
         elif a.startswith("speak:visitor_"):
             line = fill(SCRIPT[a.split(":")[1]], store.hh)
             store.history.append(("system", line))
-            ref = voice.say(line, "assistant")
+            ref = await asyncio.to_thread(voice.say, line, "assistant")
             emit(
                 store,
                 {
@@ -87,7 +87,7 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
         elif a == "capture_exit_frames":
             store.hub.publish("dashboard", {"type": "exit_frames_request", "incident_id": inc.id})
         elif a == "build_brief":
-            clothing = llm.describe_clothing(store.frame_bytes.get(inc.id))
+            clothing = await _clothing_now(store, inc.id)
             habits = await store.memory.search("where does he go when he leaves at night", 3)
             store.briefs[inc.id] = briefmod.build(
                 store.hh,
@@ -113,10 +113,10 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
             store.frames.pop(inc.id, None)
 
 
-def _speak(store: Store, line: str, source: str) -> None:
-    """Resolve audio for a line (Cartesia or browser TTS) and push it to the dashboard."""
+async def _speak(store: Store, line: str, source: str) -> None:
+    """Resolve audio for a line (Cartesia or browser TTS) off the event loop and push it to the dashboard."""
     store.history.append(("system", line))
-    ref = voice.say(line, store.hh.persona)
+    ref = await asyncio.to_thread(voice.say, line, store.hh.persona)
     emit(
         store,
         {

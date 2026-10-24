@@ -113,4 +113,6 @@ def hear(audio: bytes | None, typed: str | None = None) -> str:
 
 def pre_synthesize(hh: Household) -> dict[str, Any]:
     """Warm the cache for every scripted line. Returns {line_key: mode}."""
-    return {k: say(fill(v, hh))["mode"] for k, v in SCRIPT.items()}
+    return {
+        k: say(fill(v, hh), "assistant" if k.startswith("visitor_") else hh.persona)["mode"] for k, v in SCRIPT.items()
+    }

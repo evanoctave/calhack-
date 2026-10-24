@@ -6,6 +6,7 @@ the caller's words POST to /twiml/{inc}/{member}/turn -> call_agent.handle -> sp
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from xml.sax.saxutils import escape
 
@@ -120,20 +121,29 @@ async def agent_turn(body: TurnIn) -> dict[str, Any]:
     )
     if r.ack:
         await _ack(store, body.incident_id, body.member_id)
-    return {"say": r.say, "intent": r.intent, "done": r.done, "ack": r.ack, "audio": voice.say(r.say, "assistant")}
+    return {
+        "say": r.say,
+        "intent": r.intent,
+        "done": r.done,
+        "ack": r.ack,
+        "audio": await asyncio.to_thread(voice.say, r.say, "assistant"),
+    }
 
 
 @router.get("/agent/opening/{incident_id}/{member_id}")
 async def agent_opening(incident_id: str, member_id: str) -> dict[str, Any]:
     store, b, name = _ctx(incident_id, member_id)
     say = call_agent.opening(store.hh, b, name)
-    return {"say": say, "audio": voice.say(say, "assistant")}
+    return {"say": say, "audio": await asyncio.to_thread(voice.say, say, "assistant")}
 
 
 async def _ack(store: Any, incident_id: str, member_id: str) -> None:
     from nightfall.api import AckIn, ack
 
-    await ack(AckIn(incident_id=incident_id, member_id=member_id))
+    try:
+        await ack(AckIn(incident_id=incident_id, member_id=member_id))
+    except HTTPException as e:
+        print(f"ack on a superseded incident ignored: {e.detail}")
 
 
 class VoiceSelectIn(BaseModel):

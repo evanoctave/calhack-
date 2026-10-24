@@ -114,7 +114,7 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
         return Reply("Goodbye. The brief stays open on your phone.", "bye", True)
     if anthropic_llm.enabled():
         try:
-            out = anthropic_llm.complete(QA_SYSTEM.format(facts=facts(hh, brief)), t, max_tokens=120)
+            out = anthropic_llm.complete(QA_SYSTEM.format(facts=facts(hh, brief)), t, max_tokens=600)
             out = out.replace(" — ", ", ").replace("—", ", ").replace("–", ", ")
             if 0 < len(out) < 400 and not any(b in out.lower() for b in BANNED):
                 return Reply(out, "qa")

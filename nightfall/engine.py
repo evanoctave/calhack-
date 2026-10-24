@@ -23,6 +23,7 @@ class State(str, Enum):
     ARMED_IDLE = "ARMED_IDLE"
     CONVERSATION = "CONVERSATION"
     VISITOR = "VISITOR"
+    WATCHING = "WATCHING"
     DOOR_OPEN = "DOOR_OPEN"
     ESCALATING = "ESCALATING"
     ACKED = "ACKED"
@@ -194,7 +195,7 @@ def _person_lost(inc: Incident, ev: Event) -> Transition:
 def _lost_from_idle(inc: Incident, ev: Event) -> Transition:
     """Person walked out of view before any approach was seen: speak now and start the exit clock."""
     first = _motion(inc, ev)
-    if first.rule == "ignored":
+    if first.to_state != State.CONVERSATION:
         return first
     second = _person_lost(inc, ev)
     return Transition(
@@ -213,6 +214,23 @@ def _person_back_escalating(inc: Incident, ev: Event) -> Transition:
     return _t(inc, State.RETURNED, ("cancel_escalation", "notify:returned"), "R2", "person back in frame after exit")
 
 
+def _person_back_quiet(inc: Incident, ev: Event) -> Transition:
+    """Back in frame after the family answered, or while only watching: tell the phones, no ladder to cancel."""
+    inc.person_in_frame = True
+    return _t(inc, State.RETURNED, ("notify:returned",), "R2", "person back in frame")
+
+
+def _watching_features(inc: Incident, ev: Event) -> Transition:
+    """Identity firmed up while watching: a match now rings; anything else keeps watching."""
+    _absorb(inc, ev)
+    v = inc.verdict()
+    if v.action == "escalate":
+        return _t(
+            inc, State.ESCALATING, ("start_escalation",), "R2", f"now ringing; score {v.score}: " + "; ".join(v.reasons)
+        )
+    return Transition(inc.state, inc.state, (), "R11", f"watching; score {v.score}")
+
+
 def _seen_inside_conv(inc: Incident, ev: Event) -> Transition:
     if not ev.payload.get("inside", True):
         return _ignored(inc, ev, "seen but not inside")
@@ -229,15 +247,19 @@ def _door_open(inc: Incident, ev: Event) -> Transition:
 
 
 def _exit(inc: Incident, ev: Event, detail: str) -> Transition:
+    """R11 bands at the moment they leave: ignore = not a wander, speak_only = watch without ringing, else ring."""
     inc.exited_at = ev.ts
     v = inc.verdict()
+    why = "; ".join(v.reasons)
+    if v.action == "ignore":
+        return _t(inc, State.CLOSED, ("notify:stand_down",), "R11", f"{detail}; score {v.score}, not a wander: {why}")
     if v.action == "speak_only":
         return _t(
             inc,
-            State.ESCALATING,
+            State.WATCHING,
             ("build_brief", "notify:watch_only"),
             "R11",
-            f"{detail}; score {v.score}, no ring: " + "; ".join(v.reasons),
+            f"{detail}; score {v.score}, no ring: {why}",
         )
     return _t(inc, State.ESCALATING, ("build_brief", "start_escalation"), "R2", f"{detail}; score {v.score}")
 
@@ -352,6 +374,15 @@ TRANSITIONS: Final[dict[tuple[State, str], Handler]] = {
     (State.DOOR_OPEN, "person_seen"): _seen_inside_door,
     (State.DOOR_OPEN, "tick"): _tick_door,
     (State.ESCALATING, "ack"): _ack,
+    (State.ESCALATING, "close"): _close,
+    (State.ACKED, "person_back"): _person_back_quiet,
+    (State.EXHAUSTED, "person_back"): _person_back_quiet,
+    (State.WATCHING, "person_back"): _person_back_quiet,
+    (State.WATCHING, "ack"): _ack,
+    (State.WATCHING, "close"): _close,
+    (State.WATCHING, "features"): _watching_features,
+    (State.WATCHING, "stand_down"): _stand_down,
+    (State.WATCHING, "sos"): _sos,
     (State.ESCALATING, "tick"): _tick_escalating,
     (State.EXHAUSTED, "ack"): _ack,
     (State.VISITOR, "reply"): _visitor_reply,

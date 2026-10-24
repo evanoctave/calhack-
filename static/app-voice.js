@@ -56,7 +56,7 @@ function pttTap(ev) { ev.preventDefault(); recToggle($("r-ptt"), $("r-pttstat"),
 const Live = {ws: null, ctx: null, src: null, proc: null, on: false, sent: 0};
 async function liveToggle(btnId, statId) {
   const btn = $(btnId || "r-live"), stat = $(statId || "r-livestat");
-  if (Live.on) { liveStop(); btn.classList.remove("on"); btn.textContent = btn.dataset.idle || "Talk through the door"; stat.textContent = "Mic off. The door speaker is quiet."; if (incident) post("/takeover", {member_id: member, on: false}); return; }
+  if (Live.on) { liveStop(); btn.classList.remove("on"); btn.textContent = btn.dataset.idle || "Talk through the door"; stat.textContent = "Mic off. The door speaker is quiet."; return; }
   btn.dataset.idle = btn.dataset.idle || btn.textContent;
   let stream; try { stream = await micStream(); } catch (e) { stat.textContent = "Microphone blocked. Allow the mic for this site."; return; }
   const proto = location.protocol === "https:" ? "wss" : "ws"; const ws = new WebSocket(`${proto}://${location.host}/ws/talk/${member}`); ws.binaryType = "arraybuffer";

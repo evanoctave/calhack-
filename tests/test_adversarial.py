@@ -72,11 +72,9 @@ def test_arrival_then_real_approach_is_not_poisoned(client: TestClient) -> None:
     r = client.post("/event", json={"kind": "features", "payload": {"identity": "other", "attire_night": True}}).json()
     assert "score 30" in r["detail"]
     client.post("/event", json={"kind": "person_lost", "payload": {"direction": "exit"}})
-    import time
-
-    time.sleep(0.2)
+    client.post("/event", json={"kind": "door_close"})
     s = client.get("/app/state").json()
-    assert s["incident"]["wander"]["action"] == "speak_only"
+    assert s["incident"]["state"] == "WATCHING" and s["incident"]["wander"]["action"] == "speak_only" and not s["rings"]
 
 
 def test_identity_match_rings_with_reason(client: TestClient) -> None:
@@ -95,6 +93,7 @@ def test_new_approach_supersedes_watch_only_incident(client: TestClient) -> None
     client.post("/event", json={"kind": "person_lost", "payload": {"direction": "exit"}})
     client.post("/event", json={"kind": "door_close"})
     first = client.get("/state").json()["incident"]["id"]
+    assert client.get("/state").json()["incident"]["state"] in ("WATCHING", "CLOSED")
     r = client.post("/event", json={"kind": "person_enter", "payload": {"identity": "match"}}).json()
     assert r["incident_id"] != first and r["to"] == "CONVERSATION"
     client.post("/event", json={"kind": "person_lost", "payload": {"direction": "exit"}})
