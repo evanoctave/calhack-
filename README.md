@@ -19,13 +19,17 @@ Cal Hacks 13.0. See `NIGHTFALL-MASTER-PROMPT.md` for the full spec and team lane
 
 Demo knobs: `DOOR_WAIT_S=5 ESCALATION_STEP_S=10 ./run.sh` shortens the waits.
 
-## The moment (mock)
+## The moment
 
-1. Open `http://127.0.0.1:8000`. Type your name in the judge box, open the phone page link on a phone (or a second tab), tap Enable sound.
-2. Press Simulate approach (or enable the camera and walk into the right third of the frame). The browser speaks the redirect line.
-3. Press Open door, then wait 20 s (or Close door). The phone page rings and speaks the message.
-4. Tap Open brief on the phone: photo, clothing, meds, map with red hazards and green call-first pins, 15-minute clock.
-5. Tap I've got him. Rings stop. The dashboard log shows every transition with its rule id.
+1. `./run.sh demo`. Open the dashboard on the laptop, Enable camera (TensorFlow.js person detector loads). Add yourself in the judge box, open the phone link on a phone, tap Enable sound.
+2. Walk into the frame (simulating stepping out the front door). The detector fires `person_enter`; the door speaks the redirect in the caregiver voice and keeps talking every 8 s while you stay (4 lines max). Type a reply to steer it; Moss notes shape the next line.
+3. Walk out of frame for 3 s: `person_lost`, exit timer starts (5 s in demo). The clothing model reads the last frame with you in it.
+4. Phone rings. Tap Answer: live camera feed, the AI call agent's opening (time, clothing, hazards, open places), and the brief link.
+5. Tap Take over the voice: quick phrases or typed lines play at the door in the caregiver voice; hold to talk sends your real voice.
+6. Still out of view 45 s later: a Call 911 option appears on every phone (you dial, never the system). Walk back into frame: rings cancel, phones show returned.
+7. Address setup: `/setup.html` turns any address into hazards (OpenStreetMap) in seconds and open-at-night places (Apify) in a minute.
+
+Keys: `m` approach, `l` leave frame, `b` back in frame, `o`/`c` door.
 
 ## What is real vs mock
 

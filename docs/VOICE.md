@@ -31,6 +31,15 @@ Transports, same brain:
 - Phone page (mock and fallback): `GET /agent/opening/{inc}/{member}`, `POST /agent/turn` with browser speech
   recognition in and TTS or Cartesia audio out. A spoken ack calls `/ack` exactly like the button.
 
+## 2b. Human takeover
+
+When a relative taps Answer on the phone page they get the live door feed (`/cam/latest.jpg`, relayed by
+the dashboard every 400 ms) and a Take over button. `POST /takeover` pauses the AI's auto lines
+(`takeover_skip` in the log). `POST /say` speaks their typed line at the door in the caregiver voice;
+`POST /say/clip` relays a hold-to-talk recording (mp4 on iOS, webm elsewhere) untouched. Handing back
+resumes the AI. The 911 option (`call_911_option` after `CALL_911_S`, default 45 s out of view) is a
+`tel:911` link; nothing dials automatically.
+
 ## 3. Brief prose
 
 `llm.brief_prose(fields)` -> two sentences from fields; template is the mock and the fallback.
