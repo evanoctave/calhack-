@@ -147,7 +147,7 @@ function startFeed() { if (feedTimer) return; feedTimer = setInterval(() => { co
 function enableSound() { if (soundOn) return; soundOn = true; try { const a = $("ring"); a.src = ringDataUrl(); a.load(); a.volume = 1; a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {}); } catch (e) {} try { speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch (e) {} }
 function armPhone() { enableSound(); $("arm").hidden = true; try { localStorage.setItem("nf-armed", "1"); } catch (e) {} }
 let rungFor = ""; let lastRingMsg = "";
-function showIncoming(msg) { $("inc-title").textContent = ((S && S.household.person_full_name.split(" ")[0]) || "Robert") + " left home"; $("inc-msg").textContent = msg || ""; $("incoming").hidden = false; }
+function showIncoming(msg) { const first = (S && S.household.person_full_name.split(" ")[0]) || "Robert"; $("inc-title").textContent = /help button/i.test(msg || "") ? "Help button pressed at the door" : first + " left home"; $("inc-msg").textContent = msg || ""; $("incoming").hidden = false; }
 function answerFromOverlay() { $("incoming").hidden = true; answerCall(); }
 function dismissOverlay() { $("incoming").hidden = true; stopRing(); go("alert"); }
 function ringNow(incId, msg) { if (rungFor === incId) return; rungFor = incId; incident = incId; lastRingMsg = msg; startRing(); showIncoming(msg); fillIncoming(); }
@@ -157,7 +157,7 @@ function fillIncoming() {
   $("inc-wear").textContent = !c || c.source === "pending" ? "describing from the exit frame…" : (inc.clothing_line === "see photo" ? "see the exit photo" : inc.clothing_line) + " (AI-described, verify)";
   $("inc-head").textContent = headingText(inc.heading) + (inc.exited_at ? " at " + hhmm(inc.exited_at) : "");
   $("inc-911").textContent = inc.emergency ? inc.emergency.text : "not called";
-  $("inc-msg").textContent = "Exit at " + hhmm(inc.exited_at) + ". Ringing " + (S.rings.length ? S.rings[S.rings.length - 1].members.join(", ") : "you") + ".";
+  if (!/help button/i.test(lastRingMsg)) $("inc-msg").textContent = "Exit at " + hhmm(inc.exited_at) + ". Ringing " + (S.rings.length ? S.rings[S.rings.length - 1].members.join(", ") : "you") + ".";
 }
 function ringDataUrl() { const sr = 8000, len = sr * 3, buf = new Uint8Array(44 + len); const w = (o, s) => [...s].forEach((c, i) => buf[o + i] = c.charCodeAt(0)); w(0, "RIFF"); w(8, "WAVEfmt "); buf[16] = 16; buf[20] = 1; buf[22] = 1; buf[24] = sr & 255; buf[25] = sr >> 8; buf[28] = sr & 255; buf[29] = sr >> 8; buf[32] = 1; buf[34] = 8; w(36, "data"); for (let i = 0; i < len; i++) { const t = i / sr, on = (t % 1) < 0.45; buf[44 + i] = on ? 128 + Math.round(110 * Math.sin(2 * Math.PI * (t < 1.5 ? 880 : 660) * t)) : 128; } return "data:audio/wav;base64," + btoa(String.fromCharCode(...buf)); }
 function startRing() { try { $("ring").play().catch(() => {}); } catch (e) {} if (navigator.vibrate) navigator.vibrate([300, 200, 300]); }
