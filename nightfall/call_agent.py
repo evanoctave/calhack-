@@ -18,6 +18,11 @@ ACK: Final = re.compile(
     r"\b(got him|got her|found (him|her|them)|i have (him|her)|i'?ve got|he'?s (here|home|safe|with me)|she'?s (here|home|safe))\b",
     re.IGNORECASE,
 )
+RESPONDING: Final = re.compile(
+    r"\b(on my way|i'?m (going|coming|heading|leaving|out)|i'?ll (go|look|find|check|head)|going (to look|out|now)|"
+    r"heading (out|over)|leaving now|i'?m on it|i'?ll handle)\b",
+    re.IGNORECASE,
+)
 REPEAT: Final = re.compile(r"\b(repeat|again|say that|what did you say)\b", re.IGNORECASE)
 HAZARDS: Final = re.compile(
     r"\b(hazard|danger|creek|water|rail|track|freeway|highway|where (should|do) i (look|go|start))\b", re.IGNORECASE
@@ -47,15 +52,23 @@ def _names(items: list[dict[str, Any]], n: int) -> str:
     return ", ".join(p["name"] for p in items[:n]) or "none listed"
 
 
+def _wearing(hh: Household, brief: dict[str, Any]) -> str:
+    """Clothing as a spoken clause; never reads the brief's 'see photo' label aloud."""
+    line = brief["clothing_line"]
+    if not line or line == "see photo":
+        return "What he was wearing is in the photo on the brief."
+    return f"He was wearing {line}."
+
+
 def opening(hh: Household, brief: dict[str, Any], member_name: str) -> str:
     """The first thing the agent says. Facts only, from the brief, no model."""
     t = brief["last_seen_hhmm"]
     for_whom = "" if member_name == hh.caregiver_name else f" for {hh.caregiver_name}"
     return (
-        f"{member_name}, this is Nightfall calling{for_whom}. {hh.person_name} left the house at {t} "
-        f"wearing {brief['clothing_line']}. Most people are found within {brief['home']['radius_mi']:g} miles. "
+        f"{member_name}, this is Nightfall calling{for_whom}. {hh.person_name} left the house at {t}. "
+        f"{_wearing(hh, brief)} Most people are found within {brief['home']['radius_mi']:g} miles. "
         f"The nearest hazards are {_names(brief['hazards'], 2)}. Open now nearby: {_names(brief['call_first'], 2)}. "
-        f"Say I've got him to stop the other calls, or ask me a question."
+        f"Say I'm on my way to stop the other calls, or ask me a question."
     )
 
 
@@ -88,6 +101,16 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
         return Reply(
             f"Thank you. I am telling the rest of the family {hh.person_name} is safe. Goodbye.", "ack", True, True
         )
+    if RESPONDING.search(t):
+        first = brief["hazards"][0] if brief["hazards"] else None
+        where = f" Check {first['name']} first, {first['distance_mi']} miles from home." if first else ""
+        return Reply(
+            f"Thank you. I've told the family you're on it, so the other calls stop.{where} "
+            f"Say I've got him when he's safe, or ask me anything.",
+            "responding",
+            False,
+            True,
+        )
     if REPEAT.search(t):
         return Reply(opening(hh, brief, member_name), "repeat")
     if HAZARDS.search(t):
@@ -98,7 +121,7 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
             "hazards",
         )
     if CLOTHES.search(t):
-        return Reply(f"{hh.person_name} was wearing {brief['clothing_line']}. The photo is on the brief.", "clothing")
+        return Reply(f"{_wearing(hh, brief)} The photo is on the brief.", "clothing")
     if MEDS.search(t):
         meds = "; ".join(f"{m['name']} {m['dose']} {m['note']}".strip() for m in brief["medications"])
         return Reply(f"Medications on file: {meds}." if meds else "Medications were not shared for this brief.", "meds")

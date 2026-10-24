@@ -46,3 +46,15 @@ def test_qa_uses_model_only_with_facts(monkeypatch) -> None:
     monkeypatch.setattr(call_agent.anthropic_llm, "complete", fake)
     r = call_agent.handle(hh, make_brief(), "S", "is there anywhere he used to go")
     assert r.intent == "qa" and "Palace of Fine Arts" in seen["system"] and "donepezil" in seen["system"]
+
+
+def test_responding_stops_calls_but_keeps_line_open() -> None:
+    r = call_agent.handle(hh, make_brief(), "Sarah", "okay I'll go look for him")
+    assert r.intent == "responding" and r.ack and not r.done
+
+
+def test_unknown_clothing_is_not_read_as_see_photo() -> None:
+    b = make_brief()
+    b["clothing_line"] = "see photo"
+    assert "wearing see photo" not in call_agent.opening(hh, b, "Sarah")
+    assert "photo on the brief" in call_agent.handle(hh, b, "Sarah", "what was he wearing").say
