@@ -25,12 +25,14 @@ PUBLIC_URL = os.environ.get("PUBLIC_URL") or "http://127.0.0.1:8000"
 
 
 def places_file() -> Path:
-    """PLACES_FILE wins; else the setup page's live cache if present; else the SF Marina fixture."""
+    """PLACES_FILE wins; else the setup page's live cache; else the live Marina run; else the Marina fixture."""
     env = os.environ.get("PLACES_FILE")
     if env:
         return Path(env)
-    custom = ROOT / "data" / "places.custom.live.json"
-    return custom if custom.exists() else ROOT / "data" / "places.marina.json"
+    for name in ("places.custom.live.json", "places.marina.live.json"):
+        if (ROOT / "data" / name).exists():
+            return ROOT / "data" / name
+    return ROOT / "data" / "places.marina.json"
 
 
 class Store:
