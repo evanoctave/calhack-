@@ -1,4 +1,5 @@
 import asyncio
+import time
 from xml.etree import ElementTree
 
 import pytest
@@ -96,6 +97,56 @@ def test_agent_turn_json(client: TestClient) -> None:
     ).json()
     assert r["intent"] == "clothing" and "barefoot" in r["say"]
     assert client.get("/voice/../x.wav").status_code in (404, 400)
+
+
+def test_twiml_turn_keeps_cartesia_when_ready(client: TestClient, monkeypatch) -> None:
+    client.post("/event", json={"kind": "door_open"})
+    inc = client.post("/event", json={"kind": "door_close"}).json()["incident_id"]
+    monkeypatch.setattr(
+        api_voice.voice,
+        "say",
+        lambda *args, **kwargs: {"mode": "cartesia", "url": "/voice/ready.wav"},
+    )
+    response = client.post(f"/twiml/{inc}/TM-PRIMARY/turn", data={"SpeechResult": "what is he wearing"})
+    gather = ElementTree.fromstring(response.text).find("Gather")
+    assert gather.find("Play").text.endswith("/voice/ready.wav")
+
+
+def test_twiml_turn_speaks_when_cartesia_is_slow(client: TestClient, monkeypatch) -> None:
+    client.post("/event", json={"kind": "door_open"})
+    inc = client.post("/event", json={"kind": "door_close"}).json()["incident_id"]
+    monkeypatch.setattr(api_voice, "CALL_AUDIO_TIMEOUT_S", 0.005, raising=False)
+
+    def slow_synthesis(*args, **kwargs):
+        time.sleep(0.05)
+        return {"mode": "cartesia", "url": "/voice/late.wav"}
+
+    monkeypatch.setattr(api_voice.voice, "say", slow_synthesis)
+    response = client.post(f"/twiml/{inc}/TM-PRIMARY/turn", data={"SpeechResult": "what is he wearing"})
+    gather = ElementTree.fromstring(response.text).find("Gather")
+    assert gather.find("Say") is not None
+    assert "navy hoodie" in gather.find("Say").text
+    assert gather.find("Play") is None
+
+
+def test_twiml_turn_speaks_when_reasoning_is_slow(client: TestClient, monkeypatch) -> None:
+    client.post("/event", json={"kind": "door_open"})
+    inc = client.post("/event", json={"kind": "door_close"}).json()["incident_id"]
+    monkeypatch.setattr(api_voice, "CALL_REASONING_TIMEOUT_S", 0.005, raising=False)
+
+    def slow_reasoning(*args, **kwargs):
+        time.sleep(0.05)
+        return api_voice.call_agent.Reply("A late answer.", "qa")
+
+    def unexpected_synthesis(*args, **kwargs):
+        raise AssertionError("Timeout notices must not wait for speech synthesis")
+
+    monkeypatch.setattr(api_voice.call_agent, "handle", slow_reasoning)
+    monkeypatch.setattr(api_voice.voice, "say", unexpected_synthesis)
+    response = client.post(f"/twiml/{inc}/TM-PRIMARY/turn", data={"SpeechResult": "can you tell me more"})
+    gather = ElementTree.fromstring(response.text).find("Gather")
+    assert gather.find("Say") is not None and "brief" in gather.find("Say").text
+    assert gather.find("Play") is None
 
 
 async def test_twilio_notifier_falls_back_to_sse(monkeypatch) -> None:

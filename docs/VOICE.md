@@ -7,6 +7,8 @@ Three voice jobs, all behind mocks, all validated by code. The model never sets 
 - `voice.say(line, persona)` -> `AudioRef {mode, text, url, source}`. Real: Cartesia Sonic `POST /tts/bytes`
   (`Authorization: Bearer`, `Cartesia-Version: 2026-08-14`, `model_id: sonic-3`, WAV 24 kHz) cached by sha1
   in `out/voice/` (LRU 64), served at `/voice/<sha>.wav`. Mock: the dashboard speaks with SpeechSynthesis.
+  Completed audio is rewritten with finite RIFF and data lengths before caching; versioned cache keys bypass
+  older streaming WAVs whose length placeholders can break telephone playback.
 - `voice.pre_synthesize(hh)` runs at boot so the first line at the door never waits on the network.
 - `voice.hear(audio, typed)` -> text. Real: Cartesia Ink `POST /stt` (`model=ink-whisper`). Mock: the typed reply.
 - `llm.next_line(hh, history, memory_hits)` -> `(line, source)`. Real: Claude (`claude-opus-5`, override with
@@ -32,6 +34,8 @@ Transports, same brain:
   The pickup response uses `<Say voice="Polly.Joanna">` immediately, without waiting for Cartesia synthesis or an
   audio-file download. Later replies retain Cartesia, with reasoning and synthesis off the server event loop so
   one slow call does not block another call's opening or incident handling.
+  Telephone reasoning has a five-second budget and speech generation a two-second budget. Slow reasoning returns
+  a spoken brief/help prompt; slow synthesis speaks the answer with Twilio's voice and keeps listening.
 - Phone page (mock and fallback): `GET /agent/opening/{inc}/{member}`, `POST /agent/turn` with browser speech
   recognition in and TTS or Cartesia audio out. A spoken ack calls `/ack` exactly like the button.
 
