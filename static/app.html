@@ -124,5 +124,10 @@
   <a id="t-care" onclick="go('profile')"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Care</a>
 </nav>
 <audio id="ring" loop hidden></audio>
+<div id="arm" style="position:fixed;inset:0;background:linear-gradient(180deg,var(--bg1),var(--bg2));display:flex;align-items:center;justify-content:center;z-index:50;padding:24px">
+  <div class="card" style="padding:24px;max-width:360px;text-align:center"><h1 style="font-size:24px">Arm this phone</h1><p class="sub">One tap lets Nightfall ring and speak on this phone tonight.</p><button class="btn primary" onclick="armPhone()">Arm alerts</button></div></div>
+<div id="incoming" hidden style="position:fixed;inset:0;background:rgba(198,40,40,.96);color:#fff;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center">
+  <div style="font-size:14px;opacity:.85;margin-bottom:8px">Nightfall · incoming alert</div><div id="inc-title" style="font-size:30px;font-weight:700;line-height:1.15">Robert left home</div><div id="inc-msg" style="margin:14px 0 28px;opacity:.9"></div>
+  <button class="btn" style="background:#fff;color:#c62828;border:0" onclick="answerFromOverlay()">Answer</button><button class="btn" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.5)" onclick="dismissOverlay()">See the alert</button></div>
 <script src="/app-ui.js"></script><script src="/app-voice.js"></script>
 </body></html>
