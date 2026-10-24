@@ -1,43 +1,63 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Nightfall</title><link rel="stylesheet" href="/tokens.css"><script src="/app.js"></script>
+<title>Nightfall</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app.css"><script src="/app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 <script src="/cam.js"></script>
-<style>.camwrap { position: relative; width: 100%; max-width: 420px; } #cam, #overlay { width: 100%; border-radius: var(--radius); display: block; } #cam { border: 1px solid var(--border); background: #000; } #overlay { position: absolute; left: 0; top: 0; pointer-events: none; }</style>
+<style>
+body { padding: 16px 0 32px; } .phone { max-width: 1180px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 0 18px; flex-wrap: wrap; }
+h2 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; margin: 0 0 10px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.card { padding: 18px; }
+.rowb { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btn.small { margin: 0; }
+.camwrap { position: relative; width: 100%; max-width: 460px; border-radius: var(--radius); overflow: hidden; background: var(--dark-img); }
+#cam, #overlay { width: 100%; display: block; } #overlay { position: absolute; left: 0; top: 0; pointer-events: none; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: var(--glass2); border: 1px solid var(--line); color: var(--muted); }
+.pill.ok { color: var(--ok); } .pill.danger { color: var(--danger); } .pill.accent { color: var(--accent); }
+.log { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow: auto; }
+.log li { display: grid; grid-template-columns: 70px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.mono { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--muted); }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--muted); margin-right: 6px; }
+.dot.ok { background: var(--ok); } .dot.danger { background: var(--danger); } .dot.warn { background: var(--warn); } .dot.accent { background: var(--accent); }
+.state { font-size: 22px; font-weight: 600; }
+input { padding: 10px 14px; font-size: 15px; } .tabs { display: none; }
+</style>
 </head><body>
+<div class="phone">
 <header>
-  <div><h1>Nightfall</h1><div class="muted small">Night-exit guardian. Mock mode, no keys.</div></div>
-  <div class="row"><span id="clock" class="mono"></span><span id="night" class="pill"></span><button onclick="toggleTheme()">Theme</button><button onclick="reset()">Reset</button></div>
+  <div><h1 id="hdr">Night watch is on</h1><div class="sub" style="margin:0" id="hdrsub">Front entrance · door device</div></div>
+  <div class="rowb"><span id="clock" class="mono"></span><span id="night" class="pill"></span><span id="integ" class="pill"></span><a class="btn small" href="/app?me=Judge" target="_blank">Phone app</a><a class="btn small" href="/setup.html">Setup</a><a class="btn small" href="/voices.html">Voices</a><button class="btn small" onclick="toggleTheme()">Theme</button><button class="btn small" onclick="reset()">Reset</button></div>
 </header>
 <div class="grid">
   <section class="card">
     <h2>Incident</h2>
-    <div class="row" style="margin-bottom:8px"><span id="sdot" class="dot"></span><strong id="state">none</strong><span id="inc" class="mono muted"></span></div>
+    <div class="rowb" style="margin-bottom:8px"><span id="sdot" class="dot"></span><span class="state" id="state">none</span><span id="inc" class="mono"></span></div>
     <div id="detail" class="muted small">Press Simulate approach, or walk into the camera zone.</div>
     <div id="deadline" class="small muted"></div>
-    <div class="row" style="margin-top:12px">
-      <button class="primary" onclick="ev('person_enter')">Simulate approach</button>
-      <button onclick="ev('person_lost')">Simulate leaving frame</button>
-      <button onclick="ev('person_back')">Simulate back in frame</button>
-      <button onclick="ev('door_open')">Open door (o)</button>
-      <button onclick="ev('door_close')">Close door (c)</button>
-      <button onclick="ev('person_seen',{inside:true})">Person seen inside</button>
-      <button onclick="reply()">Reply (typed)</button>
-      <button onclick="ev('close')">Close incident</button>
+    <div class="rowb" style="margin-top:12px">
+      <button class="btn small primary" onclick="ev('person_enter')">Simulate approach</button>
+      <button class="btn small" onclick="ev('person_lost')">Leaves frame</button>
+      <button class="btn small" onclick="ev('person_back')">Back in frame</button>
+      <button class="btn small" onclick="ev('door_open')">Open door (o)</button>
+      <button class="btn small" onclick="ev('door_close')">Close door (c)</button>
+      <button class="btn small" onclick="ev('person_seen',{inside:true})">Seen inside</button>
+      <button class="btn small" onclick="ev('close')">Close incident</button>
     </div>
-    <div class="row" style="margin-top:8px"><input id="replytext" placeholder="What Dad says" style="flex:1"></div>
+    <div class="rowb" style="margin-top:10px"><input id="replytext" placeholder="What Dad says at the door" style="flex:1"><button class="btn small primary" onclick="reply()">Reply</button></div>
   </section>
   <section class="card">
     <h2>Camera (laptop webcam, person detection)</h2>
     <div class="camwrap"><video id="cam" autoplay muted playsinline width="320" height="240"></video><canvas id="overlay" width="320" height="240"></canvas></div>
-    <div class="row" style="margin-top:8px"><button class="primary" onclick="startCam()">Enable camera</button><span id="persondot" class="dot"></span><span id="persontxt" class="small">no person</span></div>
+    <div class="rowb" style="margin-top:10px"><button class="btn small primary" onclick="startCam()">Enable camera</button><span id="persondot" class="dot"></span><span id="persontxt" class="small">no person</span></div>
     <div id="camstat" class="muted small" style="margin-top:4px">off. Person enters frame = approach (voice starts); leaves frame 3 s = exit timer; back in frame = returned.</div>
     <div id="takeover" class="banner" hidden style="margin-top:8px"></div>
   </section>
   <section class="card">
     <h2>Family tree</h2>
-    <ul id="tree" class="list"></ul>
-    <div class="row" style="margin-top:8px"><input id="judge" placeholder="Your name (judge)"><button class="primary" onclick="addJudge()">Add me at tier 1</button></div>
+    <ul id="tree" class="list" style="padding-left:18px;margin:0"></ul>
+    <div class="rowb" style="margin-top:10px"><input id="judge" placeholder="Your name (judge)" style="flex:1"><button class="btn small primary" onclick="addJudge()">Add me at tier 1</button></div>
     <div id="judgeurl" class="small" style="margin-top:8px"></div>
   </section>
   <section class="card" style="grid-column: 1 / -1">
@@ -49,6 +69,8 @@
 let last = null;
 function render(s) {
   document.getElementById("clock").textContent = fmtTime(s.now);
+  document.getElementById("hdr").textContent = s.night_mode ? "Night watch is on" : "Night watch is off";
+  document.getElementById("hdrsub").textContent = "Watching over " + esc(s.household.person_name) + " · front entrance · " + (s.incident ? s.incident.state : "ARMED_IDLE");
   const n = document.getElementById("night"); n.textContent = s.night_mode ? "night mode on" : "night mode off"; n.className = "pill " + (s.night_mode ? "ok" : "");
   const inc = s.incident; const st = inc ? inc.state : "ARMED_IDLE";
   document.getElementById("state").textContent = st; document.getElementById("inc").textContent = inc ? inc.id : "";
@@ -80,7 +102,7 @@ async function reset() { await post("/reset"); refresh(); }
 async function addJudge() {
   const name = document.getElementById("judge").value.trim(); if (!name) return;
   const r = await post("/tree", {name, phone: "web", tier: 1});
-  document.getElementById("judgeurl").innerHTML = `Open on your phone: <a href="${esc(r.phone_url)}" target="_blank">${esc(r.phone_url)}</a>`;
+  const appUrl = r.phone_url.replace(/\/phone\.html#.*$/, "/app?me=" + encodeURIComponent(name)); document.getElementById("judgeurl").innerHTML = `Open on your phone: <a href="${esc(appUrl)}" target="_blank">${esc(appUrl)}</a> <span class="muted small">(classic page: <a href="${esc(r.phone_url)}" target="_blank">phone.html</a>)</span>`;
   refresh();
 }
 sse("/sse/dashboard", async e => {
@@ -91,4 +113,6 @@ sse("/sse/dashboard", async e => {
 });
 document.addEventListener("keydown", e => { if (e.target.tagName === "INPUT") return; if (e.key === "o") ev("door_open"); if (e.key === "c") ev("door_close"); if (e.key === "m") ev("person_enter"); if (e.key === "l") ev("person_lost"); if (e.key === "b") ev("person_back"); });
 refresh(); setInterval(refresh, 5000);
-</script></body></html>
+fetch("/health").then(r => r.json()).then(h => { const m = h.mock; const live = Object.keys(m).filter(k => !m[k]); document.getElementById("integ").textContent = live.length ? "live: " + live.join(", ") : "mock mode"; document.getElementById("integ").className = "pill " + (live.length ? "ok" : ""); });
+</script>
+</div></body></html>
