@@ -43,6 +43,7 @@ class Store:
         self.vision_tasks: dict[str, asyncio.Task[None]] = {}
         self.latest_frame_at: float = 0.0
         self.takeover_by: str | None = None
+        self.takeover_explicit: bool = False
         self.call_911_sent: bool = False
         self.voice_source: str = "clone" if os.environ.get("VOICE_IS_CLONE") == "1" else "stock"
         self.voice_name: str = os.environ.get("VOICE_NAME", "")

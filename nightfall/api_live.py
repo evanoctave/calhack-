@@ -132,6 +132,7 @@ async def ws_talk(ws: WebSocket, member_id: str) -> None:
     from nightfall.actions import emit
 
     emit(store, {"type": "live", "on": True, "by": m.name, "member_id": member_id})
+    store.hub.publish("dashboard", {"type": "live", "on": True, "by": m.name, "member_id": member_id})
     await live.status({"type": "live", "on": True, "by": m.name})
     try:
         while True:
@@ -147,7 +148,10 @@ async def ws_talk(ws: WebSocket, member_id: str) -> None:
     finally:
         if live.talker == member_id:
             live.talker = None
+        if store.takeover_by == member_id and not store.takeover_explicit:
+            store.takeover_by = None
         emit(store, {"type": "live", "on": False, "by": m.name, "member_id": member_id})
+        store.hub.publish("dashboard", {"type": "live", "on": False, "by": m.name, "member_id": member_id})
         await live.status({"type": "live", "on": False, "by": m.name})
 
 

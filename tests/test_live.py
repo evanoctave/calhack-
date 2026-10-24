@@ -57,3 +57,20 @@ def test_video_relay(client: TestClient) -> None:
             assert phone.receive_bytes().startswith(b"\xff\xd8")
         assert door.receive_json() == {"type": "watchers", "count": 0}
     assert video.door is None and not video.watchers
+
+
+def test_live_talk_pauses_ai_and_resumes_on_hangup(client: TestClient) -> None:
+    client.post("/event", json={"kind": "person_enter"})
+    with client.websocket_connect("/ws/talk/TM-SARAH") as talk:
+        talk.send_bytes(b"\x00" * 64)
+        assert api.store.takeover_by == "TM-SARAH"
+        r = client.post("/event", json={"kind": "reply", "payload": {"text": "where am I"}}).json()
+        assert "speak:again" in r["actions"]
+        assert any(e["type"] == "takeover_skip" for e in client.get("/state").json()["log"]), (
+            "AI line skipped while live"
+        )
+    assert api.store.takeover_by is None, "AI resumes when the mic closes"
+    client.post("/takeover", json={"member_id": "TM-SARAH", "on": True})
+    with client.websocket_connect("/ws/talk/TM-SARAH"):
+        pass
+    assert api.store.takeover_by == "TM-SARAH", "explicit takeover survives a live session"

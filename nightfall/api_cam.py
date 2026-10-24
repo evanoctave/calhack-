@@ -128,6 +128,7 @@ async def takeover(body: TakeoverIn) -> dict[str, Any]:
     if m is None:
         raise HTTPException(403, "not a tree member")
     store.takeover_by = body.member_id if body.on else None
+    store.takeover_explicit = body.on
     from nightfall.actions import emit
 
     emit(store, {"type": "takeover", "by": m.name if body.on else None, "member_id": body.member_id, "on": body.on})

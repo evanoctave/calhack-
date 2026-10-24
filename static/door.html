@@ -67,13 +67,16 @@ function tick() {
 setInterval(tick, 200);
 function showSpeak(who, text) { $("speakwho").textContent = who; $("speaktxt").textContent = text; $("speak").classList.add("on"); clearTimeout(showSpeak.t); showSpeak.t = setTimeout(() => $("speak").classList.remove("on"), 9000); }
 function tele(event, detail) { fetch("/door/telemetry", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({event, detail: String(detail || "")})}).catch(() => {}); }
+const Cur = {audio: null, live: false};
+function cutAudio(reason) { if (Cur.audio) { try { Cur.audio.pause(); Cur.audio.currentTime = 0; } catch (err) {} Cur.audio = null; } try { speechSynthesis.cancel(); } catch (err) {} $("speak").classList.remove("on"); tele("audio_cut", reason || ""); }
 async function playAtDoor(e) {
+  if (Cur.live && !(e.line_source || "").startsWith("human:") && e.mode !== "clip") { tele("speak_dropped_live", e.text); return; }
   const who = e.line_source && e.line_source.startsWith("human:") ? e.line_source.slice(6) + " (family)" : "Nightfall · " + (last && last.household.caregiver_name || "family") + "'s voice";
   showSpeak(who, e.mode === "clip" ? "your family member's voice" : e.text);
   if (!e.url) { tele("speak_browser_tts", e.text); speak(e.text); return; }
   try {
     const r = await fetch(e.url, {cache: "no-store"}); if (!r.ok) throw new Error("audio " + r.status);
-    const blob = await r.blob(); const a = new Audio(URL.createObjectURL(blob)); a.volume = 1;
+    const blob = await r.blob(); cutAudio("new line"); const a = new Audio(URL.createObjectURL(blob)); a.volume = 1; Cur.audio = a;
     a.onplay = () => { audioOk = true; tele("audio_playing", e.url + " " + Math.round(blob.size / 1024) + "KB"); };
     a.onended = () => tele("audio_ended", e.url);
     await a.play();
@@ -84,7 +87,8 @@ document.addEventListener("click", () => { if (pending) { const e = pending; pen
 sse("/sse/dashboard", e => {
   if (e.type === "speak") playAtDoor(e);
   if (e.type === "command") runCommand(e);
-  if (e.type === "takeover" || e.type === "live") { $("livepill").classList.toggle("on", !!e.on); if (e.on) $("livepill").textContent = "LIVE · " + e.by + " speaking"; }
+  if (e.type === "live") { Cur.live = !!e.on; if (e.on) cutAudio("family went live"); }
+  if (e.type === "takeover" || e.type === "live") { $("livepill").classList.toggle("on", !!e.on); if (e.on) $("livepill").textContent = (e.type === "live" ? "LIVE · " : "TAKEOVER · ") + e.by; }
   refresh();
 });
 async function runCommand(c) {
@@ -100,7 +104,7 @@ const Spk = {ws: null, ctx: null, t: 0};
 function doorConnect() {
   const proto = location.protocol === "https:" ? "wss" : "ws"; const ws = new WebSocket(`${proto}://${location.host}/ws/door`); ws.binaryType = "arraybuffer"; Spk.ws = ws;
   ws.onmessage = ev => {
-    if (typeof ev.data === "string") { const m = JSON.parse(ev.data); if (m.type === "live") { $("livepill").classList.toggle("on", !!m.on); if (m.on) $("livepill").textContent = "LIVE · " + m.by + " speaking through the door"; Mic.talking = !!m.on; micUpdate(); } return; }
+    if (typeof ev.data === "string") { const m = JSON.parse(ev.data); if (m.type === "live") { Cur.live = !!m.on; if (m.on) cutAudio("family went live"); $("livepill").classList.toggle("on", !!m.on); if (m.on) $("livepill").textContent = "LIVE · " + m.by + " speaking through the door"; Mic.talking = !!m.on; micUpdate(); } return; }
     if (!Spk.ctx) { Spk.ctx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 16000}); Spk.t = 0; }
     const pcm = new Int16Array(ev.data), buf = Spk.ctx.createBuffer(1, pcm.length, 16000), ch = buf.getChannelData(0);
     for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
