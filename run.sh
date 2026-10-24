@@ -9,7 +9,7 @@ PY=.venv/bin/python
 [ -f .env ] && set -a && . ./.env && set +a
 export MOCK="${MOCK:-1}"
 case "${1:-serve}" in
-  serve) exec $PY -m uvicorn nightfall.api:app --host 127.0.0.1 --port "${PORT:-8000}" ;;
+  serve) exec $PY -m uvicorn nightfall.api:app --host "${HOST:-127.0.0.1}" --port "${PORT:-8000}" ;;
   test) exec $PY -m pytest -q ;;
   check) $PY -m pytest -q && $PY -c "import nightfall.api" && echo "check: green" ;;
   *) echo "usage: ./run.sh [serve|test|check]"; exit 2 ;;
