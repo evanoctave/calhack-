@@ -1,0 +1,29 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nightfall voices</title><link rel="stylesheet" href="/tokens.css"><script src="/app.js"></script>
+<style>table { width: 100%; border-collapse: collapse; } td, th { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); } .cur { color: var(--ok); }</style>
+</head><body>
+<header><div><h1>Door voice</h1><div class="muted small">Pick the voice the house uses for the redirect lines. Replace with the caregiver's consented clone when recorded.</div></div><div class="row"><a href="/">dashboard</a><button onclick="toggleTheme()">Theme</button></div></header>
+<section class="card">
+  <div id="cur" class="small muted">current: loading</div>
+  <div class="row" style="margin-top:8px"><label class="small">speed <input id="speed" type="number" step="0.05" min="0.6" max="1.5" value="1.0" style="width:80px"></label>
+    <label class="small">emotion <select id="emotion"><option>happy</option><option>neutral</option><option>calm</option><option>content</option></select></label>
+    <span class="muted small">applies when you click Use</span></div>
+  <table style="margin-top:12px"><thead><tr><th>Voice</th><th>Natural</th><th>Warm (happy)</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+</section>
+<script>
+function $(id) { return document.getElementById(id); }
+async function load() {
+  const cur = await (await fetch("/voice/current")).json();
+  $("cur").textContent = "current: " + (cur.voice_id || "none") + " speed " + cur.speed + " emotion " + cur.emotion + (cur.mock ? " (mock mode: browser TTS)" : "");
+  $("speed").value = cur.speed; $("emotion").value = cur.emotion;
+  const idx = await (await fetch("/samples/index.json")).json();
+  const by = {}; idx.forEach(o => { (by[o.name] = by[o.name] || {id: o.id, files: {}}).files[o.variant] = o.file; });
+  $("rows").innerHTML = Object.entries(by).map(([name, v]) => `<tr${v.id === cur.voice_id ? ' class="cur"' : ''}><td>${esc(name)}</td>
+    <td>${v.files.natural ? `<button onclick="play('${esc(v.files.natural)}')">Play</button>` : ""}</td>
+    <td>${v.files.warm ? `<button onclick="play('${esc(v.files.warm)}')">Play</button>` : ""}</td>
+    <td><button class="primary" onclick="use('${esc(v.id)}')">Use</button></td></tr>`).join("");
+}
+let a = null; function play(u) { if (a) a.pause(); a = new Audio(u); a.play(); }
+async function use(id) { const r = await post("/voice/select", {voice_id: id, speed: parseFloat($("speed").value), emotion: $("emotion").value}); if (r.ok) load(); else alert(JSON.stringify(r)); }
+load();
+</script></body></html>

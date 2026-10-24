@@ -6,6 +6,7 @@ Cartesia audio and the ring action for the Twilio call agent without touching en
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from nightfall import brief as briefmod
@@ -92,3 +93,49 @@ def _speak(store: Store, line: str, source: str) -> None:
 def tr_payload(tr: engine.Transition, inc: engine.Incident, store: Store) -> dict[str, Any]:
     """The payload of the event that caused this transition (kept on the store by the API layer)."""
     return store.last_payload
+
+
+async def _clothing_now(store: Store, incident_id: str) -> dict[str, Any]:
+    """Clothing for the brief without stalling the ring: ready result, a short wait, or 'see photo'."""
+    task = store.vision_tasks.get(incident_id)
+    if task is not None and not task.done():
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout=0.8)
+        except Exception as e:  # noqa: BLE001
+            print(f"vision not ready for the ring: {type(e).__name__}")
+    if incident_id in store.clothing:
+        return store.clothing[incident_id]
+    if incident_id not in store.frame_bytes and not llm.anthropic_llm.enabled():
+        return briefmod.mock_clothing()
+    return briefmod.coerce_clothing({"confidence": 0.0, "source": "pending"})
+
+
+def start_vision(store: Store, incident_id: str) -> None:
+    """Describe the exit frame in the background; patch the brief when the result lands."""
+    if incident_id in store.vision_tasks and not store.vision_tasks[incident_id].done():
+        return
+
+    async def run() -> None:
+        try:
+            c = await asyncio.to_thread(llm.describe_clothing, store.frame_bytes.get(incident_id))
+            store.clothing[incident_id] = c
+            b = store.briefs.get(incident_id)
+            if b is not None:
+                b["clothing"], b["clothing_line"] = c, briefmod.clothing_line(c)
+                b["prose"] = briefmod.prose(store.hh, b["last_seen_hhmm"], b["clothing_line"])
+                for m in store.hh.tree:
+                    store.hub.publish(f"phone:{m.id}", {"type": "brief_updated", "incident_id": incident_id})
+            emit(
+                store,
+                {
+                    "type": "clothing",
+                    "incident_id": incident_id,
+                    "line": briefmod.clothing_line(c),
+                    "confidence": c["confidence"],
+                    "source": c["source"],
+                },
+            )
+        finally:
+            store.vision_tasks.pop(incident_id, None)
+
+    store.vision_tasks[incident_id] = asyncio.create_task(run())

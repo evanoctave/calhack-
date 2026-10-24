@@ -1,7 +1,7 @@
 // Person detection in the browser (TensorFlow.js coco-ssd), ring buffer, live relay to phones.
 // Events: person_enter (3 consecutive hits after absence), person_lost (absent LOST_S), person_back.
 const Cam = {model: null, video: null, canvas: null, ctx: null, overlay: null, octx: null, ring: [], personFrames: [],
-             present: false, hits: 0, misses: 0, lastEvent: "", lostS: 3, relayAt: 0, busy: false, on: false};
+             present: false, hits: 0, misses: 0, lastEvent: "", lostMs: 1500, lastSeenAt: 0, relayAt: 0, busy: false, on: false};
 
 function camStatus(t) { const el = document.getElementById("camstat"); if (el) el.textContent = t; }
 
@@ -14,7 +14,7 @@ async function startCam() {
   Cam.ctx = Cam.canvas.getContext("2d", {willReadFrequently: true});
   Cam.overlay = document.getElementById("overlay"); Cam.octx = Cam.overlay.getContext("2d");
   Cam.on = true; camStatus("loading detector...");
-  try { Cam.model = await cocoSsd.load({base: "lite_mobilenet_v2"}); camStatus("detector ready. walk into frame = approach; leave frame = exit."); }
+  try { Cam.model = await cocoSsd.load({base: "lite_mobilenet_v2"}); camStatus("detector ready. walk into frame = approach; out of frame 1.5 s = exit timer."); }
   catch (e) { camStatus("detector failed to load (offline?); falling back to motion"); }
   setInterval(camTick, 250);
 }
@@ -34,10 +34,10 @@ async function camTick() {
     } else present = motionFallback();
     drawBoxes(boxes, present);
     if (present && blob) { Cam.personFrames.push(blob); if (Cam.personFrames.length > 3) Cam.personFrames.shift(); }
-    if (present) { Cam.hits++; Cam.misses = 0; } else { Cam.misses++; Cam.hits = 0; }
-    if (!Cam.present && Cam.hits >= 3) { Cam.present = true; await onEnter(); }
-    if (Cam.present && Cam.misses >= Cam.lostS * 4) { Cam.present = false; await onLost(); }
     const now = Date.now();
+    if (present) { Cam.hits++; Cam.lastSeenAt = now; } else { Cam.hits = 0; }
+    if (!Cam.present && Cam.hits >= 2) { Cam.present = true; await onEnter(); }
+    if (Cam.present && now - Cam.lastSeenAt >= Cam.lostMs) { Cam.present = false; await onLost(); }
     if (blob && now - Cam.relayAt > 400 && window.lastState && window.lastState.incident && !["CLOSED"].includes(window.lastState.incident.state)) {
       Cam.relayAt = now; const fd = new FormData(); fd.append("f", blob, "f.jpg"); fetch("/cam/frame", {method: "POST", body: fd}).catch(() => {});
     }

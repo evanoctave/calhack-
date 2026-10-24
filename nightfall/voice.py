@@ -28,7 +28,8 @@ class AudioRef(TypedDict):
 
 
 def _key(text: str, voice_id: str) -> str:
-    return hashlib.sha1(f"{voice_id}|{text}".encode()).hexdigest()
+    speed, emotion = style()
+    return hashlib.sha1(f"{voice_id}|{speed}|{emotion}|{text}".encode()).hexdigest()
 
 
 def cached_path(text: str, voice_id: str) -> Path:
@@ -40,6 +41,35 @@ def _prune() -> None:
     files = sorted(OUT.glob("*.wav"), key=lambda p: p.stat().st_mtime)
     for p in files[:-LRU]:
         p.unlink(missing_ok=True)
+
+
+def style() -> tuple[float, str]:
+    """Speed and emotion for the caregiver voice; VOICE_SPEED and VOICE_EMOTION env, defaults 1.0 / happy."""
+    try:
+        speed = float(os.environ.get("VOICE_SPEED", "1.0"))
+    except ValueError:
+        speed = 1.0
+    return speed, os.environ.get("VOICE_EMOTION", "happy")
+
+
+def select(voice_id: str, speed: float, emotion: str, env_path: str | Path = ".env") -> None:
+    """Switch the caregiver voice at runtime and persist it to .env (key stays untouched)."""
+    os.environ["CARTESIA_VOICE_ID"] = voice_id
+    os.environ["VOICE_SPEED"] = str(speed)
+    os.environ["VOICE_EMOTION"] = emotion
+    path = Path(env_path)
+    if not path.exists():
+        return
+    lines = path.read_text().splitlines()
+    want = {"CARTESIA_VOICE_ID": voice_id, "VOICE_SPEED": str(speed), "VOICE_EMOTION": emotion}
+    seen: set[str] = set()
+    for i, ln in enumerate(lines):
+        k = ln.split("=", 1)[0].strip()
+        if k in want:
+            lines[i] = f"{k}={want[k]}"
+            seen.add(k)
+    lines += [f"{k}={v}" for k, v in want.items() if k not in seen]
+    path.write_text("\n".join(lines) + "\n")
 
 
 def say(text: str, persona: str = "caregiver_clone") -> AudioRef:
@@ -56,7 +86,8 @@ def say(text: str, persona: str = "caregiver_clone") -> AudioRef:
     try:
         if not path.exists():
             OUT.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(cartesia.tts_wav(text, voice_id))
+            speed, emotion = style()
+            path.write_bytes(cartesia.tts_wav(text, voice_id, speed=speed, emotion=emotion))
             _prune()
         return {"mode": "cartesia", "text": text, "url": f"/voice/{path.name}", "source": "cartesia"}
     except Exception as e:  # noqa: BLE001 - any vendor failure degrades to mock

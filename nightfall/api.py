@@ -269,6 +269,7 @@ async def reset() -> dict[str, Any]:
     store.log.clear()
     store.history, store.frame_bytes = [], {}
     store.takeover_by, store.call_911_sent, store.latest_frame = None, False, b""
+    store.clothing.clear()
     store.runner.rings.clear()
     store.hh = load(ROOT / "data" / "household.json")
     store.places = briefmod.load_places(os.environ.get("PLACES_FILE") or ROOT / "data" / "places.fullerton.json")

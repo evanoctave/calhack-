@@ -29,7 +29,7 @@ def _headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {key}", "Cartesia-Version": VERSION}
 
 
-def tts_wav(text: str, voice_id: str | None = None, speed: float = 0.9) -> bytes:
+def tts_wav(text: str, voice_id: str | None = None, speed: float = 1.0, emotion: str = "happy") -> bytes:
     """Synthesize one line to 24 kHz 16-bit WAV. Raises on any HTTP or network error."""
     vid = voice_id or os.environ.get("CARTESIA_VOICE_ID", "")
     if not vid:
@@ -40,7 +40,7 @@ def tts_wav(text: str, voice_id: str | None = None, speed: float = 0.9) -> bytes
         "voice": {"mode": "id", "id": vid},
         "output_format": {"container": "wav", "encoding": "pcm_s16le", "sample_rate": 24000},
         "language": "en",
-        "generation_config": {"speed": speed, "emotion": "calm"},
+        "generation_config": {"speed": speed, "emotion": emotion},
     }
     r = httpx.post(f"{BASE}/tts/bytes", headers=_headers(), json=body, timeout=10.0)
     r.raise_for_status()

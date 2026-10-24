@@ -136,6 +136,42 @@ async def _ack(store: Any, incident_id: str, member_id: str) -> None:
     await ack(AckIn(incident_id=incident_id, member_id=member_id))
 
 
+class VoiceSelectIn(BaseModel):
+    voice_id: str
+    speed: float = 1.0
+    emotion: str = "happy"
+
+
+@router.post("/voice/select")
+async def voice_select(body: VoiceSelectIn) -> dict[str, Any]:
+    """Switch the door voice now; re-synthesizes the script lines in the background."""
+    import asyncio
+    import os
+
+    store = _store()
+    if not 0.6 <= body.speed <= 1.5 or len(body.voice_id) < 8:
+        raise HTTPException(422, "bad voice settings")
+    voice.select(body.voice_id, body.speed, body.emotion, os.environ.get("ENV_FILE", ".env"))
+    asyncio.get_running_loop().run_in_executor(None, voice.pre_synthesize, store.hh)
+    from nightfall.actions import emit
+
+    emit(store, {"type": "voice", "voice_id": body.voice_id[:8], "speed": body.speed, "emotion": body.emotion})
+    return {"ok": True, "voice_id": body.voice_id, "speed": body.speed, "emotion": body.emotion}
+
+
+@router.get("/voice/current")
+async def voice_current() -> dict[str, Any]:
+    import os
+
+    speed, emotion = voice.style()
+    return {
+        "voice_id": os.environ.get("CARTESIA_VOICE_ID", ""),
+        "speed": speed,
+        "emotion": emotion,
+        "mock": not voice.cartesia.enabled(),
+    }
+
+
 @router.get("/voice/{name}")
 async def voice_file(name: str) -> FileResponse:
     if not name.endswith(".wav") or "/" in name or ".." in name:

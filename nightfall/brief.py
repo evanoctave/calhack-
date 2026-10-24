@@ -139,6 +139,14 @@ def build(
     }
 
 
+def prose(hh: Household, hhmm: str, line: str) -> str:
+    """Two template sentences from fields; the model never adds facts here."""
+    return (
+        f"{hh.person_name} left home at {hhmm} wearing {line}. "
+        f"Most people are found within {hh.radius_mi:g} miles; check the hazards first, then call the open places."
+    )
+
+
 def mint(incident_id: str, member_id: str, now: datetime) -> str:
     """Signed token: base64url(incident|member|exp).sig"""
     exp = int((now + TTL).timestamp())

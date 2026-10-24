@@ -175,4 +175,7 @@ async def frames(incident_id: str, request: Request) -> dict[str, Any]:
     store.frames[incident_id] = (store.frames.get(incident_id, []) + out)[-3:]
     if incident_id in store.briefs:
         store.briefs[incident_id]["exit_frames"] = store.frames[incident_id]
+    from nightfall.actions import start_vision
+
+    start_vision(store, incident_id)
     return {"frame_ids": [f"FR-{i}" for i in range(len(store.frames[incident_id]))]}

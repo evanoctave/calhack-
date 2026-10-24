@@ -39,6 +39,8 @@ class Store:
         self.last_payload: dict[str, Any] = {}
         self.frame_bytes: dict[str, bytes] = {}
         self.latest_frame: bytes = b""
+        self.clothing: dict[str, dict[str, Any]] = {}
+        self.vision_tasks: dict[str, asyncio.Task[None]] = {}
         self.latest_frame_at: float = 0.0
         self.takeover_by: str | None = None
         self.call_911_sent: bool = False
