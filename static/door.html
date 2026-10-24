@@ -67,8 +67,9 @@ function tick() {
 setInterval(tick, 200);
 function showSpeak(who, text) { $("speakwho").textContent = who; $("speaktxt").textContent = text; $("speak").classList.add("on"); clearTimeout(showSpeak.t); showSpeak.t = setTimeout(() => $("speak").classList.remove("on"), 9000); }
 function tele(event, detail) { fetch("/door/telemetry", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({event, detail: String(detail || "")})}).catch(() => {}); }
-const Cur = {audio: null, live: false};
-function cutAudio(reason) { if (Cur.audio) { try { Cur.audio.pause(); Cur.audio.currentTime = 0; } catch (err) {} Cur.audio = null; } try { speechSynthesis.cancel(); } catch (err) {} $("speak").classList.remove("on"); tele("audio_cut", reason || ""); }
+const Cur = {audio: null, src: null, live: false};
+const Out = {ctx: null};  // one AudioContext, unlocked by the Start tap; Chrome never autoplay-blocks it after that
+function cutAudio(reason) { if (Cur.src) { try { Cur.src.onended = null; Cur.src.stop(); } catch (err) {} Cur.src = null; } if (Cur.audio) { try { Cur.audio.pause(); Cur.audio.currentTime = 0; } catch (err) {} Cur.audio = null; } try { speechSynthesis.cancel(); } catch (err) {} $("speak").classList.remove("on"); tele("audio_cut", reason || ""); }
 async function playAtDoor(e) {
   if (Cur.live && !(e.line_source || "").startsWith("human:") && e.mode !== "clip") { tele("speak_dropped_live", e.text); return; }
   const who = e.line_source && e.line_source.startsWith("human:") ? e.line_source.slice(6) + " (family)" : "Nightfall · " + (last && last.household.caregiver_name || "family") + "'s voice";
@@ -76,14 +77,27 @@ async function playAtDoor(e) {
   if (!e.url) { tele("speak_browser_tts", e.text); speak(e.text); return; }
   try {
     const r = await fetch(e.url, {cache: "no-store"}); if (!r.ok) throw new Error("audio " + r.status);
-    const blob = await r.blob(); cutAudio("new line"); const a = new Audio(URL.createObjectURL(blob)); a.volume = 1; Cur.audio = a;
+    const blob = await r.blob(); cutAudio("new line");
+    if (Out.ctx) {
+      if (Out.ctx.state !== "running") await Out.ctx.resume();
+      const buf = await Out.ctx.decodeAudioData(await blob.arrayBuffer());
+      const src = Out.ctx.createBufferSource(); src.buffer = buf; src.connect(Out.ctx.destination); Cur.src = src;
+      src.onended = () => { if (Cur.src === src) Cur.src = null; tele("audio_ended", e.url); };
+      src.start(); audioOk = true; tele("audio_playing", e.url + " " + Math.round(blob.size / 1024) + "KB ctx");
+      return;
+    }
+    const a = new Audio(URL.createObjectURL(blob)); a.volume = 1; Cur.audio = a;
     a.onplay = () => { audioOk = true; tele("audio_playing", e.url + " " + Math.round(blob.size / 1024) + "KB"); };
     a.onended = () => tele("audio_ended", e.url);
     await a.play();
-  } catch (err) { pending = e; tele("audio_blocked", String(err)); $("camstat").textContent = "SPEAKER BLOCKED: click anywhere on this page"; if (e.mode !== "clip") speak(e.text); }
+  } catch (err) {
+    // One voice only: the browser voice says this line now; nothing is queued to replay on a later click.
+    tele("audio_blocked", String(err)); $("camstat").textContent = "SPEAKER BLOCKED: click anywhere on this page";
+    if (e.mode !== "clip") speak(e.text);
+  }
 }
 function testSpeaker() { playAtDoor({url: "", text: "This is the Nightfall door speaker.", mode: "browser_tts"}); post("/door/command", {cmd: "say_test"}); }
-document.addEventListener("click", () => { if (pending) { const e = pending; pending = null; playAtDoor(e); } }, true);
+document.addEventListener("click", () => { if (Out.ctx && Out.ctx.state !== "running") Out.ctx.resume(); pending = null; }, true);
 sse("/sse/dashboard", e => {
   if (e.type === "speak") playAtDoor(e);
   if (e.type === "exit_frames_request") postFrames(e.incident_id);
@@ -99,7 +113,7 @@ async function runCommand(c) {
   if (c.cmd === "say_test") speak("This is the Nightfall door speaker.");
 }
 async function sos() { await post("/event", {kind: "sos"}); showSpeak("Nightfall", "Calling the family now."); refresh(); }
-async function startDoor() { $("start").classList.add("hidden"); try { const c = new (window.AudioContext || window.webkitAudioContext)(); await c.resume(); const a = new Audio("/voice/silence.wav"); a.volume = 0.01; await a.play().catch(() => {}); } catch (e) {} tele("door_started", navigator.userAgent.slice(0, 60)); startCam(); doorConnect(); micConnect(); videoConnect(); }
+async function startDoor() { $("start").classList.add("hidden"); try { const c = new (window.AudioContext || window.webkitAudioContext)(); await c.resume(); Out.ctx = c; const a = new Audio("/voice/silence.wav"); a.volume = 0.01; await a.play().catch(() => {}); } catch (e) {} tele("door_started", navigator.userAgent.slice(0, 60)); startCam(); doorConnect(); micConnect(); videoConnect(); }
 // Live voice from the phone (PCM over /ws/door)
 const Spk = {ws: null, ctx: null, t: 0};
 function doorConnect() {
