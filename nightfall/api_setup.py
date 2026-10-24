@@ -40,7 +40,12 @@ class AddressIn(BaseModel):
 
 @router.post("/setup/address")
 async def setup_address(body: AddressIn) -> dict[str, Any]:
-    """Geocode, fetch hazards now, start the Apify run, move the household home."""
+    """Save the home and radius, then update hazards and start the optional Apify run."""
+    return await _setup_address(body)
+
+
+async def _setup_address(body: AddressIn, *, persist_household: bool = True) -> dict[str, Any]:
+    """The profile route defers persistence until its other edits can be committed together."""
     global _task
     store = _store()
     if not 0.25 < body.radius_mi <= 5:
@@ -55,7 +60,12 @@ async def setup_address(body: AddressIn) -> dict[str, Any]:
     except Exception as e:  # noqa: BLE001
         print(f"overpass fallback: {e}")
         hz = []
-    store.hh = replace(store.hh, home_lat=lat, home_lng=lng, radius_mi=body.radius_mi)
+    updated = replace(store.hh, address=body.address.strip(), home_lat=lat, home_lng=lng, radius_mi=body.radius_mi)
+    if persist_household:
+        from nightfall.api_app import _persist_household
+
+        _persist_household(updated)
+    store.hh = updated
     keep = [p for p in store.places if p["category"] not in places.HAZARD_CATS]
     store.places = hz + keep
     _status.update({"address": name, "hazards": len(hz), "open": len(keep), "error": "", "lat": lat, "lng": lng})
@@ -66,7 +76,8 @@ async def setup_address(body: AddressIn) -> dict[str, Any]:
         _task = asyncio.create_task(_run_apify(lat, lng, body.radius_mi))
     else:
         _status["apify"] = "skipped" if not body.google else "no token"
-    _save(store.places)
+    if persist_household:
+        _save(store.places)
     return {"lat": lat, "lng": lng, "display_name": name, "hazards": hz, "apify": _status["apify"]}
 
 

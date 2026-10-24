@@ -1,0 +1,79 @@
+.figure {
+  margin: 0;
+  border: 1px solid var(--glass-edge);
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.viewport {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 350/154;
+  background: #d3dfe9;
+  isolation: isolate;
+}
+.square {
+  aspect-ratio: 350/220;
+}
+.viewport .live {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  object-fit: cover;
+  display: block;
+}
+.viewport .demo {
+  position: absolute;
+  width: 127.83%;
+  max-width: none;
+  left: -12.78%;
+  top: 0;
+  transform: translateY(-30.86%);
+  height: auto;
+}
+.square .demo {
+  transform: translateY(-23.82%);
+  width: 127.83%;
+}
+.viewport .returned {
+  position: absolute;
+  width: 420.42%;
+  max-width: none;
+  left: -135.98%;
+  top: 0;
+  transform: translateY(-19.82%);
+  height: auto;
+}
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted);
+  padding: 20px;
+  text-align: center;
+  font-size: 13px;
+}
+.empty > span {
+  font-size: 30px;
+}
+.liveBadge {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  background: #11251bc9;
+  color: white;
+  border-radius: 12px;
+  font-size: 11px;
+  padding: 5px 9px;
+  z-index: 2;
+}
+.figure figcaption {
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--muted);
+}

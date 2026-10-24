@@ -38,10 +38,14 @@ CLOTHES: Final = re.compile(r"\b(wear|wearing|clothes|clothing|shoes|barefoot|ja
 CALLS: Final = re.compile(r"\b(call|phone|open|gas station|diner|hospital|police|number)\b", re.IGNORECASE)
 MEDS: Final = re.compile(r"\b(meds?|medications?|medicines?|pills?|insulin)\b", re.IGNORECASE)
 BYE: Final = re.compile(r"\b(bye|goodbye|hang up|that'?s all|thanks|thank you)\b", re.IGNORECASE)
+HELP_TIME: Final = re.compile(r"\b(when|what time|how long|minutes?|time)\b", re.IGNORECASE)
+HELP_WHERE: Final = re.compile(r"\b(where|location|gone|left|leave|missing)\b", re.IGNORECASE)
+EMERGENCY: Final = re.compile(r"\b(911|emergency)\b", re.IGNORECASE)
 
 QA_SYSTEM: Final = (
-    "You are the Nightfall assistant on a phone call with a family member whose relative with memory loss has "
-    "just left home at night. Answer like a calm, kind person on the phone: contractions, plain words, one or two short "
+    "You are the Nightfall assistant on a phone call with a family member about the alert described below. "
+    "An alert can be an exit or a Help button request; a Help request is not evidence that anyone left or is missing. "
+    "Answer like a calm, kind person on the phone: contractions, plain words, one or two short "
     "spoken sentences, using ONLY the facts "
     "below. If the facts do not contain the answer, say you do not have that and suggest they open the brief. "
     "Never invent places, times, medications or directions. Facts:\n{facts}"
@@ -81,6 +85,10 @@ def _miles(r: float) -> str:
 def _wearing(hh: Household, brief: dict[str, Any]) -> str:
     """Clothing as a spoken clause; never reads the brief's 'see photo' label aloud."""
     line = brief["clothing_line"]
+    if brief.get("cause") == "help":
+        if not line or line == "see photo":
+            return "Clothing is not confirmed. Check the door camera or photo on the brief."
+        return f"The brief describes {line}; verify against the photo."
     if not line or line == "see photo":
         return "What he was wearing is in the photo on the brief."
     parts = [p.strip() for p in line.split(",") if p.strip()]
@@ -98,6 +106,12 @@ def opening(hh: Household, brief: dict[str, Any], member_name: str) -> str:
     """The first thing the agent says. Facts only, from the brief, no model."""
     t = brief["last_seen_hhmm"]
     for_whom = "" if member_name == hh.caregiver_name else f" for {hh.caregiver_name}"
+    if brief.get("cause") == "help":
+        return (
+            f"{member_name}, this is Nightfall calling{for_whom}. Help was requested at the door at {t}. "
+            "An exit has not been confirmed. Open the door camera and check on the person there. "
+            "Say I'm on my way to stop the other calls, or ask me a question."
+        )
     hz, open_now = brief["hazards"], brief["call_first"]
     look = (
         f" Start close: check {_spoken(hz[0]['name'])} first"
@@ -116,10 +130,18 @@ def opening(hh: Household, brief: dict[str, Any], member_name: str) -> str:
 def facts(hh: Household, brief: dict[str, Any]) -> str:
     """Flat fact sheet the model may quote. Medications come from the caregiver table, never invented."""
     meds = "; ".join(f"{m['name']} {m['dose']} {m['note']}".strip() for m in brief["medications"]) or "not shared"
+    help_request = brief.get("cause") == "help"
+    event = (
+        f"Care profile: {hh.person_name}. Help requested at the door at {brief['last_seen_hhmm']}. "
+        "The button press does not confirm who pressed it, an exit, or a missing person. "
+        "Current location is not confirmed; check the door camera."
+        if help_request
+        else f"Person: {hh.person_name}. Left home at {brief['last_seen_hhmm']}. Wearing: {brief['clothing_line']}."
+    )
     return "\n".join(
         [
-            f"Person: {hh.person_name}. Left home at {brief['last_seen_hhmm']}. Wearing: {brief['clothing_line']}.",
-            f"Search radius: {brief['home']['radius_mi']:g} miles from home.",
+            event,
+            f"{'Nearby area' if help_request else 'Search radius'}: {brief['home']['radius_mi']:g} miles from home.",
             "Hazards nearest first: " + "; ".join(f"{p['name']} ({p['distance_mi']} mi)" for p in brief["hazards"]),
             "Open places to call: "
             + "; ".join(f"{p['name']} {p.get('phone', '')} ({p['distance_mi']} mi)" for p in brief["call_first"][:5]),
@@ -128,7 +150,10 @@ def facts(hh: Household, brief: dict[str, Any]) -> str:
             "Contacts: "
             + "; ".join(f"{c['name']} {c.get('phone', '')} {c.get('note', '')}".strip() for c in brief["contacts"]),
             f"Medications: {meds}.",
-            f"Call 911 after 15 minutes of searching, at {brief['deadline_hhmm']}.",
+            "No confirmed exit or search-start time. If emergency help is needed, "
+            "the caregiver can call 911; Nightfall never dials."
+            if help_request
+            else f"Call 911 after 15 minutes of searching, at {brief['deadline_hhmm']}.",
         ]
     )
 
@@ -136,26 +161,62 @@ def facts(hh: Household, brief: dict[str, Any]) -> str:
 def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) -> Reply:
     """One caller turn. Deterministic intents first, then the model, then a safe default."""
     t = text.strip()
+    help_request = brief.get("cause") == "help"
     if not t:
-        return Reply("Sorry, I didn't catch that. You can say I've got him, or ask where to look.", "silence")
+        return Reply(
+            "I did not catch that. Say I'm on my way, or ask about the help request."
+            if help_request
+            else "Sorry, I didn't catch that. You can say I've got him, or ask where to look.",
+            "silence",
+        )
     if ACK.search(t) and not (RESPONDING.search(t) and not FOUND.search(t)):  # "got it, on my way" = responding
         return Reply(
-            f"Oh, good. I'll let the rest of the family know {hh.person_name}'s safe. Goodnight.", "ack", True, True
+            "Thank you. Other family calls have stopped. Goodbye."
+            if help_request
+            else f"Oh, good. I'll let the rest of the family know {hh.person_name}'s safe. Goodnight.",
+            "ack",
+            True,
+            True,
         )
     if RESPONDING.search(t):
         first = brief["hazards"][0] if brief["hazards"] else None
         where = (
-            f" Head for {_spoken(first['name'])} first, it's {first['distance_mi']} miles from the house."
+            " Check the door camera and speak with the person there."
+            if help_request
+            else f" Head for {_spoken(first['name'])} first, it's {first['distance_mi']} miles from the house."
             if first
             else ""
         )
         say = f"Okay. I've told everyone you're on your way, so nobody else gets called.{where}"
         rest_text = RESPONDING.sub(" ", t)  # "on my way, what was he wearing?" answers the question too
-        if any(p.search(rest_text) for p in (HAZARDS, CLOTHES, MEDS, CALLS)):
+        followup_patterns = (HAZARDS, CLOTHES, MEDS, CALLS) + (
+            (HELP_TIME, HELP_WHERE, EMERGENCY) if help_request else ()
+        )
+        if any(p.search(rest_text) for p in followup_patterns):
             return Reply(f"{say} {handle(hh, brief, member_name, rest_text).say}", "responding", False, True)
-        return Reply(f"{say} Tell me when you've got him, or ask me anything.", "responding", False, True)
+        tail = (
+            "Say all set when the help request is handled, or ask me anything."
+            if help_request
+            else "Tell me when you've got him, or ask me anything."
+        )
+        return Reply(f"{say} {tail}", "responding", False, True)
     if REPEAT.search(t):
         return Reply(opening(hh, brief, member_name), "repeat")
+    if help_request and EMERGENCY.search(t):
+        return Reply(
+            "If emergency help is needed, call 911. You decide; Nightfall never calls on its own.", "emergency"
+        )
+    if help_request and HELP_TIME.search(t):
+        return Reply(
+            f"Help was requested at {brief['last_seen_hhmm']}. That is the request time, not a confirmed exit time.",
+            "time",
+        )
+    if help_request and (HELP_WHERE.search(t) or HAZARDS.search(t)):
+        return Reply(
+            "Start with the door camera and check on the person there. "
+            "The Help request does not confirm an exit or current location.",
+            "help_location",
+        )
     if HAZARDS.search(t):
         habit = brief.get("habits", [{}])[0].get("text", "") if brief.get("habits") else ""
         tail = f" One more thing from your notes: {habit}." if habit else ""
@@ -170,6 +231,13 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
         meds = "; ".join(f"{m['name']} {m['dose']} {m['note']}".strip() for m in brief["medications"])
         return Reply(f"Medications on file: {meds}." if meds else "Medications were not shared for this brief.", "meds")
     if CALLS.search(t):
+        if help_request:
+            return Reply(
+                "Your care circle is "
+                + ", ".join(m.name for m in sorted(hh.tree, key=lambda m: m.tier))
+                + ". Their contact details are on the brief.",
+                "calls",
+            )
         first = brief["call_first"][:3]
         return Reply(
             "These are open right now: "
@@ -188,5 +256,8 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
         except Exception as e:  # noqa: BLE001
             print(f"anthropic qa fallback: {e}")
     return Reply(
-        "I can tell you what he's wearing, where to look, or who's open to call. The rest is on the brief.", "unknown"
+        "I can explain the help request, share care details, or tell you who to call. Open the door camera to check in."
+        if help_request
+        else "I can tell you what he's wearing, where to look, or who's open to call. The rest is on the brief.",
+        "unknown",
     )

@@ -21,7 +21,7 @@ def client(monkeypatch, tmp_path):
 def _wav(seconds: float = 1.2) -> bytes:
     r = subprocess.run(
         [
-            "ffmpeg",
+            api_app._ffmpeg_executable(),
             "-y",
             "-loglevel",
             "error",
@@ -64,7 +64,8 @@ def test_app_state_and_profile(client: TestClient) -> None:
 
 
 @pytest.mark.skipif(
-    subprocess.run(["which", "ffmpeg"], capture_output=True, check=False).returncode != 0, reason="ffmpeg"
+    subprocess.run(["which", api_app._ffmpeg_executable()], capture_output=True, check=False).returncode != 0,
+    reason="ffmpeg",
 )
 def test_samples_and_mock_clone(client: TestClient) -> None:
     wav = _wav()
@@ -99,8 +100,10 @@ def test_caregiver_rename_renames_tree_member(client: TestClient, monkeypatch: p
     client.post("/profile", json={"caregiver_name": before})
 
 
-def test_family_ack_on_old_call_silences_new_incident(client: TestClient) -> None:
-    from nightfall import api
+def test_family_ack_on_old_call_does_not_silence_new_incident(client: TestClient, monkeypatch, tmp_path) -> None:
+    from nightfall import api, history
+
+    monkeypatch.setattr(history, "FILE", tmp_path / "history.json")
 
     for k in ("person_enter", "person_lost", "door_close"):
         client.post("/event", json={"kind": k})
@@ -108,10 +111,17 @@ def test_family_ack_on_old_call_silences_new_incident(client: TestClient) -> Non
     client.post("/event", json={"kind": "person_back"})
     client.post("/event", json={"kind": "person_enter"})  # Dad back out at the door: a new incident talks
     assert api.store.inc.id != old and api.store.inc.state.value == "CONVERSATION"
+    current = api.store.inc.id
+    quiet_before = api.store.quiet_until
+    acked_before = dict(api.store.runner.acked_by)
+    log_before = list(api.store.log)
     assert client.post("/ack", json={"incident_id": old, "member_id": "TM-SARAH"}).status_code == 404
-    assert api.store.inc.state.value == "RETURNED"
+    assert api.store.inc.id == current and api.store.inc.state.value == "CONVERSATION"
+    assert api.store.quiet_until == quiet_before
+    assert api.store.runner.acked_by == acked_before
+    assert api.store.log == log_before
     r = client.post("/event", json={"kind": "person_enter"}).json()
-    assert r.get("ignored") == "quiet after family ack"
+    assert r.get("ignored") != "quiet after family ack"
     client.post("/door/telemetry", json={"event": "door_started"})
     assert api.store.quiet_until is None
 

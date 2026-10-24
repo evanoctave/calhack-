@@ -1,0 +1,10 @@
+# Minimal local mock server. External-service SDKs are intentionally not installed here.
+# Python 3.12+. See ../requirements.txt for the team's real integration environment.
+fastapi==0.162.0
+uvicorn==0.54.0
+httpx==0.28.1
+python-multipart==0.0.32
+websockets==17.3
+
+# Includes a local audio converter when system ffmpeg is unavailable.
+imageio-ffmpeg==0.6.0
