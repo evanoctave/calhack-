@@ -56,7 +56,7 @@ R11 wander score (docs/TRACKS.md): direction from the door zone, voice check-in 
 | Reply hearing (Cartesia Ink) | same | typed reply |
 | Redirect line, clothing fields, call QA (Claude) | `ANTHROPIC_API_KEY` | scripted lines, fixture clothing |
 | Memory (Moss semantic notes) | `MOSS_PROJECT_ID` + `MOSS_PROJECT_KEY` | TF-IDF over the same notes |
-| Places (Apify Google Maps + OSM Overpass) | `APIFY_TOKEN` at setup, `scripts/run_actor.py` | Marina (SF) fixture |
+| Places: our Apify Actor [night-search-radius](https://apify.com/evanoctave/night-search-radius) (Overpass hazards + Google Maps open places) | `APIFY_TOKEN` at setup, `/setup.html` or `scripts/run_actor.py` | Marina (SF) fixture |
 | Family call (Twilio + TwiML agent) | `TWILIO_*` + `PUBLIC_URL` | phone page over SSE |
 
 `MOCK=1` forces every mock. `MOCK=0` with missing keys falls back per row and prints `<name> fallback: <reason>`.

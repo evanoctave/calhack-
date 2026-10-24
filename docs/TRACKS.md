@@ -5,7 +5,7 @@
 | Cartesia (Best Use) | `nightfall/voice.py`, `integrations/cartesia.py` | Sonic TTS speaks every redirect line at the door and every call-agent line; lines cached by hash and pre-synthesized at boot so the door never waits; Ink STT path for spoken replies | browser SpeechSynthesis |
 | Anthropic (Claude for Public Benefit) | `nightfall/llm.py`, `call_agent.py`, `integrations/anthropic_llm.py` | Three jobs: writes the next redirect line inside a template (validated, medication names blocked, scripted fallback); turns the exit frame into enumerated clothing fields; answers the relative's questions on the call from a fact sheet only | scripted lines, fixture clothing, intent-only answers |
 | Moss | `nightfall/memory.py`, `integrations/moss.py` | One semantic index per household over the caregiver's notes; hits steer the redirect line ("he thinks he's going to work"), the brief's habits section and the call agent's facts | TF-IDF over the same notes |
-| Apify | `integrations/apify.py`, `nightfall/places.py`, `scripts/run_actor.py`, `api_setup.py` | Google Maps scraper fetches open-all-night places with phones and hours around the home at setup; OSM Overpass fetches hazards; both cached to `data/places.*.live.json` | Fullerton fixture |
+| Apify (Best Use + Best Actor) | `actor/` (published Actor `evanoctave/night-search-radius`), `integrations/apify.py`, `nightfall/places.py`, `api_setup.py` | Our Actor returns hazards (Overpass), open-all-night places with phones and hours (calls the Google Maps Scraper), and familiar places with distances, for any home; the product runs it at setup and caches the result | Marina fixture |
 | Microsoft (Built for the Real World) | whole flow | Customer: family caregivers of a parent with dementia at home overnight. Measured: exit to first ring under 5 s, brief under 30 s. Production path below | |
 | Meta (Bringing People Closer) | phone tree, live feed, takeover | The relative answers, sees the door, and speaks to their parent through the house in their own voice | |
 | Best People-First | whole flow | The person at the door is never argued with, never told they have dementia; the relative decides about 911 | |
@@ -33,6 +33,14 @@ the door greets them in the neutral assistant voice ("you've reached the househo
 gets a doorbell chime with the live feed, Talk (phone mic to door speaker) and Listen (door mic to phone),
 and a transcript of what they said. The visitor incident closes when they leave or after two minutes. The
 HELP button (R12) and the night wander flow (R0-R11) are untouched by visitors.
+
+## Devpost (deadline Sun Oct 25, 9:00 AM; be at the venue by 8:00 AM)
+
+- Title: Nightfall. Tagline: Life Alert inside a doorbell camera, for families keeping a parent with dementia at home.
+- Required: project image, public GitHub repo, live or pre-recorded demo. Judging is a 3-minute pitch plus 2 minutes of questions.
+- Opt in: Best Use of Cartesia, Anthropic Claude for Public Benefit, Microsoft Built for the Real World, Best Use of Apify, Best Actor (Actor: https://apify.com/evanoctave/night-search-radius), Best Use of Moss, Best People-First Hack, Most Technically Complex, Most Creative, Meta Bringing People Closer Together.
+- Pitch spine (3 minutes): 0:00 the moment (turn away, voice, out of frame, phone rings with the brief); 0:50 answer, live feed, take over the voice; 1:20 neighbor at the door, chime not alarm; 1:40 the problem and the figures, named community; 2:10 how: Cartesia clone, Claude's three bounded jobs, Moss notes, Apify Actor, wander score; 2:45 what's real vs mock, no autonomous 911.
+- Q&A answers ready: deception and consent; false alarms (R11/R13); why not call 911; privacy (3 frames, faces as numbers); where Claude goes wrong.
 
 ## Named community (Anthropic)
 
