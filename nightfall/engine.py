@@ -108,6 +108,7 @@ def _motion(inc: Incident, ev: Event) -> Transition:
     inc.lines_spoken = 1
     inc.last_line_at = ev.ts
     inc.person_in_frame = ev.kind == "person_enter"
+    inc.identity, inc.direction, inc.checkin, inc.checkin_who = "unknown", "unknown", "none", ""
     _absorb(inc, ev)
     v = inc.verdict()
     if v.action == "ignore":
@@ -283,6 +284,7 @@ TRANSITIONS: Final[dict[tuple[State, str], Handler]] = {
     (State.DOOR_OPEN, "stand_down"): _stand_down,
     (State.ESCALATING, "stand_down"): _stand_down,
     (State.CONVERSATION, "features"): _features,
+    (State.CONVERSATION, "person_enter"): _features,
     (State.DOOR_OPEN, "features"): _features,
     (State.ARMED_IDLE, "features"): _features,
     (State.CONVERSATION, "person_lost"): _person_lost,
@@ -316,6 +318,8 @@ EVENT_KINDS: Final[frozenset[str]] = frozenset(
         "person_enter",
         "person_lost",
         "person_back",
+        "stand_down",
+        "features",
     }
 )
 

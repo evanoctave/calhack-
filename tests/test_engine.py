@@ -80,7 +80,7 @@ def test_every_pair_resolves() -> None:
             inc.door_opened_at = at(0)
             inc.exited_at = at(0)
             tr = step(inc, Event(kind, at(1), {"member_id": "x"}))
-            assert tr.rule in {"ignored", "R0", "R1", "R2", "R3", "R4", "R10"}
+            assert tr.rule in {"ignored", "R0", "R1", "R2", "R3", "R4", "R10", "R11"}
 
 
 def test_person_enter_lost_back() -> None:

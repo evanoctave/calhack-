@@ -60,3 +60,28 @@ def test_reply_naming_a_care_circle_member_stands_down(client: TestClient) -> No
     r = client.post("/event", json={"kind": "reply", "payload": {"text": "It's Mike, just getting some air"}}).json()
     assert r["to"] == "RETURNED" and "Mike" in r["detail"]
     assert client.get("/state").json()["rings"] == []
+
+
+def test_arrival_then_real_approach_is_not_poisoned(client: TestClient) -> None:
+    r = client.post("/event", json={"kind": "person_enter", "payload": {"direction": "entry"}}).json()
+    assert r["rule"] == "ignored" and "arrival" in r["detail"]
+    r = client.post("/event", json={"kind": "person_enter"}).json()
+    assert r["to"] == "CONVERSATION"
+    r = client.post("/event", json={"kind": "features", "payload": {"identity": "other", "attire_night": True}}).json()
+    assert "score 30" in r["detail"]
+    client.post("/event", json={"kind": "person_lost", "payload": {"direction": "exit"}})
+    import time
+
+    time.sleep(0.2)
+    s = client.get("/app/state").json()
+    assert s["incident"]["wander"]["action"] == "speak_only"
+
+
+def test_identity_match_rings_with_reason(client: TestClient) -> None:
+    client.post("/event", json={"kind": "person_enter", "payload": {"identity": "match"}})
+    client.post("/event", json={"kind": "person_lost", "payload": {"direction": "exit", "heading": "left"}})
+    client.post("/event", json={"kind": "door_close"})
+    s = client.get("/app/state").json()
+    w = s["incident"]["wander"]
+    assert w["score"] == 80 and w["action"] == "escalate" and any("monitored person" in r for r in w["reasons"])
+    assert s["rings"]
