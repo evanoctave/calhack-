@@ -1,0 +1,30 @@
+{
+  "incident_id": "INC-demo001",
+  "occurred_at": "2026-10-25T02:03:17-07:00",
+  "lat": 33.8704,
+  "lng": -117.9242,
+  "clothing": {
+    "top_color": "navy",
+    "top_type": "hoodie",
+    "bottom_color": "gray",
+    "bottom_type": "sweatpants",
+    "footwear": "barefoot",
+    "confidence": 0.86,
+    "source": "mock"
+  },
+  "clothing_full": {
+    "top_pattern": "solid",
+    "bottom_pattern": "solid",
+    "outerwear": "none",
+    "headwear": "none",
+    "eyewear": "glasses",
+    "build": "average",
+    "carried_items": []
+  },
+  "clothing_line": "navy hoodie, gray sweatpants, barefoot",
+  "clothing_source": "mock",
+  "snapshot_path": "out/snapshots/INC-demo001/2026-10-25T02-03-17.jpg",
+  "direction": "north",
+  "exit_side": "right",
+  "detector": "motion"
+}
