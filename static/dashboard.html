@@ -62,6 +62,7 @@ function line(e) {
   if (e.type === "state") body = `<span class="pill">${esc(e.rule)}</span> ${esc(e.from)} to <strong>${esc(e.to)}</strong> on ${esc(e.kind)}. ${esc(e.detail)}`;
   else if (e.type === "speak") body = `<span class="pill ok">voice ${esc(e.voice_source || "")}</span> "${esc(e.text)}" <span class="muted small">line: ${esc(e.line_source || "script")}</span>`;
   else if (e.type === "memory") body = `<span class="pill">memory ${esc(e.source)}</span> "${esc(e.query)}" -> ${esc((e.hits||[]).join(" | "))}`;
+  else if (e.type === "answered") body = `<span class="pill ok">answered</span> ${esc(e.by)} picked up the web call`;
   else if (e.type === "takeover") body = `<span class="pill danger">takeover</span> ${e.on ? esc(e.by) + " speaking for the AI" : "handed back to the AI"}`;
   else if (e.type === "returned") body = `<span class="pill ok">returned</span> person back in frame, rings cancelled`;
   else if (e.type === "call_911_option") body = `<span class="pill danger">911 option</span> shown on every phone`;

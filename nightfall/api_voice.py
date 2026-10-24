@@ -67,6 +67,21 @@ async def twiml_turn(incident_id: str, member_id: str, request: Request) -> Resp
     return _twiml(r.say, f"{PUBLIC_URL}/twiml/{incident_id}/{member_id}/turn", r.done)
 
 
+class AnswerIn(BaseModel):
+    incident_id: str
+    member_id: str
+
+
+@router.post("/answer")
+async def answer(body: AnswerIn) -> dict[str, Any]:
+    """A relative picked up the web call. Logged and shown on the dashboard."""
+    store, _b, name = _ctx(body.incident_id, body.member_id)
+    from nightfall.actions import emit
+
+    emit(store, {"type": "answered", "incident_id": body.incident_id, "member_id": body.member_id, "by": name})
+    return {"ok": True}
+
+
 class TurnIn(BaseModel):
     incident_id: str
     member_id: str

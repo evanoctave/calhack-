@@ -38,15 +38,23 @@
   </div>
 </section>
 <section id="agent" class="card" hidden style="margin-top:16px">
-  <h2>Nightfall agent (ask it anything from the brief)</h2>
+  <h2>On the call with the Nightfall agent <span id="callstat" class="pill"></span></h2>
   <p id="agentsay" class="muted"></p>
-  <div class="row"><button class="primary" onclick="listen()" id="listenbtn">Tap, then speak</button><input id="agenttext" placeholder="or type: where should I look?" style="flex:1"><button onclick="askTyped()">Ask</button></div>
-  <p id="heard" class="small muted"></p>
+  <div class="row"><button class="primary" onclick="listen()" id="listenbtn">Tap, then speak</button><input id="agenttext" placeholder="or type: where should I look?" style="flex:1"><button onclick="askTyped()">Ask</button><button onclick="endCall()">End call</button></div>
+  <p id="heard" class="small muted">Say "I've got him" to stop the other phones, or ask where to look, what he's wearing, who to call.</p>
 </section>
 <script>
-const member = location.hash.slice(1) || "TM-SARAH"; document.getElementById("who").textContent = "caregiver phone: " + member;
-let ctxA = null, osc = null, incident = null, feedTimer = null, rec = null, chunks = [];
+let member = location.hash.slice(1) || "TM-SARAH";
+let ctxA = null, osc = null, incident = null, feedTimer = null, rec = null, chunks = [], onCall = false, speaking = false, listening = false;
 function $(id) { return document.getElementById(id); }
+async function resolveMember() {
+  if (!member.startsWith("new:")) return;
+  const name = decodeURIComponent(member.slice(4)); let id = "";
+  try { id = localStorage.getItem("nf-member-" + name) || ""; } catch (e) {}
+  if (id) { const s = await (await fetch("/state")).json(); if (!s.household.tree.some(m => m.id === id)) id = ""; }
+  if (!id) { const r = await post("/tree", {name, phone: "web", tier: 1}); id = r.member_id; try { localStorage.setItem("nf-member-" + name, id); } catch (e) {} }
+  member = id;
+}
 function enableSound() { ctxA = new (window.AudioContext || window.webkitAudioContext)(); $("sound").hidden = true; speak("Sound enabled."); }
 function ringTone(on) {
   if (!ctxA) return;
@@ -54,8 +62,22 @@ function ringTone(on) {
   if (!on && osc) { clearInterval(osc._iv); osc.stop(); osc = null; }
 }
 function set(status, dot, msg) { $("status").textContent = status; $("dot").className = "dot " + dot; $("msg").textContent = msg || ""; }
-function playRef(audio, text) { if (audio && audio.url) { new Audio(audio.url).play().catch(() => speak(text)); } else speak(text); }
-sse("/sse/phone/" + member, e => {
+function playRef(audio, text) {
+  return new Promise(done => {
+    speaking = true; const fin = () => { speaking = false; done(); };
+    if (audio && audio.url) { const a = new Audio(audio.url); a.onended = fin; a.onerror = () => { speakThen(text, fin); }; a.play().catch(() => speakThen(text, fin)); }
+    else speakThen(text, fin);
+  });
+}
+function speakThen(text, cb) {
+  if (!("speechSynthesis" in window)) { cb(); return; }
+  const u = new SpeechSynthesisUtterance(text); u.rate = 0.95; u.onend = cb; u.onerror = cb; speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+async function main() {
+  await resolveMember(); $("who").textContent = "caregiver phone: " + member;
+  sse("/sse/phone/" + member, onEvent);
+}
+function onEvent(e) {
   if (e.type === "ring") {
     incident = e.incident_id; $("card").classList.add("ringing"); set("Ringing: tier " + e.tier, "danger", e.message);
     $("answer").hidden = false; $("brief").href = e.link; ringTone(true); if (navigator.vibrate) navigator.vibrate([300, 200, 300]); speak(e.message);
@@ -65,10 +87,23 @@ sse("/sse/phone/" + member, e => {
   if (e.type === "call_911_option") { $("e911").hidden = false; $("e911txt").textContent = "Out of view for " + e.out_of_view_s + " s and still not found. Call now if you cannot see him."; if (navigator.vibrate) navigator.vibrate([500, 200, 500]); }
   if (e.type === "deadline") { $("e911").hidden = false; $("e911txt").textContent = "15 minutes since exit. The Alzheimer's Association says call 911 now."; }
   if (e.type === "takeover") { $("tostat").textContent = e.on ? e.by + " is speaking." : "AI is speaking for you."; }
-});
-function answer() {
+}
+main();
+async function answer() {
   ringTone(false); $("answer").hidden = true; $("card").classList.remove("ringing"); set("On the line", "accent", "Live feed below. Take over the voice or let the AI keep talking.");
-  $("live").hidden = false; $("agent").hidden = false; startFeed(); openingLine();
+  $("live").hidden = false; $("agent").hidden = false; onCall = true; $("callstat").textContent = "connected"; startFeed();
+  post("/answer", {incident_id: incident, member_id: member});
+  await openingLine(); callLoop();
+}
+function endCall() { onCall = false; $("callstat").textContent = "ended"; $("heard").textContent = "Call ended. The feed and brief stay open."; }
+function callLoop() {
+  if (!onCall || speaking || listening) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) { $("callstat").textContent = "type to talk"; return; }
+  const r = new SR(); r.lang = "en-US"; r.interimResults = false; listening = true; $("callstat").textContent = "listening";
+  r.onresult = ev => { listening = false; sendTurn(ev.results[0][0].transcript); };
+  r.onend = () => { listening = false; if (onCall && !speaking) setTimeout(callLoop, 300); };
+  r.onerror = ev => { listening = false; if (ev.error === "not-allowed" || ev.error === "service-not-allowed") { onCall = false; $("callstat").textContent = "mic blocked: tap, then speak"; } };
+  try { r.start(); } catch (e) { listening = false; }
 }
 function startFeed() {
   if (feedTimer) return;
@@ -89,10 +124,11 @@ async function startRec() {
 }
 function stopRec() { if (rec && rec.state === "recording") rec.stop(); }
 const ptt = $("ptt"); ptt.addEventListener("touchstart", e => { e.preventDefault(); startRec(); }); ptt.addEventListener("touchend", e => { e.preventDefault(); stopRec(); }); ptt.addEventListener("mousedown", startRec); ptt.addEventListener("mouseup", stopRec);
-async function openingLine() { if (!incident) return; const r = await (await fetch("/agent/opening/" + incident + "/" + member)).json(); $("agentsay").textContent = r.say; playRef(r.audio, r.say); }
+async function openingLine() { if (!incident) return; const r = await (await fetch("/agent/opening/" + incident + "/" + member)).json(); $("agentsay").textContent = r.say; await playRef(r.audio, r.say); }
 async function sendTurn(text) {
   $("heard").textContent = 'You: "' + text + '"'; const r = await post("/agent/turn", {incident_id: incident, member_id: member, text});
-  $("agentsay").textContent = r.say; playRef(r.audio, r.say); if (r.ack) { set("You acknowledged by voice", "ok", "Other phones stop ringing."); }
+  $("agentsay").textContent = r.say; if (r.ack) { set("You acknowledged by voice", "ok", "Other phones stop ringing."); }
+  await playRef(r.audio, r.say); if (r.done) endCall(); else callLoop();
 }
 function listen() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) { $("heard").textContent = "Speech recognition not available here; type instead."; return; }
