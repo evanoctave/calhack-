@@ -39,7 +39,7 @@ class Store:
         self.frame_bytes: dict[str, bytes] = {}
         self.night_mode: bool = True
         self.hub = Hub()
-        notifier = TwilioNotifier(self.hub, self.link, PUBLIC_URL) if twilio.enabled() else SseNotifier(self.hub, self.link)
+        notifier = TwilioNotifier(self.hub, self.link, PUBLIC_URL, self.log) if twilio.enabled() else SseNotifier(self.hub, self.link, self.log)
         self.runner = Runner(notifier)
         self.lock = asyncio.Lock()
         self.tick_task: asyncio.Task[None] | None = None

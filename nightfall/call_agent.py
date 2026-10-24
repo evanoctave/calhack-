@@ -93,6 +93,7 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
     if anthropic_llm.enabled():
         try:
             out = anthropic_llm.complete(QA_SYSTEM.format(facts=facts(hh, brief)), t, max_tokens=120)
+            out = out.replace(" — ", ", ").replace("—", ", ").replace("–", ", ")
             if 0 < len(out) < 400 and not any(b in out.lower() for b in BANNED):
                 return Reply(out, "qa")
         except Exception as e:  # noqa: BLE001

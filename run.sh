@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 if [ ! -d .venv ]; then python3 -m venv .venv && .venv/bin/pip install -q -r requirements.txt; fi
 PY=.venv/bin/python
 [ -f .env ] && set -a && . ./.env && set +a
-export MOCK="${MOCK:-1}"
+export MOCK="${MOCK:-1}" PYTHONUNBUFFERED=1
 case "${1:-serve}" in
   serve) exec $PY -m uvicorn nightfall.api:app --host "${HOST:-127.0.0.1}" --port "${PORT:-8000}" ;;
   demo)

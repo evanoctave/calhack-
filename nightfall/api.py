@@ -221,7 +221,8 @@ async def sse_phone(member_id: str) -> StreamingResponse:
 async def reset() -> dict[str, Any]:
     if store.inc is not None:
         await store.runner.cancel(store.inc.id)
-    store.inc, store.log, store.frames, store.briefs = None, [], {}, {}
+    store.inc, store.frames, store.briefs = None, {}, {}
+    store.log.clear()
     store.history, store.frame_bytes = [], {}
     store.runner.rings.clear()
     store.hh = load(ROOT / "data" / "household.json")
