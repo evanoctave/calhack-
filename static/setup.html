@@ -1,0 +1,42 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nightfall setup</title><link rel="stylesheet" href="/tokens.css"><script src="/app.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head><body>
+<header><div><h1>Nightfall setup</h1><div class="muted small">Enter the home address. Hazards appear in seconds from OpenStreetMap; open-all-night places arrive from Apify in a minute or two.</div></div><div class="row"><a href="/">dashboard</a><button onclick="toggleTheme()">Theme</button></div></header>
+<section class="card">
+  <div class="row"><input id="addr" placeholder="e.g. 303 W Commonwealth Ave, Fullerton, CA" style="flex:2;min-width:240px"><input id="radius" type="number" step="0.25" min="0.5" max="5" value="1.5" style="width:90px"> mi
+    <label class="small"><input id="google" type="checkbox" checked> Apify open-places run</label><button class="primary" onclick="go()">Find hazards</button></div>
+  <div id="stat" class="muted small" style="margin-top:8px">idle</div>
+</section>
+<div class="grid" style="margin-top:16px">
+  <section class="card" style="grid-column: 1 / -1"><div id="map" style="height:380px"></div></section>
+  <section class="card"><h2>Check first (hazards)</h2><ul id="hz" class="list"></ul></section>
+  <section class="card"><h2>Call first (open at night) <span id="src" class="pill"></span></h2><ul id="cf" class="list"></ul></section>
+</div>
+<script>
+let map, layer; function $(id) { return document.getElementById(id); }
+function li(p, extra) { return `<li>${esc(p.name)} <span class="muted small">${p.distance_mi} mi</span> ${extra || ""}</li>`; }
+function draw(s) {
+  if (!map) { map = L.map("map"); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution: "OpenStreetMap"}).addTo(map); }
+  if (layer) layer.remove(); layer = L.layerGroup().addTo(map);
+  map.setView([s.home.lat, s.home.lng], 14);
+  L.circle([s.home.lat, s.home.lng], {radius: s.home.radius_mi * 1609.34, color: "#6b9cff", fillOpacity: 0.05}).addTo(layer);
+  L.circleMarker([s.home.lat, s.home.lng], {radius: 6, color: "#6b9cff"}).addTo(layer).bindPopup("Home");
+  const pin = (p, c) => L.circleMarker([p.lat, p.lng], {radius: 7, color: c, fillOpacity: 0.8}).addTo(layer).bindPopup(esc(p.name));
+  s.hazards_ranked.forEach(p => pin(p, "#ff6b6b")); s.call_first.forEach(p => pin(p, "#4cc17a")); s.familiar.forEach(p => pin(p, "#6b9cff"));
+  $("hz").innerHTML = s.hazards_ranked.map(p => li(p)).join("") || "<li class='muted'>none within radius</li>";
+  $("cf").innerHTML = s.call_first.map(p => li(p, (p.open_now === true ? '<span class="pill ok">open</span>' : p.open_now === false ? '<span class="pill">closed</span>' : "") + " " + esc(p.phone || ""))).join("") || "<li class='muted'>waiting for Apify</li>";
+  $("src").textContent = "src=" + s.places_source;
+  $("stat").textContent = (s.address ? s.address + ". " : "") + "hazards " + s.hazards + ", open places " + s.open + ", apify: " + s.apify + (s.error ? " (" + s.error + ")" : "");
+}
+async function status() { draw(await (await fetch("/setup/status")).json()); }
+async function go() {
+  const address = $("addr").value.trim(); if (!address) return;
+  $("stat").textContent = "geocoding and querying OpenStreetMap...";
+  const r = await fetch("/setup/address", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({address, radius_mi: parseFloat($("radius").value), google: $("google").checked})});
+  if (!r.ok) { $("stat").textContent = "error: " + ((await r.json()).detail || r.status); return; }
+  await status();
+  const poll = setInterval(async () => { const s = await (await fetch("/setup/status")).json(); draw(s); if (s.apify !== "running") clearInterval(poll); }, 5000);
+}
+status();
+</script></body></html>

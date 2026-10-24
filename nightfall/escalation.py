@@ -4,6 +4,7 @@ LADDER is (tier, seconds to wait for an ack before the next tier). Tier 3 is eve
 911 guidance. Rejected: a heap-based scheduler thread; asyncio tasks are cancellable and enough for
 one household per process.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -73,7 +74,7 @@ class Runner:
                 try:
                     await asyncio.wait_for(ack.wait(), timeout=wait)
                     return
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue
             await ack.wait()
         finally:

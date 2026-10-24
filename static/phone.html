@@ -1,38 +1,140 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Nightfall phone</title><link rel="stylesheet" href="/tokens.css"><script src="/app.js"></script>
-<style>body { max-width: 480px; } .ringing { border-color: var(--danger); } </style>
+<style>body { max-width: 480px; } .ringing { border-color: var(--danger); } #feed { width: 100%; border-radius: var(--radius); border: 1px solid var(--border); background: #000; min-height: 120px; }
+.quick button { text-align: left; } #ptt:active { background: var(--danger); color: #fff; } a.btn { text-decoration: none; }</style>
 </head><body>
 <header><div><h1>Nightfall</h1><div id="who" class="muted small">caregiver phone</div></div><button onclick="toggleTheme()">Theme</button></header>
 <section id="card" class="card">
   <div class="row" style="margin-bottom:8px"><span id="dot" class="dot ok"></span><strong id="status">Waiting. Nothing to do tonight.</strong></div>
   <p id="msg" class="muted"></p>
   <button id="sound" class="big" onclick="enableSound()">Enable sound</button>
-  <div id="actions" hidden>
-    <button class="big danger" onclick="ack()">I've got him</button>
-    <div style="height:8px"></div>
-    <a id="brief" class="big" href="#" target="_blank"><button class="big primary">Open brief</button></a>
+  <button id="answer" class="big danger" onclick="answer()" hidden>Answer</button>
+  <div id="e911" class="banner" hidden style="margin-top:8px">
+    <div id="e911txt">Out of view for a while and not acknowledged.</div>
+    <a class="btn" href="tel:911"><button class="big danger" style="margin-top:8px">Call 911</button></a>
+    <div class="small" style="margin-top:6px">You decide. Nightfall never dials on its own.</div>
   </div>
-  <div id="deadline" class="banner" hidden>15 minutes since exit. Call 911 now.</div>
+</section>
+<section id="live" class="card" hidden style="margin-top:16px">
+  <h2>Live camera at the door <span id="feedage" class="muted small"></span></h2>
+  <img id="feed" alt="live feed">
+  <div class="row" style="margin-top:8px">
+    <button id="tobtn" class="primary" onclick="toggleTakeover()">Take over the voice</button>
+    <span id="tostat" class="muted small">AI is speaking for you.</span>
+  </div>
+  <div id="takeover" hidden style="margin-top:8px">
+    <div class="quick row">
+      <button onclick="sayText(this.textContent)">Dad, it's me. Come back inside, I'm on my way.</button>
+      <button onclick="sayText(this.textContent)">Wait right there by the door. I'll be two minutes.</button>
+      <button onclick="sayText(this.textContent)">Everything's okay. Let's go sit down, I'm coming.</button>
+    </div>
+    <div class="row" style="margin-top:8px"><input id="saytext" placeholder="type what to say in your voice" style="flex:1"><button class="primary" onclick="sayTyped()">Say</button></div>
+    <div class="row" style="margin-top:8px"><button id="ptt" class="big">Hold to talk (your real voice)</button></div>
+    <div id="pttstat" class="small muted"></div>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <a id="brief" class="btn" href="#" target="_blank"><button class="primary">Open brief</button></a>
+    <button class="danger" onclick="ack()">I've got him</button>
+  </div>
+</section>
+<section id="agent" class="card" hidden style="margin-top:16px">
+  <h2>On the call with the Nightfall agent <span id="callstat" class="pill"></span></h2>
+  <p id="agentsay" class="muted"></p>
+  <div class="row"><button class="primary" onclick="listen()" id="listenbtn">Tap, then speak</button><input id="agenttext" placeholder="or type: where should I look?" style="flex:1"><button onclick="askTyped()">Ask</button><button onclick="endCall()">End call</button></div>
+  <p id="heard" class="small muted">Say "I've got him" to stop the other phones, or ask where to look, what he's wearing, who to call.</p>
 </section>
 <script>
-const member = location.hash.slice(1) || "TM-SARAH"; document.getElementById("who").textContent = "caregiver phone: " + member;
-let ctxA = null, osc = null, incident = null, soundOn = false;
-function enableSound() { ctxA = new (window.AudioContext || window.webkitAudioContext)(); soundOn = true; document.getElementById("sound").hidden = true; speak("Sound enabled."); }
+let member = location.hash.slice(1) || "TM-SARAH";
+let ctxA = null, osc = null, incident = null, feedTimer = null, rec = null, chunks = [], onCall = false, speaking = false, listening = false;
+function $(id) { return document.getElementById(id); }
+async function resolveMember() {
+  if (!member.startsWith("new:")) return;
+  const name = decodeURIComponent(member.slice(4)); let id = "";
+  try { id = localStorage.getItem("nf-member-" + name) || ""; } catch (e) {}
+  if (id) { const s = await (await fetch("/state")).json(); if (!s.household.tree.some(m => m.id === id)) id = ""; }
+  if (!id) { const r = await post("/tree", {name, phone: "web", tier: 1}); id = r.member_id; try { localStorage.setItem("nf-member-" + name, id); } catch (e) {} }
+  member = id;
+}
+function enableSound() { ctxA = new (window.AudioContext || window.webkitAudioContext)(); $("sound").hidden = true; speak("Sound enabled."); }
 function ringTone(on) {
   if (!ctxA) return;
   if (on && !osc) { osc = ctxA.createOscillator(); const g = ctxA.createGain(); g.gain.value = 0.15; osc.frequency.value = 880; osc.connect(g); g.connect(ctxA.destination); osc.start(); let hi = true; osc._iv = setInterval(() => { hi = !hi; osc.frequency.value = hi ? 880 : 660; }, 400); }
   if (!on && osc) { clearInterval(osc._iv); osc.stop(); osc = null; }
 }
-function set(status, dot, msg) { document.getElementById("status").textContent = status; document.getElementById("dot").className = "dot " + dot; document.getElementById("msg").textContent = msg || ""; }
-sse("/sse/phone/" + member, e => {
+function set(status, dot, msg) { $("status").textContent = status; $("dot").className = "dot " + dot; $("msg").textContent = msg || ""; }
+function playRef(audio, text) {
+  return new Promise(done => {
+    speaking = true; const fin = () => { speaking = false; done(); };
+    if (audio && audio.url) { const a = new Audio(audio.url); a.onended = fin; a.onerror = () => { speakThen(text, fin); }; a.play().catch(() => speakThen(text, fin)); }
+    else speakThen(text, fin);
+  });
+}
+function speakThen(text, cb) {
+  if (!("speechSynthesis" in window)) { cb(); return; }
+  const u = new SpeechSynthesisUtterance(text); u.rate = 0.95; u.onend = cb; u.onerror = cb; speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+async function main() {
+  await resolveMember(); $("who").textContent = "caregiver phone: " + member;
+  sse("/sse/phone/" + member, onEvent);
+}
+function onEvent(e) {
   if (e.type === "ring") {
-    incident = e.incident_id; document.getElementById("card").classList.add("ringing");
-    set("Ringing: tier " + e.tier, "danger", e.message);
-    document.getElementById("actions").hidden = false; document.getElementById("brief").href = e.link;
-    ringTone(true); if (navigator.vibrate) navigator.vibrate([300, 200, 300]); speak(e.message);
+    incident = e.incident_id; $("card").classList.add("ringing"); set("Ringing: tier " + e.tier, "danger", e.message);
+    $("answer").hidden = false; $("brief").href = e.link; ringTone(true); if (navigator.vibrate) navigator.vibrate([300, 200, 300]); speak(e.message);
   }
-  if (e.type === "acked") { ringTone(false); document.getElementById("card").classList.remove("ringing"); set("Acknowledged by " + e.by, "ok", "No further rings."); }
-  if (e.type === "deadline") document.getElementById("deadline").hidden = false;
-});
+  if (e.type === "acked") { ringTone(false); $("card").classList.remove("ringing"); set("Acknowledged by " + e.by, "ok", "No further rings."); }
+  if (e.type === "returned") { ringTone(false); $("card").classList.remove("ringing"); set("He is back in frame", "ok", "Rings cancelled. Keep watching the feed."); $("e911").hidden = true; }
+  if (e.type === "call_911_option") { $("e911").hidden = false; $("e911txt").textContent = "Out of view for " + e.out_of_view_s + " s and still not found. Call now if you cannot see him."; if (navigator.vibrate) navigator.vibrate([500, 200, 500]); }
+  if (e.type === "deadline") { $("e911").hidden = false; $("e911txt").textContent = "15 minutes since exit. The Alzheimer's Association says call 911 now."; }
+  if (e.type === "takeover") { $("tostat").textContent = e.on ? e.by + " is speaking." : "AI is speaking for you."; }
+}
+main();
+async function answer() {
+  ringTone(false); $("answer").hidden = true; $("card").classList.remove("ringing"); set("On the line", "accent", "Live feed below. Take over the voice or let the AI keep talking.");
+  $("live").hidden = false; $("agent").hidden = false; onCall = true; $("callstat").textContent = "connected"; startFeed();
+  post("/answer", {incident_id: incident, member_id: member});
+  await openingLine(); callLoop();
+}
+function endCall() { onCall = false; $("callstat").textContent = "ended"; $("heard").textContent = "Call ended. The feed and brief stay open."; }
+function callLoop() {
+  if (!onCall || speaking || listening) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) { $("callstat").textContent = "type to talk"; return; }
+  const r = new SR(); r.lang = "en-US"; r.interimResults = false; listening = true; $("callstat").textContent = "listening";
+  r.onresult = ev => { listening = false; sendTurn(ev.results[0][0].transcript); };
+  r.onend = () => { listening = false; if (onCall && !speaking) setTimeout(callLoop, 300); };
+  r.onerror = ev => { listening = false; if (ev.error === "not-allowed" || ev.error === "service-not-allowed") { onCall = false; $("callstat").textContent = "mic blocked: tap, then speak"; } };
+  try { r.start(); } catch (e) { listening = false; }
+}
+function startFeed() {
+  if (feedTimer) return;
+  feedTimer = setInterval(() => { const img = $("feed"); const u = "/cam/latest.jpg?t=" + Date.now(); const probe = new Image(); probe.onload = () => { img.src = u; $("feedage").textContent = "live"; }; probe.onerror = () => { $("feedage").textContent = "no frame (enable the camera on the laptop)"; }; probe.src = u; }, 400);
+}
+async function toggleTakeover() {
+  const on = $("takeover").hidden;
+  await post("/takeover", {member_id: member, on});
+  $("takeover").hidden = !on; $("tobtn").textContent = on ? "Hand back to the AI" : "Take over the voice";
+  $("tostat").textContent = on ? "You are speaking. Typed lines play at the door in the caregiver voice." : "AI is speaking for you.";
+}
+async function sayText(t) { const r = await post("/say", {member_id: member, text: t}); $("pttstat").textContent = r.ok ? "Played at the door (" + r.audio.source + ")." : "Failed."; }
+async function sayTyped() { const t = $("saytext").value.trim(); if (t) { $("saytext").value = ""; sayText(t); } }
+async function startRec() {
+  try { const s = await navigator.mediaDevices.getUserMedia({audio: true}); const mt = MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "audio/webm"; rec = new MediaRecorder(s, {mimeType: mt}); chunks = []; rec.ondataavailable = e => chunks.push(e.data);
+    rec.onstop = async () => { s.getTracks().forEach(t => t.stop()); const blob = new Blob(chunks, {type: mt}); const fd = new FormData(); fd.append("member_id", member); fd.append("clip", blob, "clip." + (mt.includes("mp4") ? "mp4" : "webm")); const r = await fetch("/say/clip", {method: "POST", body: fd}); $("pttstat").textContent = r.ok ? "Your voice played at the door." : "Clip failed."; };
+    rec.start(); $("pttstat").textContent = "Recording... release to send."; } catch (e) { $("pttstat").textContent = "Microphone not available; type instead."; }
+}
+function stopRec() { if (rec && rec.state === "recording") rec.stop(); }
+const ptt = $("ptt"); ptt.addEventListener("touchstart", e => { e.preventDefault(); startRec(); }); ptt.addEventListener("touchend", e => { e.preventDefault(); stopRec(); }); ptt.addEventListener("mousedown", startRec); ptt.addEventListener("mouseup", stopRec);
+async function openingLine() { if (!incident) return; const r = await (await fetch("/agent/opening/" + incident + "/" + member)).json(); $("agentsay").textContent = r.say; await playRef(r.audio, r.say); }
+async function sendTurn(text) {
+  $("heard").textContent = 'You: "' + text + '"'; const r = await post("/agent/turn", {incident_id: incident, member_id: member, text});
+  $("agentsay").textContent = r.say; if (r.ack) { set("You acknowledged by voice", "ok", "Other phones stop ringing."); }
+  await playRef(r.audio, r.say); if (r.done) endCall(); else callLoop();
+}
+function listen() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) { $("heard").textContent = "Speech recognition not available here; type instead."; return; }
+  const r = new SR(); r.lang = "en-US"; $("listenbtn").textContent = "Listening..."; r.onresult = ev => sendTurn(ev.results[0][0].transcript);
+  r.onend = () => { $("listenbtn").textContent = "Tap, then speak"; }; r.onerror = () => { $("heard").textContent = "Did not catch that."; }; r.start();
+}
+async function askTyped() { const t = $("agenttext").value.trim(); if (t) { $("agenttext").value = ""; sendTurn(t); } }
 async function ack() { if (!incident) return; const r = await post("/ack", {incident_id: incident, member_id: member}); ringTone(false); set("You acknowledged", "ok", r.first ? "Other phones stop ringing." : "Already acknowledged by " + r.acked_by); }
 </script></body></html>

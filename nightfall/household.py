@@ -2,6 +2,7 @@
 
 Frozen dataclasses so the engine cannot mutate the tree mid-incident. Loaded from data/household.json.
 """
+
 from __future__ import annotations
 
 import json
@@ -35,6 +36,8 @@ class Household:
     medications: tuple[dict[str, str], ...] = field(default_factory=tuple)
     familiar_places: tuple[dict[str, Any], ...] = field(default_factory=tuple)
     contacts: tuple[dict[str, str], ...] = field(default_factory=tuple)
+    persona: str = "caregiver_clone"
+    notes: tuple[dict[str, str], ...] = field(default_factory=tuple)
 
     def members_at(self, tier: int) -> list[TreeMember]:
         """Tree members at exactly this tier."""
@@ -44,7 +47,7 @@ class Household:
         """Look up a member by id."""
         return next((m for m in self.tree if m.id == member_id), None)
 
-    def with_member(self, m: TreeMember) -> "Household":
+    def with_member(self, m: TreeMember) -> Household:
         """Return a copy with one more tree member."""
         return replace(self, tree=self.tree + (m,))
 
@@ -81,4 +84,6 @@ def load(path: str | Path) -> Household:
         medications=tuple(raw.get("medications", [])),
         familiar_places=tuple(raw.get("familiar_places", [])),
         contacts=tuple(raw.get("contacts", [])),
+        persona=str(raw.get("persona", "caregiver_clone")),
+        notes=tuple(raw.get("notes", [])),
     )

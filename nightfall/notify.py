@@ -1,10 +1,12 @@
 """Notifiers. SSE pushes a ring to each member's phone page; Twilio (voice lane) sits behind the same
 interface and falls back to SSE.
 """
+
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from nightfall.household import TreeMember
 
@@ -44,18 +46,56 @@ class Hub:
 class SseNotifier:
     """Rings phone pages over SSE. Also mirrors every ring to the dashboard log."""
 
-    def __init__(self, hub: Hub, link: LinkFn) -> None:
+    def __init__(self, hub: Hub, link: LinkFn, log: list[dict[str, Any]] | None = None) -> None:
         self._hub = hub
         self._link = link
+        self._log = log
 
     async def ring(self, members: list[TreeMember], message: str, incident_id: str, tier: int) -> None:
         for m in members:
             self._hub.publish(
                 f"phone:{m.id}",
-                {"type": "ring", "message": message, "link": self._link(incident_id, m.id),
-                 "incident_id": incident_id, "tier": tier},
+                {
+                    "type": "ring",
+                    "message": message,
+                    "link": self._link(incident_id, m.id),
+                    "incident_id": incident_id,
+                    "tier": tier,
+                },
             )
-        self._hub.publish(
-            "dashboard",
-            {"type": "ring", "tier": tier, "members": [m.name for m in members], "source": "sse"},
-        )
+        self._record({"type": "ring", "tier": tier, "members": [m.name for m in members], "source": "sse"})
+
+    def _record(self, obj: dict[str, Any]) -> None:
+        """Push to the dashboard and keep it in the persistent log when one is attached."""
+        if self._log is not None:
+            from datetime import datetime
+
+            obj.setdefault("ts", datetime.now().astimezone().isoformat())
+            self._log.append(obj)
+        self._hub.publish("dashboard", obj)
+
+
+class TwilioNotifier:
+    """Calls members with an E.164 phone through the TwiML agent and texts the link; SSE always runs too."""
+
+    def __init__(self, hub: Hub, link: LinkFn, public_url: str, log: list[dict[str, Any]] | None = None) -> None:
+        self._sse = SseNotifier(hub, link, log)
+        self._hub = hub
+        self._link = link
+        self._public = public_url
+
+    async def ring(self, members: list[TreeMember], message: str, incident_id: str, tier: int) -> None:
+        await self._sse.ring(members, message, incident_id, tier)
+        from nightfall.integrations import twilio
+
+        for m in members:
+            if not m.phone.startswith("+"):
+                continue
+            result = "called"
+            try:
+                await asyncio.to_thread(twilio.create_call, m.phone, f"{self._public}/twiml/{incident_id}/{m.id}")
+                await asyncio.to_thread(twilio.send_sms, m.phone, f"{message} {self._link(incident_id, m.id)}")
+            except Exception as e:  # noqa: BLE001
+                print(f"twilio fallback: {e}")
+                result = f"sse only: {e}"
+            self._sse._record({"type": "ring", "tier": tier, "members": [m.name], "source": "twilio", "result": result})

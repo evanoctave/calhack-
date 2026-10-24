@@ -3,6 +3,7 @@
 Single pass computes distance once per place; sorts on n ~ 200 are cheap. Rejected: a geo index.
 The Apify lane fills data/places.*.json; this module only ranks.
 """
+
 from __future__ import annotations
 
 import math
@@ -10,6 +11,7 @@ from datetime import datetime
 from typing import Any, Final, NamedTuple
 
 HAZARDS: Final = frozenset({"water", "rail", "motorway", "construction"})
+MAX_HAZARDS: Final = 8
 CALL_FIRST: Final = frozenset({"fuel", "convenience", "diner", "hospital", "transit", "pharmacy"})
 
 
@@ -54,15 +56,23 @@ def is_open(hours: tuple[tuple[int, int], ...], at: datetime) -> bool | None:
     return any(a <= m < b for a, b in hours)
 
 
-def rank(places: list[dict[str, Any]], home: tuple[float, float], radius_mi: float, at: datetime,
-         familiar: list[dict[str, Any]], contacts: list[dict[str, Any]]) -> Sections:
+def rank(
+    places: list[dict[str, Any]],
+    home: tuple[float, float],
+    radius_mi: float,
+    at: datetime,
+    familiar: list[dict[str, Any]],
+    contacts: list[dict[str, Any]],
+) -> Sections:
     """R9: hazards by distance; call-first open-now first then unknown, top 8; familiar in caregiver order."""
     inside: list[dict[str, Any]] = []
     for p in places:
         d = haversine_mi(home[0], home[1], float(p["lat"]), float(p["lng"]))
         if d <= radius_mi:
             inside.append({**p, "distance_mi": round(d, 2)})
-    hazards = sorted((p for p in inside if p["category"] in HAZARDS), key=lambda p: (p["distance_mi"], p["name"]))
+    hazards = sorted((p for p in inside if p["category"] in HAZARDS), key=lambda p: (p["distance_mi"], p["name"]))[
+        :MAX_HAZARDS
+    ]
 
     def open_rank(p: dict[str, Any]) -> int:
         o = is_open(parse_hours(str(p.get("hours", ""))), at)

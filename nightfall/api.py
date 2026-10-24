@@ -2,32 +2,36 @@
 
 State lives in nightfall.store.Store; side effects of transitions live in nightfall.actions.
 """
+
 from __future__ import annotations
 
 import asyncio
-import base64
 import json
 import os
 import secrets
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import datetime
-from typing import Any, AsyncIterator
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from nightfall import brief as briefmod
-from nightfall import engine
+from nightfall import engine, voice
 from nightfall.actions import emit as _emit
 from nightfall.actions import run_actions as _run_actions
+from nightfall.api_cam import router as cam_router
+from nightfall.api_setup import router as setup_router
+from nightfall.api_voice import router as voice_router
 from nightfall.escalation import LADDER
 from nightfall.household import TreeMember, load
+from nightfall.integrations import anthropic_llm, cartesia, twilio
 from nightfall.store import ROOT, Store
 
-PUBLIC_URL = os.environ.get("PUBLIC_URL", "http://127.0.0.1:8000")
-MAX_FRAME = 200 * 1024
+PUBLIC_URL = os.environ.get("PUBLIC_URL") or "http://127.0.0.1:8000"
+CALL_911_S = float(os.environ.get("CALL_911_S", "45"))
 
 
 store = Store()
@@ -36,10 +40,15 @@ store = Store()
 @asynccontextmanager
 async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
     store.tick_task = asyncio.create_task(_ticker())
+    print("voice pre-synthesis:", voice.pre_synthesize(store.hh))
+    store.memory_task = asyncio.create_task(_warm_memory())
     try:
         yield
     finally:
         store.tick_task.cancel()
+        if store.memory_task is not None:
+            store.memory_task.cancel()
+        await store.memory.close()
         if store.inc is not None:
             await store.runner.cancel(store.inc.id)
 
@@ -69,44 +78,112 @@ class ArmIn(BaseModel):
 
 async def _step(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
     async with store.lock:
-        if store.inc is None or store.inc.state == engine.State.CLOSED:
+        done = (engine.State.CLOSED, engine.State.RETURNED, engine.State.ACKED, engine.State.EXHAUSTED)
+        fresh = kind in ("motion", "person_enter", "door_open")
+        if store.inc is None or store.inc.state == engine.State.CLOSED or (store.inc.state in done and fresh):
+            if store.inc is not None and store.inc.state != engine.State.CLOSED:
+                await store.runner.cancel(store.inc.id)
             store.inc = engine.Incident(id=f"INC-{secrets.token_hex(4)}", night_mode=store.night())
+            store.takeover_by, store.call_911_sent = None, False
         inc = store.inc
         inc.night_mode = store.night()
+        store.last_payload = payload
         tr = engine.step(inc, engine.Event(kind, store.now(), payload))
         if kind != "tick" or tr.from_state != tr.to_state:
-            _emit(store, {"type": "state", "incident_id": inc.id, "kind": kind, "from": tr.from_state.value,
-                   "to": tr.to_state.value, "rule": tr.rule, "detail": tr.detail, "actions": list(tr.actions)})
+            _emit(
+                store,
+                {
+                    "type": "state",
+                    "incident_id": inc.id,
+                    "kind": kind,
+                    "from": tr.from_state.value,
+                    "to": tr.to_state.value,
+                    "rule": tr.rule,
+                    "detail": tr.detail,
+                    "actions": list(tr.actions),
+                },
+            )
         await _run_actions(store, tr, inc)
-        return {"incident_id": inc.id, "from": tr.from_state.value, "to": tr.to_state.value,
-                "rule": tr.rule, "detail": tr.detail, "actions": list(tr.actions)}
+        return {
+            "incident_id": inc.id,
+            "from": tr.from_state.value,
+            "to": tr.to_state.value,
+            "rule": tr.rule,
+            "detail": tr.detail,
+            "actions": list(tr.actions),
+        }
+
+
+async def _warm_memory() -> None:
+    n = await store.memory.ensure()
+    print("memory:", store.memory.source, "notes:", n)
+    store.hub.publish("dashboard", {"type": "memory_ready", "source": store.memory.source, "notes": n})
 
 
 async def _ticker() -> None:
     while True:
-        await asyncio.sleep(1)
-        if store.inc is not None and store.inc.state in (engine.State.DOOR_OPEN, engine.State.ESCALATING):
+        await asyncio.sleep(0.5)
+        inc = store.inc
+        if inc is not None and inc.state in (
+            engine.State.CONVERSATION,
+            engine.State.DOOR_OPEN,
+            engine.State.ESCALATING,
+        ):
             await _step("tick", {})
+        if (
+            inc is not None
+            and inc.exited_at is not None
+            and not store.call_911_sent
+            and inc.state in (engine.State.ESCALATING, engine.State.ACKED, engine.State.EXHAUSTED)
+            and (store.now() - inc.exited_at).total_seconds() >= CALL_911_S
+        ):
+            store.call_911_sent = True
+            for m in store.hh.tree:
+                store.hub.publish(
+                    f"phone:{m.id}", {"type": "call_911_option", "incident_id": inc.id, "out_of_view_s": CALL_911_S}
+                )
+            _emit(store, {"type": "call_911_option", "incident_id": inc.id})
 
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
-    return {"ok": True, "mock": {"cartesia": True, "anthropic": True, "apify": True, "twilio": True},
-            "now": store.now().isoformat(), "night_mode": store.night()}
+    return {
+        "ok": True,
+        "mock": {
+            "cartesia": not cartesia.enabled(),
+            "anthropic": not anthropic_llm.enabled(),
+            "apify": store.places_source() != "apify",
+            "twilio": not twilio.enabled(),
+            "moss": store.memory.source != "moss",
+        },
+        "now": store.now().isoformat(),
+        "night_mode": store.night(),
+    }
 
 
 @app.get("/state")
 async def state() -> dict[str, Any]:
     inc = store.inc
     return {
-        "household": {"person_name": store.hh.person_name, "caregiver_name": store.hh.caregiver_name,
-                      "tree": [m.__dict__ for m in store.hh.tree]},
-        "now": store.now().isoformat(), "night_mode": store.night(), "ladder": LADDER,
-        "incident": None if inc is None else {"id": inc.id, "state": inc.state.value,
-                                              "exited_at": inc.exited_at.isoformat() if inc.exited_at else None,
-                                              "deadline_at": inc.deadline_at.isoformat() if inc.deadline_at else None,
-                                              "acked_by": inc.acked_by},
-        "log": store.log[-50:], "rings": store.runner.rings,
+        "household": {
+            "person_name": store.hh.person_name,
+            "caregiver_name": store.hh.caregiver_name,
+            "tree": [m.__dict__ for m in store.hh.tree],
+        },
+        "now": store.now().isoformat(),
+        "night_mode": store.night(),
+        "ladder": LADDER,
+        "incident": None
+        if inc is None
+        else {
+            "id": inc.id,
+            "state": inc.state.value,
+            "exited_at": inc.exited_at.isoformat() if inc.exited_at else None,
+            "deadline_at": inc.deadline_at.isoformat() if inc.deadline_at else None,
+            "acked_by": inc.acked_by,
+        },
+        "log": store.log[-50:],
+        "rings": store.runner.rings,
     }
 
 
@@ -148,22 +225,6 @@ async def tree(body: TreeIn) -> dict[str, Any]:
     return {"member_id": m.id, "phone_url": f"{PUBLIC_URL}/phone.html#{m.id}"}
 
 
-@app.post("/frames/{incident_id}")
-async def frames(incident_id: str, request: Request) -> dict[str, Any]:
-    form = await request.form()
-    out: list[str] = []
-    for f in form.values():
-        if isinstance(f, UploadFile):
-            data = await f.read()
-            if len(data) > MAX_FRAME:
-                raise HTTPException(413, "frame over 200 KB")
-            out.append("data:image/jpeg;base64," + base64.b64encode(data).decode())
-    store.frames[incident_id] = (store.frames.get(incident_id, []) + out)[-3:]
-    if incident_id in store.briefs:
-        store.briefs[incident_id]["exit_frames"] = store.frames[incident_id]
-    return {"frame_ids": [f"FR-{i}" for i in range(len(store.frames[incident_id]))]}
-
-
 @app.get("/brief/{token}")
 async def get_brief(token: str) -> dict[str, Any]:
     try:
@@ -184,7 +245,7 @@ async def _sse(channel: str) -> AsyncIterator[str]:
             try:
                 obj = await asyncio.wait_for(q.get(), timeout=15)
                 yield f"data: {json.dumps(obj)}\n\n"
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 yield ": keepalive\n\n"
     finally:
         store.hub.unsubscribe(channel, q)
@@ -204,9 +265,17 @@ async def sse_phone(member_id: str) -> StreamingResponse:
 async def reset() -> dict[str, Any]:
     if store.inc is not None:
         await store.runner.cancel(store.inc.id)
-    store.inc, store.log, store.frames, store.briefs = None, [], {}, {}
+    store.inc, store.frames, store.briefs = None, {}, {}
+    store.log.clear()
+    store.history, store.frame_bytes = [], {}
+    store.takeover_by, store.call_911_sent, store.latest_frame = None, False, b""
+    store.clothing.clear()
     store.runner.rings.clear()
     store.hh = load(ROOT / "data" / "household.json")
+    store.places = briefmod.load_places(os.environ.get("PLACES_FILE") or ROOT / "data" / "places.marina.json")
+    from nightfall.memory import Memory
+
+    store.memory = Memory(store.hh)
     store.hub.publish("dashboard", {"type": "reset"})
     return {"ok": True}
 
@@ -216,4 +285,7 @@ async def index() -> FileResponse:
     return FileResponse(ROOT / "static" / "dashboard.html")
 
 
+app.include_router(voice_router)
+app.include_router(cam_router)
+app.include_router(setup_router)
 app.mount("/", StaticFiles(directory=str(ROOT / "static")), name="static")

@@ -18,8 +18,19 @@ class FakeNotifier:
 def hh() -> Household:
     from datetime import time
 
-    return Household("HH", "Dad", "", "Sarah", time(21), time(6), 0, 0, 1.5, True,
-                     (TreeMember("A", "a", "web", 1), TreeMember("B", "b", "web", 2), TreeMember("C", "c", "web", 3)))
+    return Household(
+        "HH",
+        "Dad",
+        "",
+        "Sarah",
+        time(21),
+        time(6),
+        0,
+        0,
+        1.5,
+        True,
+        (TreeMember("A", "a", "web", 1), TreeMember("B", "b", "web", 2), TreeMember("C", "c", "web", 3)),
+    )
 
 
 @pytest.fixture(autouse=True)

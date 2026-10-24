@@ -1,4 +1,5 @@
 """Scripted redirect lines and the R6 validator. The voice lane extends this with model-written lines."""
+
 from __future__ import annotations
 
 import re

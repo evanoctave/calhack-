@@ -1,6 +1,9 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Nightfall</title><link rel="stylesheet" href="/tokens.css"><script src="/app.js"></script>
-<style>#cam { width: 100%; max-width: 420px; border-radius: var(--radius); border: 1px solid var(--border); background: #000; }</style>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script src="/cam.js"></script>
+<style>.camwrap { position: relative; width: 100%; max-width: 420px; } #cam, #overlay { width: 100%; border-radius: var(--radius); display: block; } #cam { border: 1px solid var(--border); background: #000; } #overlay { position: absolute; left: 0; top: 0; pointer-events: none; }</style>
 </head><body>
 <header>
   <div><h1>Nightfall</h1><div class="muted small">Night-exit guardian. Mock mode, no keys.</div></div>
@@ -13,7 +16,9 @@
     <div id="detail" class="muted small">Press Simulate approach, or walk into the camera zone.</div>
     <div id="deadline" class="small muted"></div>
     <div class="row" style="margin-top:12px">
-      <button class="primary" onclick="ev('motion')">Simulate approach</button>
+      <button class="primary" onclick="ev('person_enter')">Simulate approach</button>
+      <button onclick="ev('person_lost')">Simulate leaving frame</button>
+      <button onclick="ev('person_back')">Simulate back in frame</button>
       <button onclick="ev('door_open')">Open door (o)</button>
       <button onclick="ev('door_close')">Close door (c)</button>
       <button onclick="ev('person_seen',{inside:true})">Person seen inside</button>
@@ -23,9 +28,11 @@
     <div class="row" style="margin-top:8px"><input id="replytext" placeholder="What Dad says" style="flex:1"></div>
   </section>
   <section class="card">
-    <h2>Camera (laptop webcam)</h2>
-    <video id="cam" autoplay muted playsinline></video>
-    <div class="row" style="margin-top:8px"><button onclick="startCam()">Enable camera</button><span id="camstat" class="muted small">off. Motion in the zone posts a motion event; exit frames are kept for the brief.</span></div>
+    <h2>Camera (laptop webcam, person detection)</h2>
+    <div class="camwrap"><video id="cam" autoplay muted playsinline width="320" height="240"></video><canvas id="overlay" width="320" height="240"></canvas></div>
+    <div class="row" style="margin-top:8px"><button class="primary" onclick="startCam()">Enable camera</button><span id="persondot" class="dot"></span><span id="persontxt" class="small">no person</span></div>
+    <div id="camstat" class="muted small" style="margin-top:4px">off. Person enters frame = approach (voice starts); leaves frame 3 s = exit timer; back in frame = returned.</div>
+    <div id="takeover" class="banner" hidden style="margin-top:8px"></div>
   </section>
   <section class="card">
     <h2>Family tree</h2>
@@ -53,14 +60,20 @@ function render(s) {
 function line(e) {
   let body = "";
   if (e.type === "state") body = `<span class="pill">${esc(e.rule)}</span> ${esc(e.from)} to <strong>${esc(e.to)}</strong> on ${esc(e.kind)}. ${esc(e.detail)}`;
-  else if (e.type === "speak") body = `<span class="pill ok">voice</span> "${esc(e.text)}"`;
-  else if (e.type === "ring") body = `<span class="pill danger">ring tier ${esc(e.tier)}</span> ${esc((e.members||[]).join(", "))}`;
+  else if (e.type === "speak") body = `<span class="pill ok">voice ${esc(e.voice_source || "")}</span> "${esc(e.text)}" <span class="muted small">line: ${esc(e.line_source || "script")}</span>`;
+  else if (e.type === "memory") body = `<span class="pill">memory ${esc(e.source)}</span> "${esc(e.query)}" -> ${esc((e.hits||[]).join(" | "))}`;
+  else if (e.type === "answered") body = `<span class="pill ok">answered</span> ${esc(e.by)} picked up the web call`;
+  else if (e.type === "takeover") body = `<span class="pill danger">takeover</span> ${e.on ? esc(e.by) + " speaking for the AI" : "handed back to the AI"}`;
+  else if (e.type === "returned") body = `<span class="pill ok">returned</span> person back in frame, rings cancelled`;
+  else if (e.type === "call_911_option") body = `<span class="pill danger">911 option</span> shown on every phone`;
+  else if (e.type === "call") body = `<span class="pill">call agent</span> ${esc(e.member_id)} heard "${esc(e.heard || "")}" -> ${esc(e.intent)}`;
+  else if (e.type === "ring") body = `<span class="pill danger">ring tier ${esc(e.tier)}</span> ${esc((e.members||[]).join(", "))} <span class="muted small">${esc(e.source || "")} ${esc(e.result || "")}</span>`;
   else if (e.type === "brief_ready") body = `<span class="pill">brief</span> built for ${esc(e.incident_id)}`;
   else if (e.type === "tree") body = `<span class="pill">tree</span> added ${esc(e.member.name)} at tier ${esc(e.member.tier)}`;
   else body = `<span class="pill">${esc(e.type)}</span>`;
   return `<li><span class="mono muted">${esc(fmtTime(e.ts))}</span><span>${body}</span></li>`;
 }
-async function refresh() { last = await (await fetch("/state")).json(); render(last); }
+async function refresh() { last = await (await fetch("/state")).json(); window.lastState = last; render(last); }
 async function ev(kind, payload) { await post("/event", {kind, payload: payload || {}}); refresh(); }
 async function reply() { const t = document.getElementById("replytext").value.trim(); if (t) await ev("reply", {text: t}); }
 async function reset() { await post("/reset"); refresh(); }
@@ -71,35 +84,11 @@ async function addJudge() {
   refresh();
 }
 sse("/sse/dashboard", async e => {
-  if (e.type === "speak") speak(e.text);
+  if (e.type === "speak") { if (e.url) { new Audio(e.url).play().catch(() => { if (e.mode !== "clip") speak(e.text); }); } else speak(e.text); }
+  if (e.type === "takeover") { const b = document.getElementById("takeover"); b.hidden = !e.on; b.textContent = e.on ? e.by + " has taken over the voice at the door. AI lines paused." : ""; }
   if (e.type === "exit_frames_request") postFrames(e.incident_id);
   refresh();
 });
-document.addEventListener("keydown", e => { if (e.target.tagName === "INPUT") return; if (e.key === "o") ev("door_open"); if (e.key === "c") ev("door_close"); if (e.key === "m") ev("motion"); });
-// Camera: 5 fps canvas diff in the right third of the frame (the "door zone"); 3 consecutive hits post motion.
-let ring = [], prev = null, hits = 0, lastMotion = 0, stream = null;
-const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d", {willReadFrequently: true});
-async function startCam() {
-  try { stream = await navigator.mediaDevices.getUserMedia({video: {width: 320, height: 240}}); } catch (e) { document.getElementById("camstat").textContent = "camera denied; use the buttons"; return; }
-  const v = document.getElementById("cam"); v.srcObject = stream; canvas.width = 320; canvas.height = 240;
-  document.getElementById("camstat").textContent = "on. door zone = right third.";
-  setInterval(tick, 200);
-}
-function tick() {
-  const v = document.getElementById("cam"); if (!v.videoWidth) return;
-  ctx.drawImage(v, 0, 0, 320, 240);
-  const d = ctx.getImageData(213, 0, 107, 240).data; let sum = 0;
-  if (prev) { for (let i = 0; i < d.length; i += 16) sum += Math.abs(d[i] - prev[i]); }
-  const score = sum / (d.length / 16); prev = d;
-  canvas.toBlob(b => { if (b) { ring.push(b); if (ring.length > 150) ring.shift(); } }, "image/jpeg", 0.6);
-  hits = score > 18 ? hits + 1 : 0;
-  if (hits >= 3 && Date.now() - lastMotion > 10000) { lastMotion = Date.now(); hits = 0; ev("motion"); }
-}
-async function postFrames(id) {
-  if (!ring.length) return;
-  const fd = new FormData(); const n = ring.length;
-  [n - 25, n - 10, n - 1].filter(i => i >= 0).forEach((i, k) => fd.append("f" + k, ring[i], "f" + k + ".jpg"));
-  await fetch("/frames/" + id, {method: "POST", body: fd});
-}
+document.addEventListener("keydown", e => { if (e.target.tagName === "INPUT") return; if (e.key === "o") ev("door_open"); if (e.key === "c") ev("door_close"); if (e.key === "m") ev("person_enter"); if (e.key === "l") ev("person_lost"); if (e.key === "b") ev("person_back"); });
 refresh(); setInterval(refresh, 5000);
 </script></body></html>

@@ -5,27 +5,95 @@
   "caregiver_name": "Sarah",
   "night_start": "21:00",
   "night_end": "06:00",
-  "home_lat": 37.8000,
-  "home_lng": -122.4400,
+  "home_lat": 37.8,
+  "home_lng": -122.44,
   "radius_mi": 1.5,
   "meds_opt_in": true,
   "tree": [
-    {"id": "TM-SARAH", "name": "Sarah", "phone": "web", "tier": 1},
-    {"id": "TM-MIKE", "name": "Mike", "phone": "web", "tier": 2},
-    {"id": "TM-LINDA", "name": "Linda (neighbor)", "phone": "web", "tier": 3}
+    {
+      "id": "TM-SARAH",
+      "name": "Sarah",
+      "phone": "web",
+      "tier": 1
+    },
+    {
+      "id": "TM-MIKE",
+      "name": "Mike",
+      "phone": "web",
+      "tier": 2
+    },
+    {
+      "id": "TM-LINDA",
+      "name": "Linda (neighbor)",
+      "phone": "web",
+      "tier": 3
+    }
   ],
   "medications": [
-    {"name": "donepezil", "dose": "10 mg", "note": "nightly"},
-    {"name": "metoprolol", "dose": "50 mg", "note": "morning"},
-    {"name": "no insulin", "dose": "", "note": ""}
+    {
+      "name": "donepezil",
+      "dose": "10 mg",
+      "note": "nightly"
+    },
+    {
+      "name": "metoprolol",
+      "dose": "50 mg",
+      "note": "morning"
+    },
+    {
+      "name": "no insulin",
+      "dose": "",
+      "note": ""
+    }
   ],
   "familiar_places": [
-    {"name": "Palace of Fine Arts, walked there every morning", "lat": 37.8029, "lng": -122.4486},
-    {"name": "Old flat on Chestnut St, lived there 30 years", "lat": 37.8003, "lng": -122.4350},
-    {"name": "Corner church, attended every Sunday", "lat": 37.7990, "lng": -122.4400}
+    {
+      "name": "Palace of Fine Arts, walked there every morning",
+      "lat": 37.8029,
+      "lng": -122.4486
+    },
+    {
+      "name": "Old flat on Chestnut St, lived there 30 years",
+      "lat": 37.8003,
+      "lng": -122.435
+    },
+    {
+      "name": "Corner church, attended every Sunday",
+      "lat": 37.799,
+      "lng": -122.44
+    }
   ],
   "contacts": [
-    {"name": "SFPD non-emergency", "phone": "(415) 553-0123"},
-    {"name": "Silver Alert", "phone": "", "note": "Police request it through CHP. Call 911 or SFPD and ask them to evaluate a Silver Alert."}
+    {
+      "name": "SFPD non-emergency",
+      "phone": "(415) 553-0123"
+    },
+    {
+      "name": "Silver Alert",
+      "phone": "",
+      "note": "Police request it through CHP. Call 911 or SFPD and ask them to evaluate a Silver Alert."
+    }
+  ],
+  "notes": [
+    {
+      "kind": "habit",
+      "text": "Walks toward the Palace of Fine Arts when he thinks he is going to work; he was a groundskeeper there"
+    },
+    {
+      "kind": "habit",
+      "text": "Goes to the Marina Corner Market for coffee and the newspaper every morning"
+    },
+    {
+      "kind": "habit",
+      "text": "Looks for his old dog Buddy on the Marina Green and down the alley"
+    },
+    {
+      "kind": "medical_note",
+      "text": "Gets cold fast; usually leaves without a jacket or shoes"
+    },
+    {
+      "kind": "habit",
+      "text": "Sits on the steps of the corner church on Chestnut when he is upset"
+    }
   ]
 }

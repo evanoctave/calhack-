@@ -1,11 +1,12 @@
 """Every example in /contracts must validate against its schema."""
+
 import json
 from pathlib import Path
 
 import pytest
 
 jsonschema = pytest.importorskip("jsonschema")
-from referencing import Registry, Resource  # noqa: E402
+from referencing import Registry, Resource
 
 ROOT = Path(__file__).resolve().parent.parent / "contracts"
 

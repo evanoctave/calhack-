@@ -4,13 +4,15 @@ Owns the only place that sets incident.state. A dict keyed by (state, event kind
 handler; unknown pairs are no-ops recorded as "ignored". Rejected: nested ifs (not printable, not
 walkable by a test).
 """
+
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Final
+from typing import Any, Final
 
 
 class State(str, Enum):
@@ -28,6 +30,7 @@ class State(str, Enum):
 DOOR_WAIT_S: Final[float] = float(os.environ.get("DOOR_WAIT_S", "20"))
 DEADLINE_S: Final[float] = 15 * 60
 MAX_LINES: Final[int] = 4
+LINE_GAP_S: Final[float] = float(os.environ.get("LINE_GAP_S", "8"))
 
 
 @dataclass
@@ -48,6 +51,8 @@ class Incident:
     acked_by: str | None = None
     lines_spoken: int = 0
     seen_inside: bool = False
+    last_line_at: datetime | None = None
+    person_in_frame: bool = False
 
     @property
     def deadline_at(self) -> datetime | None:
@@ -86,6 +91,8 @@ def _motion(inc: Incident, ev: Event) -> Transition:
         return _ignored(inc, ev, "R0 outside night window")
     inc.opened_at = ev.ts
     inc.lines_spoken = 1
+    inc.last_line_at = ev.ts
+    inc.person_in_frame = ev.kind == "person_enter"
     return _t(inc, State.CONVERSATION, ("speak:open",), "R0", "ok")
 
 
@@ -93,7 +100,41 @@ def _reply(inc: Incident, ev: Event) -> Transition:
     if inc.lines_spoken >= MAX_LINES:
         return _ignored(inc, ev, "R1 line budget exhausted")
     inc.lines_spoken += 1
+    inc.last_line_at = ev.ts
     return _t(inc, State.CONVERSATION, ("speak:again",), "R1", "ok")
+
+
+def _tick_conversation(inc: Incident, ev: Event) -> Transition:
+    """While the person stays in frame, speak another line every LINE_GAP_S until the R1 budget ends."""
+    if not inc.person_in_frame or inc.last_line_at is None:
+        return _ignored(inc, ev, "conversation idle")
+    if inc.lines_spoken >= MAX_LINES:
+        return _ignored(inc, ev, "R1 line budget exhausted")
+    if (ev.ts - inc.last_line_at).total_seconds() < LINE_GAP_S:
+        return _ignored(inc, ev, "waiting for reply")
+    inc.lines_spoken += 1
+    inc.last_line_at = ev.ts
+    return _t(inc, State.CONVERSATION, ("speak:again",), "R1", "auto line")
+
+
+def _person_lost(inc: Incident, ev: Event) -> Transition:
+    """Camera lost the person: same clock as a door opening (R2)."""
+    inc.person_in_frame = False
+    tr = _door_open(inc, ev)
+    return Transition(
+        tr.from_state, tr.to_state, tr.actions, tr.rule, "person left the frame" if tr.rule != "ignored" else tr.detail
+    )
+
+
+def _person_back_door(inc: Incident, ev: Event) -> Transition:
+    inc.person_in_frame = True
+    inc.seen_inside = True
+    return _t(inc, State.RETURNED, ("log:returned",), "R2", "person back in frame")
+
+
+def _person_back_escalating(inc: Incident, ev: Event) -> Transition:
+    inc.person_in_frame = True
+    return _t(inc, State.RETURNED, ("cancel_escalation", "notify:returned"), "R2", "person back in frame after exit")
 
 
 def _seen_inside_conv(inc: Incident, ev: Event) -> Transition:
@@ -157,6 +198,11 @@ def _close(inc: Incident, ev: Event) -> Transition:
 
 TRANSITIONS: Final[dict[tuple[State, str], Handler]] = {
     (State.ARMED_IDLE, "motion"): _motion,
+    (State.ARMED_IDLE, "person_enter"): _motion,
+    (State.CONVERSATION, "tick"): _tick_conversation,
+    (State.CONVERSATION, "person_lost"): _person_lost,
+    (State.DOOR_OPEN, "person_back"): _person_back_door,
+    (State.ESCALATING, "person_back"): _person_back_escalating,
     (State.ARMED_IDLE, "door_open"): _door_open,
     (State.CONVERSATION, "reply"): _reply,
     (State.CONVERSATION, "person_seen"): _seen_inside_conv,
@@ -173,7 +219,19 @@ TRANSITIONS: Final[dict[tuple[State, str], Handler]] = {
 }
 
 EVENT_KINDS: Final[frozenset[str]] = frozenset(
-    {"motion", "door_open", "door_close", "person_seen", "reply", "tick", "ack", "close"}
+    {
+        "motion",
+        "door_open",
+        "door_close",
+        "person_seen",
+        "reply",
+        "tick",
+        "ack",
+        "close",
+        "person_enter",
+        "person_lost",
+        "person_back",
+    }
 )
 
 

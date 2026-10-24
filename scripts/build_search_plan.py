@@ -4,6 +4,7 @@ Run from the repo root: python scripts/build_search_plan.py
 Ranking reuses nightfall.search.rank, so the fixture matches what the brief shows. The route is straight-line
 walking estimates (3 mph) in caregiver order; the geo lane replaces it with real routing.
 """
+
 from __future__ import annotations
 
 import json
@@ -14,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from nightfall.search import rank  # noqa: E402
+from nightfall.search import rank
 
 WALK_MPH = 3.0
 AT = datetime(2026, 10, 25, 23, 30)  # Sunday night, so open_now reflects a night search
@@ -26,8 +27,16 @@ def main() -> None:
     home = (hh["home_lat"], hh["home_lng"])
     s = rank(places, home, hh["radius_mi"], AT, hh["familiar_places"], hh["contacts"])
 
-    stops = [{"name": f["name"], "lat": f["lat"], "lng": f["lng"], "distance_mi": f["distance_mi"],
-              "eta_min": round(f["distance_mi"] / WALK_MPH * 60)} for f in s.familiar]
+    stops = [
+        {
+            "name": f["name"],
+            "lat": f["lat"],
+            "lng": f["lng"],
+            "distance_mi": f["distance_mi"],
+            "eta_min": round(f["distance_mi"] / WALK_MPH * 60),
+        }
+        for f in s.familiar
+    ]
     plan = {
         "profile_id": hh["id"],
         "generated_at": AT.isoformat() + "Z",
