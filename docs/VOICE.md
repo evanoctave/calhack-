@@ -14,7 +14,8 @@ Three voice jobs, all behind mocks, all validated by code. The model never sets 
   no banned phrase, no digits except a time, terminal punctuation). Any failure -> scripted fallback
   (`closed_place` when the reply mentions a store or work, `again`, then `comfort`).
 - Persona: `household.persona` is `caregiver_clone` (consented clone id in `CARTESIA_VOICE_ID`) or `assistant`.
-  The family-call agent always uses the assistant voice (`CARTESIA_ASSISTANT_VOICE_ID`), never the clone.
+  The telephone opening uses Twilio's neutral voice; later call-agent lines use the assistant voice
+  (`CARTESIA_ASSISTANT_VOICE_ID`).
 
 ## 2. Family call agent
 
@@ -28,6 +29,9 @@ Transports, same brain:
 - Twilio: `TwilioNotifier` calls every member with an E.164 phone. Twilio fetches `POST /twiml/{inc}/{member}`
   (opening + `<Gather input="speech" speechTimeout="auto">`), posts `SpeechResult` to `/twiml/.../turn`, loops
   until ack or goodbye (`<Hangup/>`). The link also goes by SMS. Any Twilio error -> SSE only, logged on the dashboard.
+  The pickup response uses `<Say voice="Polly.Joanna">` immediately, without waiting for Cartesia synthesis or an
+  audio-file download. Later replies retain Cartesia, with reasoning and synthesis off the server event loop so
+  one slow call does not block another call's opening or incident handling.
 - Phone page (mock and fallback): `GET /agent/opening/{inc}/{member}`, `POST /agent/turn` with browser speech
   recognition in and TTS or Cartesia audio out. A spoken ack calls `/ack` exactly like the button.
 

@@ -26,11 +26,11 @@ def _store() -> Any:
     return store
 
 
-def _twiml(say: str, gather_url: str | None, hangup: bool) -> Response:
-    ref = voice.say(say, "assistant")
+def _twiml(say: str, gather_url: str | None, hangup: bool, *, use_cartesia: bool = True) -> Response:
+    ref = voice.say(say, "assistant") if use_cartesia else None
     inner = (
         f"<Play>{escape(PUBLIC_URL + ref['url'])}</Play>"
-        if ref["mode"] == "cartesia"
+        if ref is not None and ref["mode"] == "cartesia"
         else f'<Say voice="Polly.Joanna">{escape(say)}</Say>'
     )
     if hangup or gather_url is None:
@@ -65,7 +65,12 @@ async def twiml_open(incident_id: str, member_id: str) -> Response:
             "ts": store.now().isoformat(),
         }
     )
-    return _twiml(call_agent.opening(store.hh, b, name), f"{PUBLIC_URL}/twiml/{incident_id}/{member_id}/turn", False)
+    return _twiml(
+        call_agent.opening(store.hh, b, name),
+        f"{PUBLIC_URL}/twiml/{incident_id}/{member_id}/turn",
+        False,
+        use_cartesia=False,
+    )
 
 
 @router.post("/twiml/{incident_id}/{member_id}/turn")
@@ -73,7 +78,7 @@ async def twiml_turn(incident_id: str, member_id: str, request: Request) -> Resp
     store, b, name = _ctx(incident_id, member_id)
     form = await request.form()
     text = str(form.get("SpeechResult", ""))
-    r = call_agent.handle(store.hh, b, name, text)
+    r = await asyncio.to_thread(call_agent.handle, store.hh, b, name, text)
     store.log.append(
         {
             "type": "call",
@@ -87,7 +92,7 @@ async def twiml_turn(incident_id: str, member_id: str, request: Request) -> Resp
     store.hub.publish("dashboard", {"type": "call", "member_id": member_id, "heard": text, "intent": r.intent})
     if r.ack:
         await _ack(store, incident_id, member_id)
-    return _twiml(r.say, f"{PUBLIC_URL}/twiml/{incident_id}/{member_id}/turn", r.done)
+    return await asyncio.to_thread(_twiml, r.say, f"{PUBLIC_URL}/twiml/{incident_id}/{member_id}/turn", r.done)
 
 
 class AnswerIn(BaseModel):
@@ -115,7 +120,7 @@ class TurnIn(BaseModel):
 async def agent_turn(body: TurnIn) -> dict[str, Any]:
     """Phone-page agent (browser STT in, TTS out). Same brain as the Twilio call."""
     store, b, name = _ctx(body.incident_id, body.member_id)
-    r = call_agent.handle(store.hh, b, name, body.text)
+    r = await asyncio.to_thread(call_agent.handle, store.hh, b, name, body.text)
     store.hub.publish(
         "dashboard", {"type": "call", "member_id": body.member_id, "heard": body.text, "intent": r.intent}
     )
