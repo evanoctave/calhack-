@@ -60,3 +60,18 @@ def test_exit_frames_route(client: TestClient) -> None:
     assert r.json()["frame_ids"] == ["FR-0", "FR-1"]
     big = io.BytesIO(b"x" * (200 * 1024 + 1))
     assert client.post(f"/frames/{inc}", files={"f0": ("c.jpg", big, "image/jpeg")}).status_code == 413
+
+
+def test_phone_cannot_be_the_door(client: TestClient) -> None:
+    r = client.post(
+        "/cam/frame",
+        files={"f": ("f.jpg", io.BytesIO(b"\xff\xd8abc"), "image/jpeg")},
+        headers={"cf-connecting-ip": "203.0.113.9"},
+    )
+    assert r.status_code == 403
+    r = client.get(
+        "/", headers={"user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)"}, follow_redirects=False
+    )
+    assert r.status_code in (302, 307) and r.headers["location"] == "/app"
+    r = client.get("/", headers={"user-agent": "Mozilla/5.0 (Macintosh)"})
+    assert r.status_code == 200 and "Nightfall door" in r.text

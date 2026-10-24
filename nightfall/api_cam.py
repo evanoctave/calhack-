@@ -30,10 +30,17 @@ def _store() -> Any:
     return store
 
 
+def _from_door_device(request: Request) -> bool:
+    """The door page runs on the laptop next to the server; anything through the tunnel is a phone."""
+    return not request.headers.get("cf-connecting-ip")
+
+
 @router.post("/cam/frame")
 async def cam_frame(request: Request) -> dict[str, Any]:
-    """Latest camera frame from the dashboard (multipart 'f')."""
+    """Latest camera frame from the door device (multipart 'f'). Phones may not act as the door."""
     store = _store()
+    if not _from_door_device(request):
+        raise HTTPException(403, "only the door device may send camera frames")
     form = await request.form()
     f = form.get("f")
     if not isinstance(f, UploadFile):
@@ -58,9 +65,11 @@ async def cam_latest() -> Response:
 
 
 @router.get("/door")
-async def door_page() -> Response:
-    from fastapi.responses import FileResponse
+async def door_page(request: Request) -> Response:
+    from fastapi.responses import FileResponse, RedirectResponse
 
+    if not _from_door_device(request):
+        return RedirectResponse("/app")
     return FileResponse(Path(__file__).resolve().parent.parent / "static" / "door.html")
 
 

@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -309,7 +309,12 @@ async def reset() -> dict[str, Any]:
 
 
 @app.get("/")
-async def index() -> FileResponse:
+async def index(request: Request) -> Response:
+    """Laptop gets the door device; a phone (or anything through the tunnel) gets the caregiver app."""
+    ua = request.headers.get("user-agent", "").lower()
+    via_tunnel = bool(request.headers.get("cf-connecting-ip"))
+    if via_tunnel or any(k in ua for k in ("iphone", "ipad", "android", "mobile")):
+        return RedirectResponse("/app")
     return FileResponse(ROOT / "static" / "door.html")
 
 

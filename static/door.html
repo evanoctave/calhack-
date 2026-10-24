@@ -33,6 +33,7 @@ html, body { height: 100%; } body { padding: 0; background: #06101d; color: #eef
 .hidden { display: none !important; } #camstat, #persondot, #persontxt, #idtxt, #enrolled { font-size: 13px; }
 .live { position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%); background: rgba(76,193,122,.9); color: #06101d; border-radius: 999px; padding: 8px 16px; font-weight: 600; display: none; } .live.on { display: block; }
 </style></head><body>
+<script>if (/iphone|ipad|android|mobile/i.test(navigator.userAgent)) { location.replace("/app"); }</script>
 <div class="start" id="start"><div class="box"><h1>Nightfall door</h1><p>This screen is the doorbell camera and speaker. It watches the front door, talks in the family's voice, and the red button calls the family. Tap to start.</p><button onclick="startDoor()">Start the door</button></div></div>
 <div class="device">
   <div class="top"><div class="brand"><span class="led" id="led"></span>Night<span>fall</span> · <span id="mode">Night watch is on</span></div><div class="status" id="watching">Watching the front door</div></div>
