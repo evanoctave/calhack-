@@ -1,0 +1,9 @@
+{
+  "actorOutputSchemaVersion": 1,
+  "title": "Night search radius output",
+  "description": "Places to check first (hazards), call first (open at night) and familiar places around the home, each with distance in miles.",
+  "properties": {
+    "places": {"type": "string", "title": "Places", "description": "Dataset of hazards, open-at-night places and familiar places, nearest first.", "template": "{{links.apiDefaultDatasetUrl}}/items"},
+    "summary": {"type": "string", "title": "Summary", "description": "Counts per section and the home used.", "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/SUMMARY"}
+  }
+}

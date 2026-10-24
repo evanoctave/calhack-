@@ -1,1 +1,14 @@
-{"actorSpecification": 1, "name": "night-search-radius", "title": "Night search radius for a missing person with dementia", "version": "0.1", "buildTag": "latest", "input": "../INPUT_SCHEMA.json", "dockerfile": "../Dockerfile", "readme": "../README.md"}
+{
+  "actorSpecification": 1,
+  "name": "night-search-radius",
+  "title": "Night search radius for a missing person with dementia",
+  "version": "0.1",
+  "buildTag": "latest",
+  "input": "../INPUT_SCHEMA.json",
+  "dockerfile": "../Dockerfile",
+  "readme": "../README.md",
+  "output": "./output_schema.json",
+  "storages": {
+    "dataset": "./dataset_schema.json"
+  }
+}

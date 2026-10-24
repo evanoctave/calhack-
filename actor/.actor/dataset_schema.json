@@ -1,0 +1,29 @@
+{
+  "actorSpecification": 1,
+  "fields": {
+    "type": "object",
+    "properties": {
+      "category": {"type": "string", "title": "Category", "description": "water, rail, motorway, construction, fuel, convenience, diner, hospital, pharmacy, transit, familiar", "example": "water"},
+      "name": {"type": "string", "title": "Name", "example": "Palace of Fine Arts lagoon"},
+      "lat": {"type": "number", "title": "Latitude", "example": 37.8022},
+      "lng": {"type": "number", "title": "Longitude", "example": -122.448},
+      "distance_mi": {"type": "number", "title": "Distance (mi)", "example": 0.46},
+      "phone": {"type": "string", "title": "Phone", "example": "(415) 555-0101"},
+      "hours": {"type": "string", "title": "Hours", "description": "24/7 or HH:MM-HH:MM for today, empty if unknown", "example": "24/7"},
+      "open_24h": {"type": "boolean", "title": "Open 24 h", "example": true},
+      "address": {"type": "string", "title": "Address", "example": "Lombard St, San Francisco"},
+      "source": {"type": "string", "title": "Source", "description": "overpass, google_maps or caregiver", "example": "overpass"}
+    },
+    "required": ["category", "name", "lat", "lng", "distance_mi", "source"]
+  },
+  "views": {
+    "overview": {
+      "title": "Where to look and whom to call",
+      "transformation": {"fields": ["category", "name", "distance_mi", "phone", "hours", "source"]},
+      "display": {"component": "table", "properties": {
+        "category": {"label": "Category", "format": "text"}, "name": {"label": "Place", "format": "text"},
+        "distance_mi": {"label": "Miles", "format": "number"}, "phone": {"label": "Phone", "format": "text"},
+        "hours": {"label": "Hours", "format": "text"}, "source": {"label": "Source", "format": "text"}}}
+    }
+  }
+}
