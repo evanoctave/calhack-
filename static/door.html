@@ -153,7 +153,7 @@ async function startDoor() {
   // Unlock audio inside the tap, without awaiting: the tap's permission is single-use, and fullscreen would consume it.
   try { const c = new (window.AudioContext || window.webkitAudioContext)(); c.resume().catch(() => {}); Out.ctx = c; const a = new Audio("/voice/silence.wav"); a.volume = 0.01; a.play().catch(() => {}); } catch (e) {}
   tele("door_started", navigator.userAgent.slice(0, 60)); startCam(); doorConnect(); micConnect(); videoConnect(); earStart();
-  try { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); } catch (e) {}  // last
+  // No automatic fullscreen: it hides Chrome's camera and mic prompts. The page already fills the window.
 }
 // Live voice from the phone (PCM over /ws/door)
 const Spk = {ws: null, ctx: null, t: 0};
