@@ -105,7 +105,7 @@ def test_person_back_after_ack() -> None:
     step(inc, Event("person_enter", at(0)))
     step(inc, Event("person_lost", at(3)))
     step(inc, Event("tick", at(3 + engine.DOOR_WAIT_S)))
-    step(inc, Event("ack", at(30), {"member_id": "TM-SARAH"}))
+    step(inc, Event("ack", at(30), {"member_id": "TM-PRIMARY"}))
     tr = step(inc, Event("person_back", at(60)))
     assert inc.state == State.RETURNED and "notify:returned" in tr.actions
 

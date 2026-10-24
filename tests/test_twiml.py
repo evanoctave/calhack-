@@ -18,14 +18,14 @@ def client(monkeypatch):
 def test_twiml_call_flow(client: TestClient) -> None:
     client.post("/event", json={"kind": "door_open"})
     inc = client.post("/event", json={"kind": "door_close"}).json()["incident_id"]
-    r = client.post(f"/twiml/{inc}/TM-SARAH")
+    r = client.post(f"/twiml/{inc}/TM-PRIMARY")
     assert r.status_code == 200 and "<Gather" in r.text and "navy hoodie" in r.text and 'input="speech"' in r.text
-    r = client.post(f"/twiml/{inc}/TM-SARAH/turn", data={"SpeechResult": "where should I look"})
+    r = client.post(f"/twiml/{inc}/TM-PRIMARY/turn", data={"SpeechResult": "where should I look"})
     assert "Palace of Fine Arts lagoon" in r.text and "<Gather" in r.text
-    r = client.post(f"/twiml/{inc}/TM-SARAH/turn", data={"SpeechResult": "I've got him"})
+    r = client.post(f"/twiml/{inc}/TM-PRIMARY/turn", data={"SpeechResult": "I've got him"})
     assert "<Hangup/>" in r.text
-    assert client.get("/state").json()["incident"]["acked_by"] == "TM-SARAH"
-    assert client.post("/twiml/INC-nope/TM-SARAH").status_code == 404
+    assert client.get("/state").json()["incident"]["acked_by"] == "TM-PRIMARY"
+    assert client.post("/twiml/INC-nope/TM-PRIMARY").status_code == 404
 
 
 def test_agent_turn_json(client: TestClient) -> None:

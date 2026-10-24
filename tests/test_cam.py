@@ -22,12 +22,12 @@ def test_frame_relay_and_takeover(client: TestClient) -> None:
     assert client.get("/cam/latest.jpg").content == b"\xff\xd8abc"
     assert client.post("/takeover", json={"member_id": "TM-NOBODY"}).status_code == 403
     client.post("/event", json={"kind": "person_enter"})
-    assert client.post("/takeover", json={"member_id": "TM-SARAH"}).json()["takeover_by"] == "TM-SARAH"
-    r = client.post("/say", json={"member_id": "TM-SARAH", "text": "Dad, it's me. Come inside."}).json()
+    assert client.post("/takeover", json={"member_id": "TM-PRIMARY"}).json()["takeover_by"] == "TM-PRIMARY"
+    r = client.post("/say", json={"member_id": "TM-PRIMARY", "text": "Dad, it's me. Come inside."}).json()
     assert r["ok"] and r["audio"]["mode"] == "browser_tts"
     log = client.get("/state").json()["log"]
     assert any(e.get("line_source") == f"human:{api.store.hh.tree[0].name}" for e in log)
-    assert client.post("/takeover", json={"member_id": "TM-SARAH", "on": False}).json()["takeover_by"] is None
+    assert client.post("/takeover", json={"member_id": "TM-PRIMARY", "on": False}).json()["takeover_by"] is None
 
 
 def test_clip_relay(client: TestClient) -> None:

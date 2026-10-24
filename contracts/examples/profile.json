@@ -13,7 +13,7 @@
     {"name": "Old flat on Chestnut St, lived there 30 years", "lat": 37.8003, "lng": -122.4350}
   ],
   "contacts": [
-    {"id": "TM-SARAH", "name": "Sarah", "phone": "web", "tier": 1},
+    {"id": "TM-PRIMARY", "name": "Sarah", "phone": "web", "tier": 1},
     {"id": "TM-MIKE", "name": "Mike", "phone": "web", "tier": 2},
     {"id": "TM-LINDA", "name": "Linda (neighbor)", "phone": "web", "tier": 3}
   ],

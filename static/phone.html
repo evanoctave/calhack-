@@ -44,7 +44,7 @@
   <p id="heard" class="small muted">Say "I've got him" to stop the other phones, or ask where to look, what he's wearing, who to call.</p>
 </section>
 <script>
-let member = location.hash.slice(1) || "TM-SARAH";
+let member = location.hash.slice(1) || "TM-PRIMARY";
 let ctxA = null, osc = null, incident = null, feedTimer = null, rec = null, chunks = [], onCall = false, speaking = false, listening = false;
 function $(id) { return document.getElementById(id); }
 async function resolveMember() {
