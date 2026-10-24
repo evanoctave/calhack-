@@ -31,6 +31,8 @@ Demo knobs: `DOOR_WAIT_S=5 ESCALATION_STEP_S=10 ./run.sh` shortens the waits.
 
 Keys: `m` approach, `l` leave frame, `b` back in frame, `o`/`c` door.
 
+R11 wander score (docs/TRACKS.md): direction from the door zone, voice check-in by name, face recognition against enrolled faces, attire, time. Entry from the door and a household member answering at the door never ring; unknown always does.
+
 ## What is real vs mock
 
 | Piece | Real when | Mock otherwise |

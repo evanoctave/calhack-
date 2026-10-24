@@ -24,6 +24,7 @@ from nightfall.actions import emit as _emit
 from nightfall.actions import run_actions as _run_actions
 from nightfall.api_app import router as app_router
 from nightfall.api_cam import router as cam_router
+from nightfall.api_enroll import router as enroll_router
 from nightfall.api_live import router as live_router
 from nightfall.api_setup import router as setup_router
 from nightfall.api_voice import router as voice_router
@@ -89,6 +90,17 @@ async def _step(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
             store.takeover_by, store.call_911_sent = None, False
         inc = store.inc
         inc.night_mode = store.night()
+        if kind == "reply":
+            from nightfall.rules import parse_checkin
+
+            ck, who = parse_checkin(
+                str(payload.get("text", "")),
+                [m.name for m in store.hh.tree] + [store.hh.caregiver_name],
+                store.hh.person_name,
+            )
+            payload = {**payload, "checkin": ck, "who": who}
+            if ck == "self_other":
+                kind = "stand_down"
         store.last_payload = payload
         tr = engine.step(inc, engine.Event(kind, store.now(), payload))
         if kind != "tick" or tr.from_state != tr.to_state:
@@ -297,4 +309,5 @@ app.include_router(cam_router)
 app.include_router(setup_router)
 app.include_router(app_router)
 app.include_router(live_router)
+app.include_router(enroll_router)
 app.mount("/", StaticFiles(directory=str(ROOT / "static")), name="static")

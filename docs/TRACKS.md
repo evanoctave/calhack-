@@ -10,6 +10,21 @@
 | Meta (Bringing People Closer) | phone tree, live feed, takeover | The relative answers, sees the door, and speaks to their parent through the house in their own voice | |
 | Best People-First | whole flow | The person at the door is never argued with, never told they have dementia; the relative decides about 911 | |
 
+## Telling a wander from a late arrival or a smoke break (R11)
+
+Deterministic wander score, every input owned by code and logged with its reason:
+
+| Signal | Source | Effect |
+|---|---|---|
+| Direction | door-zone track geometry in the browser | entry from the door = ignore; exit toward it = counts |
+| Voice check-in | the door line is a question; reply parsed by code | a care-circle member naming themselves = stand down (-50); a coherent errand = -15; no identification = +15 |
+| Identity | face recognition in the browser against enrolled descriptors; label sticks to the track when they turn away | monitored person +20; other household member -45; unknown = no change |
+| Attire | clothing enums from the exit frame | nightwear, slippers, barefoot +15 |
+| Time | night window or manual arm | daytime -20 (and R0 already gates) |
+
+Baseline 60. Under 30 ignore; 30-59 speak at the door but do not ring; 60+ ring. Unknown everything still rings:
+a false alarm costs one phone one ring, a miss can cost a life. No PIN, nothing for the person to remember.
+
 ## Named community (Anthropic)
 
 Adult children in Orange County caring for a parent with dementia at home overnight, without paid help.

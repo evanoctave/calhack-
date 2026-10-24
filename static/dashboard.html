@@ -5,6 +5,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4.1646425229/face_detection.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-detection@1.0.3/dist/face-detection.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
 <script src="/cam.js"></script>
 <style>
 body { padding: 16px 0 32px; } .phone { max-width: 1180px; }
@@ -54,7 +55,11 @@ input { padding: 10px 14px; font-size: 15px; } .tabs { display: none; }
     <h2>Camera (laptop webcam, person detection)</h2>
     <div class="camwrap"><video id="cam" autoplay muted playsinline width="320" height="240"></video><canvas id="overlay" width="320" height="240"></canvas></div>
     <div class="rowb" style="margin-top:10px"><button class="btn small primary" onclick="startCam()">Enable camera</button><span id="persondot" class="dot"></span><span id="persontxt" class="small">no person</span></div>
-    <div id="camstat" class="muted small" style="margin-top:4px">off. Person enters frame = approach (voice starts); leaves frame 3 s = exit timer; back in frame = returned.</div>
+    <div id="camstat" class="muted small" style="margin-top:4px">off. Person enters frame = approach (voice starts); leaves frame 1.5 s = exit timer; back in frame = returned.</div>
+    <div class="rowb" style="margin-top:10px"><span id="idtxt" class="small">identity: unknown</span><span class="pill" id="scorepill">wander score —</span></div>
+    <div class="rowb" style="margin-top:10px"><span class="small muted">Door is at the</span>
+      <select id="dooredge" onchange="setDoorEdge(this.value)" style="width:auto;padding:6px 10px"><option value="far">far end (small = near door)</option><option value="left">left edge</option><option value="right">right edge</option><option value="top">top edge</option></select></div>
+    <div class="rowb" style="margin-top:10px"><button class="btn small" onclick="enroll('person')">Enroll the person being watched</button><button class="btn small" onclick="enroll('other')">Enroll a household member</button><span id="enrolled" class="small muted">nobody enrolled</span></div>
     <div id="takeover" class="banner" hidden style="margin-top:8px"></div>
   </section>
   <section class="card">
@@ -78,6 +83,7 @@ function render(s) {
   const inc = s.incident; const st = inc ? inc.state : "ARMED_IDLE";
   document.getElementById("state").textContent = st; document.getElementById("inc").textContent = inc ? inc.id : "";
   document.getElementById("sdot").className = "dot " + ({ESCALATING:"danger",EXHAUSTED:"danger",DOOR_OPEN:"warn",CONVERSATION:"accent",ACKED:"ok",RETURNED:"ok"}[st] || "");
+  const sc = document.getElementById("scorepill"); if (sc) { const f = (s.log || []).slice().reverse().find(e => e.type === "state" && /score \d+/.test(e.detail || "")); const m = f && f.detail.match(/score (\d+)/); sc.textContent = inc && m ? "wander score " + m[1] : "wander score —"; }
   document.getElementById("deadline").textContent = inc && inc.deadline_at ? "Call 911 at " + fmtTime(inc.deadline_at) + " if not found (15-minute rule)." : "";
   const nameOf = id => (s.household.tree.find(m => m.id === id) || {name: id}).name; s.rings = (s.rings || []).map(r => ({...r, members: r.members.map(nameOf)}));
   const tree = document.getElementById("tree"); tree.innerHTML = s.household.tree.map(m => `<li>Tier ${m.tier}: ${esc(m.name)} <a class="small" href="/phone.html#${esc(m.id)}" target="_blank">phone page</a></li>`).join("");
@@ -109,6 +115,9 @@ function line(e) {
   else if (e.type === "takeover") body = `<span class="pill danger">takeover</span> ${e.on ? esc(e.by) + " speaking for the AI" : "handed back to the AI"}`;
   else if (e.type === "returned") body = `<span class="pill ok">returned</span> person back in frame, rings cancelled`;
   else if (e.type === "call_911_option") body = `<span class="pill danger">911 option</span> shown on every phone`;
+  else if (e.type === "features") body = `<span class="pill">R11</span> wander score ${esc(e.score)} · ${esc((e.reasons || []).join("; "))}`;
+  else if (e.type === "stand_down") body = `<span class="pill ok">stand down</span> ${esc(e.who)} · ${esc(e.detail)}`;
+  else if (e.type === "watch_only") body = `<span class="pill">watch only</span> ${esc(e.detail)}`;
   else if (e.type === "call") body = `<span class="pill">call agent</span> ${esc(e.member_id)} heard "${esc(e.heard || "")}" -> ${esc(e.intent)}`;
   else if (e.type === "ring") body = `<span class="pill danger">ring tier ${esc(e.tier)}</span> ${esc((e.members||[]).join(", "))} <span class="muted small">${esc(e.source || "")} ${esc(e.result || "")}</span>`;
   else if (e.type === "brief_ready") body = `<span class="pill">brief</span> built for ${esc(e.incident_id)}`;
@@ -143,6 +152,7 @@ sse("/sse/dashboard", async e => {
 });
 document.addEventListener("keydown", e => { if (e.target.tagName === "INPUT") return; if (e.key === "o") ev("door_open"); if (e.key === "c") ev("door_close"); if (e.key === "m") ev("person_enter"); if (e.key === "l") ev("person_lost"); if (e.key === "b") ev("person_back"); });
 refresh(); setInterval(refresh, 5000);
+try { document.getElementById("dooredge").value = localStorage.getItem("nf-door-edge") || "far"; } catch (e) {}
 // Live voice from a relative: PCM 16 kHz Int16 frames over /ws/door, scheduled back-to-back with a 120 ms jitter buffer.
 const Door = {ws: null, ctx: null, t: 0};
 function doorConnect() {

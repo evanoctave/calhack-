@@ -63,6 +63,9 @@ function render() {
     ev.push(["Voice check-in", inc.lines_spoken ? (inc.state === "RETURNED" ? "Returned inside" : inc.lines_spoken + " line" + (inc.lines_spoken > 1 ? "s" : "") + " spoken · no return confirmed") : "Not started", ""]);
     S.rings.forEach((r, i) => { const prev = S.rings[i - 1]; ev.push([(i + 1) + " · Calling " + r.members.join(", "), prev ? `${i} · ${prev.members.join(", ")} did not answer within ${S.ladder_step_s} sec.` : "", "sub"]); });
     if (inc.exited_at) ev.push(["Headed", headingText(inc.heading), ""]);
+    if (inc.wander) ev.push(["Why we " + (inc.wander.action === "escalate" ? "rang" : "did not ring"), "score " + inc.wander.score + " · " + inc.wander.reasons.join("; "), "sub"]);
+    if (inc.identity !== "unknown") ev.push(["Face", inc.identity === "match" ? "matched " + (h.person_full_name.split(" ")[0] || h.person_name) : "a different person", inc.identity === "match" ? "danger" : "ok"]);
+    if (inc.checkin === "self_other") ev.push(["Check-in", inc.checkin_who + " answered at the door", "ok"]);
     if (inc.exited_at) ev.push(["Emergency services", inc.emergency && inc.emergency.option_shown ? "Call 911 option shown. Not called." : "Not called. You decide.", inc.emergency && inc.emergency.option_shown ? "danger" : ""]);
     if (inc.acked_by_name) ev.push(["Acknowledged", inc.acked_by_name + " is responding", "ok"]);
     if (inc.state === "RETURNED") ev.push(["Back inside", "Rings cancelled", "ok"]);
@@ -100,6 +103,7 @@ function tickCountdown() {
     $(k + "-cdt").textContent = "Out of view · this phone rings in " + left.toFixed(1) + " s"; $(k + "-cds").textContent = "Back in frame cancels it."; });
 }
 setInterval(tickCountdown, 200);
+function notice(t, sub) { $("h-noticet").textContent = t; $("h-notices").textContent = sub; $("h-notice").hidden = false; setTimeout(() => { $("h-notice").hidden = true; }, 60000); if (!["respond"].includes(location.hash.slice(1))) go("home"); }
 function cap(s) { s = s.replace(/unknown ?/g, "").trim(); return s ? s[0].toUpperCase() + s.slice(1) : "See photo"; }
 function setHero(id, inc) { const el = $(id); const f = inc && inc.exit_frame; el.innerHTML = f ? `<img src="${esc(f)}" alt="exit frame">` : '<div class="door"></div><div class="line"></div>'; }
 let briefLoaded = "";
@@ -157,6 +161,8 @@ function onEvent(e) {
   if (e.type === "ring") { ringNow(e.incident_id, e.message); refresh(); }
   if (e.type === "acked" || e.type === "returned") { stopRing(); refresh(); }
   if (e.type === "brief_updated" || e.type === "deadline" || e.type === "call_911_option" || e.type === "takeover") refresh();
+  if (e.type === "stand_down") { stopRing(); $("incoming").hidden = true; notice((e.who || "A household member") + " stepped out", "No alert. " + (e.detail || "")); refresh(); }
+  if (e.type === "watch_only") { notice("Someone left, watching only", "Nightfall is not ringing the family for this one. " + (e.detail || "")); refresh(); }
 }
 (async function main() {
   await resolveMember(); await refresh(); connect(); setInterval(refresh, 2000);

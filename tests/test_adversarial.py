@@ -53,3 +53,10 @@ def test_tampered_or_foreign_tokens(client: TestClient) -> None:
     assert client.get("/brief/aaaa.bbbb").status_code == 404
     assert client.get("/brief/").status_code in (404, 405)
     assert client.get("/voice/../../etc/passwd").status_code == 404
+
+
+def test_reply_naming_a_care_circle_member_stands_down(client: TestClient) -> None:
+    client.post("/event", json={"kind": "person_enter"})
+    r = client.post("/event", json={"kind": "reply", "payload": {"text": "It's Mike, just getting some air"}}).json()
+    assert r["to"] == "RETURNED" and "Mike" in r["detail"]
+    assert client.get("/state").json()["rings"] == []

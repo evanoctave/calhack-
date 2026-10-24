@@ -16,7 +16,7 @@ async function startCam() {
   Cam.on = true; camStatus("loading detector...");
   try { Cam.model = await cocoSsd.load({base: "lite_mobilenet_v2"}); camStatus("detector ready. walk into frame = approach; out of frame 1.5 s = exit timer."); }
   catch (e) { camStatus("detector failed to load (offline?); falling back to motion"); }
-  loadFace();
+  loadFace(); loadFaceApi();
   setInterval(camTick, 250);
 }
 
@@ -36,7 +36,7 @@ async function camTick() {
     drawBoxes(boxes, present);
     if (present && blob) { Cam.personFrames.push(blob); if (Cam.personFrames.length > 3) Cam.personFrames.shift(); }
     const now = Date.now();
-    if (present) { Cam.hits++; Cam.lastSeenAt = now; trackAway(boxes, now); await checkFace(true, now); } else { Cam.hits = 0; Cam.heights = []; Cam.faceMisses = 0; Cam.awaySince = 0; Cam.awayLostSent = false; }
+    if (present) { Cam.hits++; Cam.lastSeenAt = now; trackAway(boxes, now); await checkFace(true, now); await identify(now); } else { Cam.hits = 0; Cam.heights = []; Cam.faceMisses = 0; Cam.awaySince = 0; Cam.awayLostSent = false; }
     if (!Cam.present && Cam.hits >= 2) { Cam.present = true; await onEnter(); }
     if (Cam.present && now - Cam.lastSeenAt >= Cam.lostMs) { Cam.present = false; await onLost(); }
     if (blob && now - Cam.relayAt > 400 && window.lastState && window.lastState.incident && !["CLOSED"].includes(window.lastState.incident.state)) {
@@ -91,7 +91,7 @@ function heading() {
 }
 function trackAway(boxes, now) {
   const big = boxes.reduce((m, b) => b.bbox[3] > m.bbox[3] ? b : m, boxes[0]);
-  Cam.track.push({t: now, cx: big.bbox[0] + big.bbox[2] / 2, h: big.bbox[3]}); Cam.track = Cam.track.filter(p => now - p.t < 2000);
+  const pt = {t: now, cx: big.bbox[0] + big.bbox[2] / 2, cy: big.bbox[1] + big.bbox[3] / 2, h: big.bbox[3]}; if (!Door.first) Door.first = pt; Cam.track.push(pt); Cam.track = Cam.track.filter(p => now - p.t < 2000);
   const h = Math.max(...boxes.map(b => b.bbox[3])); Cam.heights.push([now, h]); Cam.heights = Cam.heights.filter(([t]) => now - t < 1200);
   if (Cam.heights.length < 4) return; const first = Cam.heights[0][1];
   if (h < first * 0.85 && now - Cam.awayAt > 15000) { Cam.awayAt = now; camStatus("moving away from the camera: voice starts"); const st = window.lastState && window.lastState.incident ? window.lastState.incident.state : ""; if (!["CONVERSATION", "DOOR_OPEN", "ESCALATING"].includes(st)) post("/event", {kind: "person_enter", payload: {source: "coco-ssd", reason: "moving away"}}).then(() => window.refresh && refresh()); }
@@ -100,15 +100,66 @@ function sendBack(reason) { const st = window.lastState && window.lastState.inci
 async function onEnter() {
   const st = window.lastState && window.lastState.incident ? window.lastState.incident.state : "";
   const kind = ["DOOR_OPEN", "ESCALATING"].includes(st) ? "person_back" : "person_enter";
-  Cam.lastEvent = kind; await post("/event", {kind, payload: {source: "coco-ssd"}}); if (window.refresh) refresh();
+  Cam.lastEvent = kind; Face.label = "unknown"; Face.votes = []; Door.first = Cam.track[0] || null;
+  const dir = Door.first && nearDoor(Door.first) ? "entry" : "unknown";
+  await post("/event", {kind, payload: {source: "coco-ssd", identity: Face.label, direction: dir}}); if (window.refresh) refresh();
 }
 async function onLost() {
-  const hd = heading(); Cam.lastEvent = "person_lost"; camStatus("left the frame heading " + hd + ": exit clock starts");
-  await post("/event", {kind: "person_lost", payload: {source: "coco-ssd", heading: hd}}); if (window.refresh) refresh();
+  const hd = heading(), dir = direction(); Cam.lastEvent = "person_lost"; camStatus("left the frame heading " + hd + " (" + dir + ", identity " + Face.label + ")");
+  await post("/event", {kind: "person_lost", payload: {source: "coco-ssd", heading: hd, direction: dir, identity: Face.label}}); Door.first = null; if (window.refresh) refresh();
 }
 async function postFrames(id) {
   const frames = Cam.personFrames.length ? Cam.personFrames : Cam.ring.slice(-3);
   if (!frames.length) return;
   const fd = new FormData(); frames.forEach((b, k) => fd.append("f" + k, b, "f" + k + ".jpg"));
   await fetch("/frames/" + id, {method: "POST", body: fd});
+}
+
+// ---- Identity (face-api.js) and door-zone direction ----
+// Enrolled descriptors come from /enroll: label "person" (the monitored person) or "other" (household member).
+const Face = {api: null, ready: false, enrolled: [], lastAt: 0, label: "unknown", labelAt: 0, votes: []};
+async function loadFaceApi() {
+  try {
+    if (!window.faceapi) throw new Error("face-api not loaded");
+    const base = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model";
+    await faceapi.nets.tinyFaceDetector.loadFromUri(base); await faceapi.nets.faceLandmark68TinyNet.loadFromUri(base); await faceapi.nets.faceRecognitionNet.loadFromUri(base);
+    Face.api = faceapi; Face.ready = true; await loadEnrolled(); camStatus("face recognition ready · " + Face.enrolled.length + " enrolled");
+  } catch (e) { console.warn("face recognition unavailable", e); camStatus("face recognition unavailable; identity stays unknown (rings by default)"); }
+}
+async function loadEnrolled() { try { Face.enrolled = (await (await fetch("/enroll")).json()).faces || []; } catch (e) { Face.enrolled = []; } const el = document.getElementById("enrolled"); if (el) el.textContent = Face.enrolled.map(f => f.name + " (" + f.label + ")").join(", ") || "nobody enrolled"; }
+async function descriptorNow() {
+  if (!Face.ready) return null;
+  const det = await Face.api.detectSingleFace(Cam.canvas, new Face.api.TinyFaceDetectorOptions({inputSize: 224, scoreThreshold: 0.4})).withFaceLandmarks(true).withFaceDescriptor();
+  return det ? Array.from(det.descriptor) : null;
+}
+function dist(a, b) { let s = 0; for (let i = 0; i < a.length; i++) { const d = a[i] - b[i]; s += d * d; } return Math.sqrt(s); }
+async function identify(now) {
+  if (!Face.ready || !Face.enrolled.length || now - Face.lastAt < 900) return;
+  Face.lastAt = now; const d = await descriptorNow(); if (!d) return;
+  let best = null; for (const f of Face.enrolled) { const x = dist(d, f.descriptor); if (!best || x < best.x) best = {x, f}; }
+  const label = best && best.x < 0.55 ? (best.f.label === "person" ? "match" : "other") : "unknown";
+  Face.votes.push(label); Face.votes = Face.votes.slice(-3);
+  const agreed = Face.votes.length === 3 && Face.votes.every(v => v === label) ? label : null;
+  const t = document.getElementById("idtxt"); if (t) t.textContent = "identity: " + label + (best ? " (" + best.f.name + " " + best.x.toFixed(2) + ")" : "");
+  if (agreed && agreed !== Face.label) { Face.label = agreed; Face.labelAt = now; post("/event", {kind: "features", payload: {identity: agreed, who: best ? best.f.name : ""}}).then(() => window.refresh && refresh()); }
+}
+async function enroll(label) {
+  const name = prompt(label === "person" ? "Name of the person being watched over (e.g. Robert)" : "Household member's name (e.g. Mike)"); if (!name) return;
+  camStatus("look at the camera…"); const samples = [];
+  for (let i = 0; i < 4 && samples.length < 3; i++) { const d = await descriptorNow(); if (d) samples.push(d); await new Promise(r => setTimeout(r, 350)); }
+  if (!samples.length) { camStatus("no face found; face the camera and try again"); return; }
+  const mean = samples[0].map((_, k) => samples.reduce((a, s) => a + s[k], 0) / samples.length);
+  await post("/enroll", {label, name, descriptor: mean}); await loadEnrolled(); camStatus("enrolled " + name + " as " + label);
+}
+// Door zone: which edge of the frame the door is on. Entry = track started at that edge; exit = track ended there.
+const Door = {edge: (() => { try { return localStorage.getItem("nf-door-edge") || "far"; } catch (e) { return "far"; } })(), first: null};
+function setDoorEdge(e) { Door.edge = e; try { localStorage.setItem("nf-door-edge", e); } catch (ex) {} camStatus("door is at the " + e + " of the frame"); }
+function nearDoor(p) { const W = 320, H = 240; switch (Door.edge) { case "left": return p.cx < W * 0.3; case "right": return p.cx > W * 0.7; case "top": return p.cy < H * 0.35; case "far": return p.h < H * 0.45; default: return false; } }
+function direction() {
+  const tr = Cam.track; if (!tr.length) return "unknown";
+  const first = Door.first || tr[0], last = tr[tr.length - 1];
+  const startedAtDoor = nearDoor(first), endsAtDoor = nearDoor(last) || last.h < first.h * 0.8;
+  if (startedAtDoor && !endsAtDoor) return "entry";
+  if (!startedAtDoor && endsAtDoor) return "exit";
+  return "unknown";
 }

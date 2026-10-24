@@ -40,6 +40,17 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
                 emit(store, {"type": "memory", "query": reply, "hits": hits, "source": store.memory.source})
             line, source = llm.next_line(store.hh, store.history, hits)
             _speak(store, line, source)
+        elif a == "notify:stand_down":
+            who = inc.checkin_who or ("another person" if inc.identity == "other" else "someone")
+            for m in store.hh.tree:
+                store.hub.publish(
+                    f"phone:{m.id}", {"type": "stand_down", "incident_id": inc.id, "who": who, "detail": tr.detail}
+                )
+            emit(store, {"type": "stand_down", "incident_id": inc.id, "who": who, "detail": tr.detail})
+        elif a == "notify:watch_only":
+            for m in store.hh.tree:
+                store.hub.publish(f"phone:{m.id}", {"type": "watch_only", "incident_id": inc.id, "detail": tr.detail})
+            emit(store, {"type": "watch_only", "incident_id": inc.id, "detail": tr.detail})
         elif a == "notify:returned":
             for m in store.hh.tree:
                 store.hub.publish(f"phone:{m.id}", {"type": "returned", "incident_id": inc.id})
@@ -119,6 +130,20 @@ def start_vision(store: Store, incident_id: str) -> None:
         try:
             c = await asyncio.to_thread(llm.describe_clothing, store.frame_bytes.get(incident_id))
             store.clothing[incident_id] = c
+            from nightfall.rules import attire_is_night
+
+            if store.inc is not None and store.inc.id == incident_id:
+                store.inc.attire_night = attire_is_night(c)
+                emit(
+                    store,
+                    {
+                        "type": "features",
+                        "incident_id": incident_id,
+                        "attire_night": store.inc.attire_night,
+                        "score": store.inc.verdict().score,
+                        "reasons": list(store.inc.verdict().reasons),
+                    },
+                )
             b = store.briefs.get(incident_id)
             if b is not None:
                 b["clothing"], b["clothing_line"] = c, briefmod.clothing_line(c)

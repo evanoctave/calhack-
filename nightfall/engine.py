@@ -14,6 +14,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Final
 
+from nightfall.rules import Features, wander_score
+from nightfall.rules import Verdict as RuleVerdict
+
 
 class State(str, Enum):
     ARMED_OFF = "ARMED_OFF"
@@ -54,6 +57,17 @@ class Incident:
     last_line_at: datetime | None = None
     person_in_frame: bool = False
     heading: str = "unknown"
+    identity: str = "unknown"
+    direction: str = "unknown"
+    checkin: str = "none"
+    checkin_who: str = ""
+    attire_night: bool = False
+
+    def features(self) -> Features:
+        return Features(self.identity, self.direction, self.checkin, self.attire_night, self.night_mode)
+
+    def verdict(self) -> RuleVerdict:
+        return wander_score(self.features())
 
     @property
     def deadline_at(self) -> datetime | None:
@@ -94,7 +108,38 @@ def _motion(inc: Incident, ev: Event) -> Transition:
     inc.lines_spoken = 1
     inc.last_line_at = ev.ts
     inc.person_in_frame = ev.kind == "person_enter"
-    return _t(inc, State.CONVERSATION, ("speak:open",), "R0", "ok")
+    _absorb(inc, ev)
+    v = inc.verdict()
+    if v.action == "ignore":
+        return _ignored(inc, ev, "R11 " + "; ".join(v.reasons))
+    return _t(inc, State.CONVERSATION, ("speak:open",), "R0", f"ok; wander score {v.score}")
+
+
+def _absorb(inc: Incident, ev: Event) -> None:
+    """Copy detector facts from an event payload onto the incident (code-owned inputs to the score)."""
+    p = ev.payload
+    if p.get("identity") in ("match", "other", "unknown"):
+        inc.identity = str(p["identity"])
+    if p.get("direction") in ("exit", "entry", "unknown"):
+        inc.direction = str(p["direction"])
+    if p.get("checkin"):
+        inc.checkin = str(p["checkin"])
+        inc.checkin_who = str(p.get("who", ""))
+    if "attire_night" in p:
+        inc.attire_night = bool(p["attire_night"])
+
+
+def _stand_down(inc: Incident, ev: Event) -> Transition:
+    """A care-circle member identified themselves, or the face is a known other: no wander."""
+    _absorb(inc, ev)
+    v = inc.verdict()
+    if v.action != "ignore" and inc.checkin != "self_other":
+        return _ignored(inc, ev, f"R11 score {v.score}, staying alert")
+    who = inc.checkin_who or ("another person" if inc.identity == "other" else "")
+    actions: tuple[str, ...] = (
+        ("cancel_escalation", "notify:stand_down") if inc.state == State.ESCALATING else ("notify:stand_down",)
+    )
+    return _t(inc, State.RETURNED, actions, "R11", f"stand down: {who}; " + "; ".join(v.reasons))
 
 
 def _reply(inc: Incident, ev: Event) -> Transition:
@@ -171,7 +216,16 @@ def _door_open(inc: Incident, ev: Event) -> Transition:
 
 def _exit(inc: Incident, ev: Event, detail: str) -> Transition:
     inc.exited_at = ev.ts
-    return _t(inc, State.ESCALATING, ("build_brief", "start_escalation"), "R2", detail)
+    v = inc.verdict()
+    if v.action == "speak_only":
+        return _t(
+            inc,
+            State.ESCALATING,
+            ("build_brief", "notify:watch_only"),
+            "R11",
+            f"{detail}; score {v.score}, no ring: " + "; ".join(v.reasons),
+        )
+    return _t(inc, State.ESCALATING, ("build_brief", "start_escalation"), "R2", f"{detail}; score {v.score}")
 
 
 def _door_close(inc: Incident, ev: Event) -> Transition:
@@ -209,6 +263,13 @@ def _tick_escalating(inc: Incident, ev: Event) -> Transition:
     return _ignored(inc, ev, "escalating")
 
 
+def _features(inc: Incident, ev: Event) -> Transition:
+    """Detector update (identity, direction, attire) without a state change."""
+    _absorb(inc, ev)
+    v = inc.verdict()
+    return Transition(inc.state, inc.state, (), "R11", f"score {v.score} ({v.action}): " + "; ".join(v.reasons))
+
+
 def _close(inc: Incident, ev: Event) -> Transition:
     return _t(inc, State.CLOSED, ("delete_frames",), "R10", "closed")
 
@@ -218,6 +279,12 @@ TRANSITIONS: Final[dict[tuple[State, str], Handler]] = {
     (State.ARMED_IDLE, "person_enter"): _motion,
     (State.ARMED_IDLE, "person_lost"): _lost_from_idle,
     (State.CONVERSATION, "tick"): _tick_conversation,
+    (State.CONVERSATION, "stand_down"): _stand_down,
+    (State.DOOR_OPEN, "stand_down"): _stand_down,
+    (State.ESCALATING, "stand_down"): _stand_down,
+    (State.CONVERSATION, "features"): _features,
+    (State.DOOR_OPEN, "features"): _features,
+    (State.ARMED_IDLE, "features"): _features,
     (State.CONVERSATION, "person_lost"): _person_lost,
     (State.DOOR_OPEN, "person_back"): _person_back_door,
     (State.ESCALATING, "person_back"): _person_back_escalating,

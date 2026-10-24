@@ -155,3 +155,4 @@ out/
 data/*.db*
 __pycache__/
 .pytest_cache/
+data/faces.json
