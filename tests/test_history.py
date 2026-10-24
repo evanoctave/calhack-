@@ -15,7 +15,9 @@ def tmp_history(monkeypatch, tmp_path):
 def test_record_and_summary() -> None:
     t0 = datetime(2026, 10, 25, 2, 0)
     history.record("INC-1", t0, t0 + timedelta(seconds=10), t0 + timedelta(minutes=6), "returned", "left", None, 80)
-    history.record("INC-2", t0, t0 + timedelta(seconds=10), t0 + timedelta(minutes=12), "acked", "left", "TM-SARAH", 60)
+    history.record(
+        "INC-2", t0, t0 + timedelta(seconds=10), t0 + timedelta(minutes=12), "acked", "left", "TM-PRIMARY", 60
+    )
     history.record("INC-3", t0, None, t0 + timedelta(minutes=1), "stand_down", "unknown", None, 10)
     s = history.summary(history.load())
     assert s["count"] == 2 and s["typical_minutes"] == pytest.approx(8.9, abs=0.2) and s["headings"] == ["left"]

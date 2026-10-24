@@ -67,7 +67,7 @@ def in_window(t: time, start: time, end: time) -> bool:
 
 
 def phone_env(member_id: str) -> str:
-    """Real numbers live in .env (PHONE_TM_SARAH=+1...), never in the tracked household file."""
+    """Real numbers live in .env (PHONE_TM_PRIMARY=+1...), never in the tracked household file."""
     return "PHONE_" + member_id.replace("-", "_").upper()
 
 

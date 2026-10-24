@@ -5,7 +5,7 @@
   {"type": "brief_ready", "incident_id": "INC-0001"},
   {"type": "ring", "tier": 1, "members": ["Sarah"], "source": "sse"},
   {"type": "ring", "message": "Dad has left the house at 2:14 AM. Open the brief.", "link": "http://127.0.0.1:8000/brief.html#abc", "incident_id": "INC-0001", "tier": 1},
-  {"type": "acked", "by": "TM-SARAH", "incident_id": "INC-0001"},
+  {"type": "acked", "by": "TM-PRIMARY", "incident_id": "INC-0001"},
   {"type": "deadline", "incident_id": "INC-0001"},
   {"type": "tree", "member": {"id": "TM-JUDGE", "name": "Judge", "phone": "web", "tier": 1}},
   {"type": "arm", "night_mode": true},

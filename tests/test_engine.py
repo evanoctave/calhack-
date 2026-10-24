@@ -58,8 +58,8 @@ def test_ack_then_close() -> None:
     inc = Incident("INC-1")
     step(inc, Event("door_open", at(0)))
     step(inc, Event("door_close", at(5)))
-    tr = step(inc, Event("ack", at(40), {"member_id": "TM-SARAH"}))
-    assert inc.state == State.ACKED and inc.acked_by == "TM-SARAH" and "cancel_escalation" in tr.actions
+    tr = step(inc, Event("ack", at(40), {"member_id": "TM-PRIMARY"}))
+    assert inc.state == State.ACKED and inc.acked_by == "TM-PRIMARY" and "cancel_escalation" in tr.actions
     step(inc, Event("close", at(50)))
     assert inc.state == State.CLOSED
 

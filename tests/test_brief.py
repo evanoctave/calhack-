@@ -11,8 +11,8 @@ NOW = datetime(2026, 10, 25, 2, 3)
 
 
 def test_token_roundtrip_tamper_expiry() -> None:
-    t = brief.mint("INC-1", "TM-SARAH", NOW)
-    assert brief.verify(t, NOW) == ("INC-1", "TM-SARAH")
+    t = brief.mint("INC-1", "TM-PRIMARY", NOW)
+    assert brief.verify(t, NOW) == ("INC-1", "TM-PRIMARY")
     with pytest.raises(brief.BriefError) as e:
         brief.verify(t[:-1] + ("a" if t[-1] != "a" else "b"), NOW)
     assert e.value.status == 404
