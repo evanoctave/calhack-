@@ -77,7 +77,9 @@ def next_line(hh: Household, history: Sequence[tuple[str, str]], hits: Sequence[
             max_tokens=80,
         )
         line = out.strip().strip('"').splitlines()[0] if out.strip() else ""
-        line = line.replace(" — ", ", ").replace("—", ", ").replace("–", ", ").replace("’", "'")
+        line = line.replace(" — ", ", ").replace("—", ", ").replace("–", ", ").replace("’", "'").strip()
+        if line and line[-1] not in ".?!":
+            line += "."
         ok, why = validate(line)
         if ok and _mentions_medication(hh, line):
             ok, why = False, "medication named"
