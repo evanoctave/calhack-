@@ -85,3 +85,17 @@ def test_identity_match_rings_with_reason(client: TestClient) -> None:
     w = s["incident"]["wander"]
     assert w["score"] == 80 and w["action"] == "escalate" and any("monitored person" in r for r in w["reasons"])
     assert s["rings"]
+
+
+def test_new_approach_supersedes_watch_only_incident(client: TestClient) -> None:
+    client.post("/event", json={"kind": "person_enter"})
+    client.post("/event", json={"kind": "features", "payload": {"identity": "other"}})
+    client.post("/event", json={"kind": "person_lost", "payload": {"direction": "exit"}})
+    client.post("/event", json={"kind": "door_close"})
+    first = client.get("/state").json()["incident"]["id"]
+    r = client.post("/event", json={"kind": "person_enter", "payload": {"identity": "match"}}).json()
+    assert r["incident_id"] != first and r["to"] == "CONVERSATION"
+    client.post("/event", json={"kind": "person_lost", "payload": {"direction": "exit"}})
+    client.post("/event", json={"kind": "door_close"})
+    s = client.get("/app/state").json()
+    assert s["incident"]["wander"]["action"] == "escalate" and s["rings"]

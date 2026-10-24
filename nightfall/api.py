@@ -83,7 +83,16 @@ async def _step(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
     async with store.lock:
         done = (engine.State.CLOSED, engine.State.RETURNED, engine.State.ACKED, engine.State.EXHAUSTED)
         fresh = kind in ("motion", "person_enter", "door_open")
-        if store.inc is None or store.inc.state == engine.State.CLOSED or (store.inc.state in done and fresh):
+        watch_only = (
+            store.inc is not None
+            and store.inc.state == engine.State.ESCALATING
+            and store.inc.verdict().action != "escalate"
+        )
+        if (
+            store.inc is None
+            or store.inc.state == engine.State.CLOSED
+            or (fresh and (store.inc.state in done or watch_only))
+        ):
             if store.inc is not None and store.inc.state != engine.State.CLOSED:
                 await store.runner.cancel(store.inc.id)
             store.inc = engine.Incident(id=f"INC-{secrets.token_hex(4)}", night_mode=store.night())
