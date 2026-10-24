@@ -1,165 +1,271 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Nightfall</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#e8eef4">
+<title>Nightfall</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="/app.js"></script><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head><body>
-<button class="themebtn" onclick="toggleTheme()">theme</button>
+<span id="clock" hidden></span>
 <div class="phone">
-<div class="status"><span id="clock">2:07</span><span>5G · 100%</span></div>
+
+<!-- ============ SET UP ============ -->
+
+<section id="s-setup" class="screen">
+  <header class="head"><p class="eyebrow">Nightfall</p><h1>Ready for tonight</h1><p class="sub" id="su-sub">Dad's care, in one place.</p></header>
+  <div class="card"><div class="row link" onclick="go('profile')"><div><span class="k" id="su-person">Dad (Robert), 78</span><span class="sub2" id="su-person2">Sarah · Daughter · Care details</span></div></div></div>
+  <div class="card"><div class="row link" onclick="go('voice')"><div><span class="k">Family voice</span><span class="sub2" id="su-voice">Record or choose a familiar voice</span></div></div></div>
+  <div class="card"><div class="row link" onclick="go('calls')"><div><span class="k">Call order</span><span class="sub2" id="su-calls">1 Sarah → 2 Mike → 3 Linda</span></div></div></div>
+  <div class="card"><div class="row link" onclick="go('places')"><div><span class="k">Home &amp; nearby places</span><span class="sub2" id="su-places">San Francisco Marina · 1.5 mi</span></div></div></div>
+  <div class="pair"><button class="btn" onclick="go('camera')">Door camera</button><button class="btn" onclick="showArm()">Phone alerts</button></div>
+  <div class="actions"><button class="btn primary" onclick="go('home')">Start night watch</button></div>
+</section>
 
 <section id="s-profile" class="screen">
-  <div class="topline"><span class="muted small">Set up Nightfall</span><span class="tag">1 of 2</span></div>
-  <h1>Who are we caring for?</h1><p class="sub">A few details for your care circle.</p>
-  <div class="label">Full name</div><input id="p-name" placeholder="Robert Miller">
-  <div class="label">Short name they answer to · age</div><div style="display:flex;gap:8px"><input id="p-short" placeholder="Dad"><input id="p-age" type="number" placeholder="74" style="width:110px"></div>
-  <div class="label">Home address</div><input id="p-addr" placeholder="120 Example St, San Francisco">
-  <div class="label">Your name (caregiver)</div><input id="p-care" placeholder="Sarah">
-  <div class="label">What police ask for · physical description</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><input id="p-sex" placeholder="sex"><input id="p-height" placeholder="height"><input id="p-weight" placeholder="weight"><input id="p-hair" placeholder="hair"><input id="p-eyes" placeholder="eyes"><input id="p-build" placeholder="build"></div>
-  <input id="p-marks" class="mt" placeholder="distinguishing marks, gait, glasses">
-  <div class="label">Diagnosis, in the words you'd tell a dispatcher</div><input id="p-diag" placeholder="Alzheimer's, moderate stage; may not answer to his name">
-  <div class="label">Doctor</div><div style="display:flex;gap:8px"><input id="p-docname" placeholder="name, clinic"><input id="p-docphone" placeholder="phone" style="width:140px"></div>
-  <div class="label">Familiar places</div><div class="card" id="p-places"></div>
-  <div class="label">Care circle · Call order</div><div class="card" id="p-tree"></div>
-  <div style="display:flex;gap:8px;margin-top:8px"><input id="p-newname" placeholder="Add a contact name"><button class="btn small" onclick="addMember()">Add</button></div>
-  <p class="cap" id="p-ladder"></p>
-  <button class="btn primary" onclick="saveProfile()">Continue</button>
+  <header class="head"><a class="back" onclick="go('setup')">Setup</a><h1>Who are we caring for?</h1><p class="sub">Start with Dad's details and your relationship.</p></header>
+  <div class="card pad"><p class="cap">Person you care for</p>
+    <div class="lead mt"><div class="avatar" id="pf-avatar">R</div><div style="flex:1"><input id="p-name" placeholder="Robert Miller" style="font-weight:600"><div class="inline mt"><input id="p-short" placeholder="Dad"><input id="p-age" type="number" inputmode="numeric" placeholder="78" style="width:84px"></div></div></div>
+    <p class="cap mt">Use a clear, recent photo to help your family recognize him.</p></div>
+  <div class="card"><label class="field"><span class="lbl">Your information</span><input id="p-care" placeholder="Sarah Miller"></label></div>
+  <div class="card"><div class="row"><span class="k">Medications</span></div><div id="pf-meds"></div></div>
+  <p class="label">What police ask for</p>
+  <div class="card"><div class="grid2"><label class="field"><span class="lbl">Sex</span><input id="p-sex"></label><label class="field"><span class="lbl">Height</span><input id="p-height"></label>
+    <label class="field"><span class="lbl">Weight</span><input id="p-weight"></label><label class="field"><span class="lbl">Hair</span><input id="p-hair"></label>
+    <label class="field"><span class="lbl">Eyes</span><input id="p-eyes"></label><label class="field"><span class="lbl">Build</span><input id="p-build"></label></div>
+    <label class="field"><span class="lbl">Marks, gait, glasses</span><input id="p-marks"></label>
+    <label class="field"><span class="lbl">Diagnosis, as you'd tell a dispatcher</span><input id="p-diag"></label>
+    <div class="grid2"><label class="field"><span class="lbl">Doctor</span><input id="p-docname"></label><label class="field"><span class="lbl">Doctor's phone</span><input id="p-docphone" inputmode="tel"></label></div></div>
+  <div class="actions"><button class="btn primary" onclick="saveProfile()">Save care details</button></div>
 </section>
 
 <section id="s-voice" class="screen">
-  <div class="topline"><a class="back" onclick="go('profile')">‹ Set up Nightfall</a><span class="tag">2 of 2</span></div>
-  <h1>A familiar AI voice</h1><p class="sub">Record a few samples of your voice.</p>
-  <div class="topline"><span id="v-owner" style="font-weight:500">Sarah's voice</span><span class="tag" id="v-count">0 samples</span></div>
-  <div class="card mt" id="v-samples"></div>
-  <p class="cap">AI uses your samples to create new sentences and choose a reassuring tone. Only record your own voice.</p>
-  <div id="v-recpanel" class="card mt" style="padding:16px" hidden>
-    <div id="v-line" style="font-size:17px;font-weight:500;margin-bottom:10px"></div>
-    <button id="v-recbtn" class="rec" onclick="recTap(event)">Tap to record</button>
-    <p class="cap" id="v-recstat">Tap, read the line, tap again to save.</p>
-  </div>
-  <button class="btn primary" id="v-clone" onclick="cloneVoice()">Create family AI voice</button>
-  <div id="v-ready" class="card mt" style="padding:16px" hidden>
-    <b id="v-readyt">Sarah's AI voice is ready</b><p class="cap">New sentences are generated in this voice. Try one:</p>
-    <input id="v-sit" value="He is at the front door at 2 AM and says he needs to go to work.">
-    <button class="btn mt" onclick="previewVoice()">Generate and play a line</button>
-    <p id="v-preview" class="cap"></p>
-  </div>
-  <button class="btn mt" onclick="go('home')">Done</button>
+  <header class="head"><a class="back" onclick="go('setup')">Setup</a><h1>A familiar AI voice</h1><p class="sub">Record a few samples of your voice.</p></header>
+  <div class="card"><div class="row"><span class="k" id="v-owner">Sarah's voice</span><span class="v" id="v-count">0 samples</span></div><div id="v-samples"></div></div>
+  <div id="v-recpanel" class="card pad" hidden><p class="cap">Read aloud</p><p class="quote mt" id="v-line"></p>
+    <button id="v-recbtn" class="rec mt" onclick="recTap(event)">Tap to record</button><p class="cap mt" id="v-recstat">Tap, read the line, tap again to save.</p></div>
+  <p class="cap">AI uses your samples to create new sentences and choose a reassuring tone.</p>
+  <div id="v-ready" class="card pad ok" hidden><p class="title green" id="v-readyt">Sarah's AI voice is ready</p><p class="body">New sentences are generated in this voice. Try one.</p>
+    <input id="v-sit" class="mt" value="He is at the front door at 2 AM and says he needs to go to work."><button class="btn mt" onclick="previewVoice()">Generate a line</button><p class="cap mt" id="v-preview"></p></div>
+  <div class="actions"><button class="btn" onclick="go('voices')">Choose a ready-made voice</button><button class="btn primary" id="v-clone" onclick="cloneVoice()">Create family AI voice</button></div>
 </section>
 
+<section id="s-voices" class="screen">
+  <header class="head"><a class="back" onclick="go('voice')">Family voice</a><p class="eyebrow">Voice library</p><h1>Choose a voice</h1><p class="sub">Listen first, then choose the voice Dad hears.</p></header>
+  <div class="card" id="vl-list"><div class="row"><span class="muted">Loading voices…</span></div></div>
+  <div class="actions"><button class="btn primary" id="vl-use" onclick="useVoice()" disabled>Use this voice</button></div>
+</section>
+
+<section id="s-calls" class="screen">
+  <header class="head"><a class="back" onclick="go('setup')">Setup</a><h1>Who should we call?</h1><p class="sub">Choose who hears from Nightfall first.</p></header>
+  <div class="card" id="p-tree"></div>
+  <div class="inline"><input id="p-newname" placeholder="Invite a family member"><button class="btn small" onclick="addMember()">Add</button></div>
+  <p class="cap" id="p-ladder"></p>
+  <div class="actions"><button class="btn primary" onclick="go('setup')">Save call order</button></div>
+</section>
+
+<section id="s-places" class="screen">
+  <header class="head"><a class="back" onclick="go('setup')">Setup</a><h1>Home &amp; familiar places</h1><p class="sub">Help your family know where to look.</p></header>
+  <div class="card"><label class="field"><span class="lbl">Home address</span><input id="p-addr" placeholder="San Francisco Marina"></label></div>
+  <div class="card"><div class="row"><span class="k">Familiar places</span></div><div id="p-places"></div></div>
+  <div class="card pad"><span class="cap blue" id="pl-radius">1.5 mi around home</span><p class="cap mt">Nearby water, roads and places open at night are included in the search brief.</p></div>
+  <p class="cap">You can edit these details later in Care.</p>
+  <div class="actions"><button class="btn primary" onclick="findPlaces()">Find nearby places</button></div>
+</section>
+
+<section id="s-area" class="screen">
+  <header class="head"><a class="back" onclick="go('places')">Home and places</a><h1>Know the area first</h1><p class="sub" id="ar-sub">San Francisco Marina · 1.5 mi around home</p></header>
+  <div id="area-map"></div>
+  <div class="card"><div class="row"><div><span class="k">Places to check first</span><span class="sub2">Waterfront and nearby hazards</span></div><span class="v blue" id="ar-haz">0</span></div>
+    <div class="row"><div><span class="k">Places to call</span><span class="sub2">Open late or open now</span></div><span class="v blue" id="ar-call">0</span></div></div>
+  <p class="cap">Familiar places stay separate from nearby risks. This map is a search reference.</p>
+  <p class="cap blue" id="ar-status"></p>
+  <div class="actions"><button class="btn primary" onclick="go('setup')">Use these nearby places</button></div>
+</section>
+
+<section id="s-camera" class="screen">
+  <header class="head"><a class="back" onclick="go('setup')">Setup</a><h1>Set up the door camera</h1><p class="sub">Keep the computer facing the entrance.</p></header>
+  <div class="media"><img class="feed-live" alt="Door camera" style="display:none"><div class="ph"></div></div>
+  <div class="card pad"><p class="k" style="font-weight:600;margin:0">Which edge leads outside?</p>
+    <div class="seg mt" id="cam-edge"><button data-e="far" class="on">Far</button><button data-e="left">Left</button><button data-e="right">Right</button><button data-e="top">Top</button></div>
+    <select id="h-edge" hidden onchange="doorCmd({cmd:'door_edge', edge:this.value})"><option value="far">far</option><option value="left">left</option><option value="right">right</option><option value="top">top</option></select></div>
+  <div class="card pad"><div class="topline"><span class="k" style="font-weight:600" id="cam-person">Dad (Robert)</span><a onclick="enrollCmd('person')" style="cursor:pointer;font-weight:500;font-size:14px">Register</a></div>
+    <p class="cap">Person we are watching</p>
+    <input id="h-enrollname" class="mt" placeholder="Name to register">
+    <p class="cap mt">Ask them to face the door camera, then tap Register. Other household members can be registered separately.</p>
+    <p class="cap blue mt">Enrolled: <span id="h-enrolled">none</span></p></div>
+  <div class="actions"><button class="btn" onclick="enrollCmd('other')">Register a household member</button><button class="btn primary" onclick="go('setup')">Save camera setup</button></div>
+</section>
+
+<!-- ============ WATCH ============ -->
+
 <section id="s-home" class="screen">
-  <h1 id="h-title">Night watch is on</h1><p class="sub" id="h-greet">Good evening, Sarah</p>
-  <div id="h-notice" class="ok-card" hidden style="margin:0 0 12px"><b id="h-noticet">Mike stepped out</b><span id="h-notices">No alert. The door asked, and a household member answered.</span></div>
-  <div id="h-cd" class="banner" hidden style="margin:0 0 12px"><b id="h-cdt">Out of view</b><div id="h-cds" class="small"></div></div>
-  <div class="hero" style="height:200px"><img id="h-feed" class="feed-live" alt="front door camera" style="display:none;width:100%;height:100%;object-fit:cover"><div class="door" id="h-door"></div><div class="line"></div></div>
-  <p class="cap" id="h-feedcap">Front door camera · connecting…</p>
-  <div style="display:flex;gap:8px" class="mt"><button class="rec" id="h-live" onclick="liveToggle('h-live','h-livestat')">Talk</button><button class="rec" id="h-listen" style="background:var(--accent-bg);color:var(--accent)" onclick="listenToggle('h-listen')">Listen</button></div>
-  <p class="cap" id="h-livestat">Talk: your voice plays on the door speaker live. Listen: hear the door microphone on this phone.</p>
-  <div class="card mt"><div class="row big"><div><span class="k" id="h-watch">Watching over Robert</span><span class="sub2" id="h-cam">Front entrance camera</span></div><span id="h-check" style="color:var(--ok);font-size:20px">✓</span></div></div>
-  <div class="label">Tonight</div>
-  <div class="card"><div class="row"><span class="k">Latest event</span><span class="v" id="h-event">No exit detected</span></div>
-    <div class="row"><span class="k">Camera</span><span class="v ok" id="h-camstat">Connected</span></div>
-    <div class="row"><span class="k">Last check</span><span class="v" id="h-last">Just now</span></div></div>
-  <div class="label">Your care setup</div>
-  <div class="card"><div class="row link" onclick="go('voice')"><div><span class="k">Family AI voice</span><span class="sub2" id="h-voice">Stock voice · Demo profile</span></div></div>
-    <div class="row link" onclick="go('profile')"><div><span class="k">Care circle</span><span class="sub2" id="h-tree">1 Sarah → 2 James</span></div></div></div>
-  <div class="label">Door device</div>
-  <div class="card">
-    <div class="row"><span class="k">Door is at the</span><span class="v"><select id="h-edge" onchange="doorCmd({cmd:'door_edge', edge:this.value})" style="width:auto;padding:6px 10px"><option value="far">far end</option><option value="left">left edge</option><option value="right">right edge</option><option value="top">top edge</option></select></span></div>
-    <div class="row"><span class="k">Faces enrolled</span><span class="v" id="h-enrolled">none</span></div>
-    <div class="row"><div><span class="k">Enroll a face</span><span class="sub2">Have them face the door camera, then tap.</span></div></div>
-    <div style="padding:0 18px 14px;display:flex;gap:8px;flex-wrap:wrap"><input id="h-enrollname" placeholder="Name" style="flex:1;min-width:120px"><button class="btn small primary" onclick="enrollCmd('person')">The person we watch</button><button class="btn small" onclick="enrollCmd('other')">Household member</button></div>
-  </div>
-  <button class="btn" onclick="testAlert()">Run a test alert</button>
-  <p class="demo" id="h-demo">Demo session · Sample data</p>
+  <header class="head"><p class="eyebrow" id="h-greet">Good evening, Sarah</p><h1 id="h-title">Night watch is on</h1></header>
+  <div id="h-notice" class="card pad ok" hidden><p class="title green" id="h-noticet">Back inside</p><p class="body" id="h-notices"></p></div>
+  <div id="h-cd" class="banner" hidden><b id="h-cdt">Out of view</b><div id="h-cds" class="small"></div></div>
+  <div class="media"><img id="h-feed" class="feed-live" alt="Front door camera" style="display:none"><div class="ph" id="h-door"></div></div>
+  <p class="media-cap"><span id="h-cam">Front entrance</span> · <span id="h-feedcap">Live</span></p>
+  <div class="card pad"><p class="title green" id="h-watch">Watching over Dad</p><p class="body" id="h-event">No exit detected.</p>
+    <span id="h-camstat" hidden></span><span id="h-last" hidden></span><span id="h-voice" hidden></span><span id="h-tree" hidden></span></div>
+  <button class="btn" onclick="go('setup')">Care settings</button>
+  <p class="cap" id="h-demo"></p>
+  <div class="actions"><button class="btn primary" onclick="testAlert()">Try the night scenario</button><button class="btn" onclick="go('talk')">Talk to the door</button></div>
+</section>
+
+<section id="s-door" class="screen">
+  <header class="head"><p class="eyebrow caps">At the door</p><h1 id="d-title">Dad approaches the door</h1></header>
+  <div class="media tall"><img class="feed-live" alt="Door camera" style="display:none"><div class="ph"></div></div>
+  <p class="media-cap" id="d-cap">Person detected · Live</p>
+  <div class="card pad"><p class="quote lg" id="d-quote">“Hi Dad. It's Sarah. Let's head back inside.”</p></div>
+  <p class="credit">Voice · Cartesia<span>/</span>Dialogue · Claude</p>
+  <p class="cap" id="d-next">No return after 20 seconds? We call Sarah.</p>
+  <div class="actions"><button class="btn" onclick="go('talk')">Talk to Dad</button><button class="btn primary" onclick="go('home')">Keep watching</button></div>
+</section>
+
+<section id="s-wait" class="screen">
+  <header class="head"><p class="eyebrow caps">Door open · Checking</p><h1 id="w-title">Will Dad come back?</h1><p class="sub">Nightfall gives him a moment to return.</p></header>
+  <div class="media tall"><img class="feed-live" alt="Door camera" style="display:none"><div class="ph"></div></div>
+  <div class="card pad"><p class="big-num" id="w-num">20 seconds</p><p class="title" style="font-size:16px" id="w-until">Until Sarah is called</p>
+    <div class="drain"><i id="w-drain"></i></div><p class="cap mt">If Dad returns now, no family call is needed.</p></div>
+  <div class="actions"><button class="btn" onclick="go('talk')">Talk through the door</button></div>
 </section>
 
 <section id="s-alert" class="screen">
-  <div class="topline"><a class="back" onclick="go('home')">‹ Home</a><span class="tag">Live alert</span></div>
-  <h1 id="a-title">Robert left home</h1><p class="sub" id="a-sub">Front entrance · 2:03 AM</p>
-  <div class="hero" id="a-hero"><div class="door"></div><div class="line"></div></div><p class="cap" id="a-cap">Camera image · Recorded at exit</p>
+  <header class="head"><a class="back" onclick="go('home')">Home</a></header>
+  <div class="card pad alarm"><p class="eyebrow red" style="margin:0 0 4px">Needs your attention</p><p class="title" style="font-size:23px;line-height:32px" id="a-title">Dad has left home</p><p class="body" id="a-sub">Front entrance · 2:03 AM</p></div>
   <div id="a-cd" class="banner" hidden><b id="a-cdt">Out of view</b><div id="a-cds" class="small"></div></div>
-  <div class="label">What happened</div>
-  <div class="card" id="a-events"></div>
-  <div id="a-ack" class="ok-card mt" hidden><b id="a-ackt">Sarah is responding</b><span>Your care circle has been notified.</span></div>
-  <button class="btn primary" onclick="openBrief()">Open caregiver brief</button>
-  <button class="btn ok" id="a-answer" onclick="answerCall()">Answer the call</button>
+  <div class="card"><div class="media" id="a-hero" style="border-radius:0;box-shadow:none"><div class="ph"></div></div>
+    <div class="row"><div><span class="k">Last clear camera image</span><span class="sub2" id="a-cap">At the moment he left</span></div></div>
+    <div class="row"><div><span class="k" id="a-nop">No person detected</span><span class="sub2" id="a-nop2">No return after 20 seconds</span></div></div></div>
+  <div class="card" id="a-order"></div>
+  <div id="a-ack" class="card pad ok" hidden><p class="title green" id="a-ackt">Sarah is responding</p><p class="body">Calls to the others stopped.</p></div>
+  <p class="cap" id="a-ladder">No answer? The next person is called after 60 seconds.</p>
+  <div class="card" hidden><div id="a-events"></div></div>
+  <div class="actions"><div class="pair"><button class="btn" onclick="openBrief()">Open brief</button><button class="btn" onclick="gotHim()">I've got him</button></div><button class="btn primary" id="a-answer" onclick="answerCall()">Answer Nightfall</button></div>
+</section>
+
+<section id="s-call" class="screen">
+  <header class="head"><p class="eyebrow caps">Connected</p><h1>Call with Nightfall</h1></header>
+  <div class="card pad"><p class="quote lg" id="r-say">“Connecting…”</p></div>
+  <p class="cap blue" id="r-sub">Listening…</p>
+  <div class="card"><div class="inline" style="padding:6px 6px 6px 16px"><input id="r-ask" placeholder="Where should I look?" style="border:0;background:transparent;padding:10px 0;font-weight:500"><button class="btn small" onclick="askTyped()">Ask</button></div></div>
+  <div class="pair"><button class="btn" id="r-listen" onclick="listenOnce()">Speak</button><button class="btn" onclick="endCall()">End call</button></div>
+  <button class="btn" onclick="go('talk')">Open door camera</button>
+  <p class="cap">Say “I've got him” to stop other calls.</p>
+  <div id="r-911" class="banner" hidden>Still not found. <a href="tel:911" style="color:inherit;text-decoration:underline">Call 911</a>. You decide; Nightfall never dials.</div>
+  <p class="cap" id="r-monitortxt" hidden></p>
+  <div class="actions"><button class="btn primary" onclick="openBrief()">Open search brief</button></div>
+</section>
+
+<section id="s-talk" class="screen">
+  <header class="head"><a class="back" onclick="history.back()">Back</a><p class="eyebrow caps">Door camera</p><h1>Talk to Dad at the door</h1><p class="sub">See the entrance and speak through its speaker.</p></header>
+  <div class="media"><img id="r-feed" class="feed-live" alt="Live door camera" style="display:none"><div class="ph"></div></div>
+  <p class="media-cap" id="r-feedcap">Live camera at the door</p>
+  <div class="card pad"><div class="pair"><button class="rec" id="r-live" onclick="liveToggle('r-live','r-livestat')">Talk</button><button class="rec" id="t-listen" onclick="listenToggle('t-listen')">Listen</button></div>
+    <button class="btn mt" id="r-tobtn" onclick="toggleTakeover()">Take over the voice</button><p class="cap mt" id="r-livestat">Talk plays your voice at the door. Listen brings the door's microphone here.</p></div>
+  <div class="card pad"><p class="k" style="font-weight:600;margin:0 0 6px">Say in the family AI voice</p>
+    <div class="chips"><span class="chip" onclick="sayText(this.textContent)">Hi Dad, I'm here.</span><span class="chip" onclick="sayText(this.textContent)">Please come back inside.</span><span class="chip" onclick="sayText(this.textContent)">Let's sit down together.</span></div></div>
+  <span id="r-tostat" hidden></span>
+  <div class="actions"><button class="btn primary" onclick="history.back()">Back</button></div>
+</section>
+
+<section id="s-takeover" class="screen">
+  <header class="head"><p class="eyebrow caps" id="tk-eyebrow">Sarah is speaking</p><h1>You have the door voice</h1><p class="sub">Nightfall's automatic speech is paused.</p></header>
+  <div id="r-takeover">
+    <div class="card pad"><p class="title" id="tk-who">Sarah took over the voice at the door</p><p class="body">You can type a phrase or send your own voice.</p></div>
+    <div class="card pad mt"><p class="k" style="font-weight:600;margin:0">Say in the family voice</p><input id="r-text" class="mt" value="Dad, I'm here. Please wait by the door."><button class="btn primary mt" onclick="sayTyped()">Speak this phrase</button></div>
+    <button class="rec mt" id="r-ptt" onclick="pttTap(event)">Hold to talk</button>
+    <p class="cap mt" id="r-pttstat">Tap to record your real voice. Tap again to send it to the door speaker.</p>
+  </div>
+  <div class="actions"><button class="btn" onclick="toggleTakeover()">Hand back to Nightfall</button><button class="btn primary" onclick="go('talk')">Back to the camera</button></div>
 </section>
 
 <section id="s-brief" class="screen">
-  <div class="topline"><a class="back" onclick="go('alert')">‹ Alert</a><span class="tag">Caregiver brief</span></div>
-  <h1 id="b-name">Robert Miller, 74</h1><p class="sub" id="b-seen">Last seen at home · 2:03 AM</p>
-  <p class="danger-text" id="b-loc">Current location unknown</p>
-  <div class="hero" id="b-hero"><div class="door"></div><div class="line"></div></div><p class="cap">Camera image · Check the clothing below</p>
-  <div class="label">Description</div>
-  <div class="card"><div class="row"><span class="k">Wearing</span><span class="v" id="b-wear">—</span></div>
-    <div class="row"><span class="k">Also wearing</span><span class="v" id="b-wear2">—</span></div>
-    <div class="row"><span class="k">Backup contact</span><span class="v" id="b-backup">—</span></div></div>
-  <p class="cap" id="b-conf">Clothing is AI-described. Verify against the image.</p>
-  <div class="label">Read this to the dispatcher</div>
-  <div class="card" style="padding:14px 18px"><div id="b-police" style="line-height:1.5"></div><div class="row" style="padding:10px 0 0;border:0"><button class="btn small" onclick="copyPolice()">Copy</button><a class="btn small" href="tel:911" style="text-decoration:none;color:var(--danger)">Call 911</a><span class="cap" id="b-copied"></span></div></div>
-  <p class="cap">Police classify this as "missing and at risk". Ask for a Silver Alert. Nightfall never dials.</p>
-  <div id="b-respond"><button class="btn primary" onclick="respond()">I'm responding</button></div>
-  <div id="b-responding" class="ok-card mt" hidden><b>You're responding</b><span>Your care circle has been notified.</span></div>
-  <button class="btn" onclick="go('search')">Search details & contacts</button>
+  <header class="head"><a class="back" onclick="history.back()">Back</a><p class="eyebrow caps">Search brief</p><h1 id="b-name">Dad left home</h1><p class="sub" id="b-seen">Last seen 2:03 AM · Front entrance</p></header>
+  <p class="cap" id="b-loc" style="color:var(--red);font-weight:500">Current location unknown</p>
+  <div class="who"><div class="media" id="b-hero"><div class="ph"></div></div><div><p class="title" style="font:600 18px/25px var(--font);margin:0" id="b-wear">See photo</p><p class="cap" id="b-wear2"></p><p class="cap" id="b-conf">AI-described · Check the photo.</p></div></div>
+  <div><p class="title" style="font:600 20px/27px var(--font);margin:0">Where to look first</p><p class="cap" id="b-radius">Within 1.5 mi of home</p></div>
+  <div id="map"></div>
+  <div class="legend"><span><i style="background:var(--red)"></i>Hazards</span><span><i style="background:var(--green)"></i>Call first</span><span><i style="background:var(--blue)"></i>Familiar</span></div>
+  <p class="credit">Nearby business data · Apify</p>
+  <p class="cap">Nearby places, not Dad's live location.</p>
+  <div class="card"><div class="row link" onclick="go('search')"><div><span class="sub2" style="margin:0">Check first</span><span class="k" id="b-first">Palace of Fine Arts lagoon</span></div></div></div>
+  <div class="card pad"><p class="cap">Read this to the dispatcher</p><p class="mt" id="b-police" style="margin-bottom:0"></p>
+    <div class="inline mt"><button class="btn small" onclick="copyPolice()">Copy</button><a class="btn small" href="tel:911" style="color:var(--red)">Call 911</a><span class="cap" id="b-copied"></span></div></div>
+  <p class="cap">Backup contact: <span id="b-backup">Mike</span></p>
+  <div id="b-responding" class="card pad ok" hidden><p class="title green">You're on it</p><p class="body">Other phones stopped ringing.</p></div>
+  <div class="actions"><div id="b-respond"><button class="btn" onclick="respond()">I'm responding</button></div><button class="btn primary" onclick="gotHim()">I've got him</button></div>
 </section>
 
 <section id="s-search" class="screen">
-  <div class="topline"><a class="back" onclick="go('brief')">‹ Caregiver brief</a><span class="tag" id="sr-src">Demo</span></div>
-  <h1>Start with what we know</h1><p class="sub" id="sr-radius">Reference search area · 1.5-mile radius</p>
-  <div id="map"></div><p class="cap">Dashed line is a family-provided familiar route, not a predicted location. Red: hazards. Green: open now.</p>
-  <div class="card mt"><div class="row"><span class="k" id="sr-last">Last confirmed at home · 2:03 AM</span></div></div>
-  <div class="label">Familiar places</div><div class="card" id="sr-fam"></div>
-  <div class="label">Check first · hazards</div><div class="card" id="sr-haz"></div>
-  <div class="label">Call first · open now</div><div class="card" id="sr-call"></div>
-  <div class="label">Wander history</div><div class="card" id="sr-history"></div>
-  <div class="label">Care notes</div><div class="card" id="sr-notes"></div>
-  <div class="label">Contacts</div><div class="card" id="sr-contacts"></div>
-  <div id="sr-911" class="banner" hidden>Out of view and not found. <a href="tel:911" style="color:inherit;font-weight:600">Call 911</a>. You decide; Nightfall never dials.</div>
+  <header class="head"><a class="back" onclick="go('brief')">Search brief</a><h1>Where should we look?</h1><p class="sub" id="sr-radius">1.5 mi around home</p></header>
+  <div class="card pad alarm" id="sr-rec"><p class="title red" style="font-size:16px" id="sr-rect">Emergency recommendation in 12:40</p><p class="body">You can choose to call 911 sooner.</p></div>
+  <div id="sr-911" class="banner" hidden>Out of view and not found. <a href="tel:911" style="color:inherit;text-decoration:underline">Call 911</a>. You decide; Nightfall never dials.</div>
+  <p class="cap" id="sr-last">Last confirmed at home · 2:03 AM</p>
+  <p class="label">Check first</p><div class="card" id="sr-haz"></div>
+  <p class="label">Familiar places</p><div class="card" id="sr-fam"></div>
+  <p class="label">Call first · open now</p><div class="card" id="sr-call"></div>
+  <p class="label">Wander history</p><div class="card" id="sr-history"></div>
+  <p class="label">Care notes</p><div class="card" id="sr-notes"></div>
+  <p class="label">Contacts</p><div class="card" id="sr-contacts"></div>
+  <span class="tag" id="sr-src" hidden></span>
+  <div class="actions"><button class="btn primary" onclick="gotHim()">I've got him</button></div>
 </section>
 
-<section id="s-respond" class="screen">
-  <div class="topline"><a class="back" onclick="go('alert')">‹ Alert</a><span class="tag">On the line</span></div>
-  <h1>You're on the line</h1><p class="sub" id="r-sub">Nightfall is talking to Robert at the door.</p>
-  <img id="r-feed" class="feed feed-live" alt="live door camera"><p class="cap" id="r-feedcap">Live camera at the door</p>
-  <div class="card mt" id="r-monitor" style="padding:12px 18px"><span class="small muted">Agent monitoring</span><div id="r-monitortxt" style="font-weight:500">Watching the door</div></div>
-  <div class="label">Nightfall agent</div>
-  <div class="card" style="padding:14px 18px"><div id="r-say" class="muted">Connecting…</div>
-    <div style="display:flex;gap:8px;margin-top:10px"><button class="btn small primary" id="r-listen" onclick="listenOnce()">Tap, then speak</button><input id="r-ask" placeholder="ask: where should I look?"><button class="btn small" onclick="askTyped()">Ask</button></div></div>
-  <div class="label">Talk to him yourself</div>
-  <div class="card" style="padding:14px 18px">
-    <button class="rec" id="r-live" onclick="liveToggle('r-live','r-livestat')">Talk through the door</button><p class="cap" id="r-livestat">Your voice plays at the door in real time. The agent keeps watching and escalating.</p>
-    <button class="btn small primary mt" id="r-tobtn" onclick="toggleTakeover()">Take over the voice</button><span class="muted small" id="r-tostat" style="margin-left:8px">AI is speaking for you.</span>
-    <div id="r-takeover" hidden><div class="chips mt"><span class="chip" onclick="sayText(this.textContent)">Dad, it's me. Come back inside, I'm on my way.</span><span class="chip" onclick="sayText(this.textContent)">Wait right there by the door. I'll be two minutes.</span><span class="chip" onclick="sayText(this.textContent)">Everything's okay. Let's sit down, I'm coming.</span></div>
-      <div style="display:flex;gap:8px;margin-top:10px"><input id="r-text" placeholder="type what to say in your voice"><button class="btn small" onclick="sayTyped()">Say</button></div>
-      <button class="rec mt" id="r-ptt" onclick="pttTap(event)">Tap to talk (your real voice)</button><p class="cap" id="r-pttstat"></p></div></div>
-  <div id="r-911" class="banner" hidden>Out of view for a while and still not found. <a href="tel:911" style="color:inherit;font-weight:600">Call 911</a>. You decide; Nightfall never dials.</div>
-  <button class="btn ok mt" onclick="gotHim()">I've got him</button>
-  <button class="btn" onclick="go('brief')">Open caregiver brief</button>
+<section id="s-responding" class="screen">
+  <header class="head"><p class="eyebrow caps">Response confirmed</p><h1>You're on it.</h1><p class="sub">Other phones stopped ringing.</p></header>
+  <div class="card pad ok"><p class="title green" style="font-size:23px;line-height:32px" id="rs-who">Sarah · Responding</p><p class="body" id="rs-stopped">Calls to Mike and Linda stopped.</p></div>
+  <p class="cap" id="rs-return">Dad's return is not yet confirmed.</p>
+  <div class="actions"><button class="btn primary" onclick="openBrief()">Keep search brief open</button><button class="btn" onclick="go('talk')">Open the door camera</button></div>
 </section>
+
+<section id="s-back" class="screen">
+  <header class="head"><p class="eyebrow green caps">&#10003; Returned before a call</p><h1>Dad is back inside</h1><p class="sub">A familiar voice helped him turn back.</p></header>
+  <div class="media tall"><img class="feed-live" alt="Door camera" style="display:none"><div class="ph"></div></div>
+  <p class="media-cap">Back in view · Live</p>
+  <div class="card pad ok"><p class="title green">&#10003; No family call was needed.</p><p class="body">Night watch continues. This check-in is saved in tonight's activity.</p></div>
+  <div class="actions"><button class="btn primary" onclick="go('home')">Back to night watch</button></div>
+</section>
+
+<section id="s-emergency" class="screen">
+  <header class="head"><p class="eyebrow red caps">&#9888; <span id="em-tag">Emergency option available</span></p><h1 id="em-title">Need emergency help?</h1><p class="sub" id="em-sub">Since the confirmed exit</p></header>
+  <div class="card pad"><p class="big-num red" id="em-clock">00:45</p><p class="title" style="font-size:18px" id="em-line">You can choose to call 911 now.</p><p class="body">You decide. Nightfall does not call 911 on its own.</p></div>
+  <div class="actions"><button class="btn" onclick="openBrief()">Keep the search brief open</button><a class="btn danger" href="tel:911">Call 911</a></div>
+</section>
+
+<section id="s-help" class="screen">
+  <header class="head"><p class="eyebrow red caps">&#9888; Help button pressed</p><h1>Help requested at the door</h1><p class="sub">The door device's HELP button was pressed.</p></header>
+  <div class="card pad"><p class="title">Calling the family now</p><p class="k" style="font-weight:600;margin:4px 0" id="hp-who">Sarah · Mike · Linda</p><p class="body">This request skips the usual return wait. Emergency services have not been called.</p></div>
+  <div class="actions"><button class="btn" onclick="go('talk')">Open the door camera</button><button class="btn primary" onclick="answerCall()">Answer Nightfall</button></div>
+</section>
+
 </div>
 
-<nav class="tabs">
-  <a id="t-home" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</a>
-  <a id="t-alert" onclick="go('alert')"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0"/></svg>Alerts</a>
-  <a id="t-care" onclick="go('profile')"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Care</a>
-</nav>
 <audio id="ring" loop hidden></audio>
-<div id="arm" style="position:fixed;inset:0;background:linear-gradient(180deg,var(--bg1),var(--bg2));display:flex;align-items:center;justify-content:center;z-index:50;padding:24px">
-  <div class="card" style="padding:24px;max-width:360px;text-align:center"><h1 style="font-size:24px">Arm this phone</h1><p class="sub">One tap lets Nightfall ring and speak on this phone tonight.</p><button class="btn primary" onclick="armPhone()">Arm alerts</button></div></div>
-<div id="visitor" hidden style="position:fixed;inset:0;background:linear-gradient(180deg,#16284a,#0f1d33);color:#fff;z-index:55;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center">
-  <div style="font-size:14px;opacity:.8;margin-bottom:8px">Nightfall · doorbell</div><div style="font-size:28px;font-weight:700">Someone's at the door</div>
-  <div id="vis-said" style="margin:10px 0;opacity:.9;min-height:22px"></div>
-  <img id="vis-feed" class="feed feed-live" style="max-width:360px;margin:8px 0 16px" alt="door camera">
-  <div style="display:flex;gap:8px;width:100%;max-width:360px"><button class="rec" id="vis-talk" onclick="liveToggle('vis-talk','vis-stat')">Talk</button><button class="rec" id="vis-listen" style="background:rgba(127,167,255,.25);color:#fff" onclick="listenToggle('vis-listen')">Listen</button></div>
-  <p class="cap" id="vis-stat" style="color:#cdd8ea">Nightfall greeted them in the assistant voice. Talk to answer the door yourself.</p>
-  <button class="btn" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.3)" onclick="dismissVisitor()">Not now</button></div>
-<div id="incoming" hidden style="position:fixed;inset:0;background:rgba(198,40,40,.96);color:#fff;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center">
-  <div style="font-size:14px;opacity:.85;margin-bottom:8px">Nightfall · incoming alert</div><div id="inc-title" style="font-size:30px;font-weight:700;line-height:1.15">Robert left home</div><div id="inc-msg" style="margin:10px 0 18px;opacity:.9"></div>
-  <div style="background:rgba(255,255,255,.12);border-radius:16px;padding:14px 16px;text-align:left;width:100%;max-width:360px;margin-bottom:22px;font-size:15px;line-height:1.5">
-    <div><b>Wearing</b> · <span id="inc-wear">describing…</span></div>
-    <div><b>Headed</b> · <span id="inc-head">—</span></div>
-    <div><b>Emergency services</b> · <span id="inc-911">not called</span></div></div>
-  <button class="btn" style="background:#fff;color:#c62828;border:0" onclick="answerFromOverlay()">Answer</button><button class="btn" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.5)" onclick="dismissOverlay()">See the alert</button></div>
+
+<!-- Let this phone ring -->
+<div id="arm" class="call-screen" style="background:linear-gradient(180deg,#e8eef4,#dde7f0);color:var(--ink);align-items:stretch;text-align:left;padding-top:calc(env(safe-area-inset-top,0px) + 44px)"><div style="max-width:390px;width:100%;margin:0 auto;display:flex;flex-direction:column;flex:1">
+  <h1>Let this phone ring</h1><p class="sub">Tap once to enable Nightfall's alert sound.</p>
+  <div class="card pad mt"><div class="avatar" style="width:44px;height:44px">&#9834;</div><p class="title mt" id="arm-who">Sarah · First contact</p><p class="body">When Dad leaves and does not return, your phone rings first.</p><p class="cap mt">Keep this page open and your volume on.</p></div>
+  <div class="actions"><button class="btn primary" onclick="armPhone()">Enable sound</button></div></div></div>
+
+<!-- Someone is at the door -->
+<div id="visitor" class="call-screen" hidden style="background:linear-gradient(180deg,#e8eef4,#dde7f0);color:var(--ink);align-items:stretch;text-align:left;padding-top:calc(env(safe-area-inset-top,0px) + 44px)"><div style="max-width:390px;width:100%;margin:0 auto;display:flex;flex-direction:column;flex:1;gap:16px">
+  <div><p class="eyebrow caps">Doorbell</p><h1>Someone is at the door</h1><p class="sub" id="vis-said">Nightfall greeted the visitor.</p></div>
+  <div class="media"><img id="vis-feed" class="feed-live" alt="Door camera" style="display:none"><div class="ph"></div></div>
+  <div class="pair"><button class="rec" id="vis-talk" onclick="liveToggle('vis-talk','vis-stat')">Talk</button><button class="rec" id="vis-listen" onclick="listenToggle('vis-listen')">Listen</button></div>
+  <p class="cap" id="vis-stat">Listen to the entrance or speak through its speaker.</p>
+  <div class="actions"><button class="btn" onclick="dismissVisitor()">Not now</button></div></div></div>
+
+<!-- Incoming call from Nightfall -->
+<div id="incoming" class="call-screen" hidden role="alertdialog" aria-labelledby="inc-title">
+  <p class="caller">Nightfall</p><p class="ctx">incoming call</p><p class="ctx" id="inc-ctx">Dad's care circle</p>
+  <p class="headline" id="inc-title">Dad has left home</p><p class="ctx" id="inc-msg">Last seen at the entrance</p>
+  <div class="ringing"><i><svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg></i></div>
+  <p class="ctx" id="inc-ring">Ringing now</p>
+  <div class="facts"><div><b>Wearing</b><span id="inc-wear">describing…</span></div><div><b>Headed</b><span id="inc-head">not seen</span></div><div><b>Emergency services</b><span id="inc-911">not called</span></div></div>
+  <div class="call-btns">
+    <button class="decline" onclick="dismissOverlay()"><span class="disc"><svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg></span>Decline</button>
+    <button class="answer" onclick="answerFromOverlay()"><span class="disc"><svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg></span>Answer</button>
+  </div>
+</div>
 <script src="/app-ui.js"></script><script src="/app-voice.js"></script>
 </body></html>
