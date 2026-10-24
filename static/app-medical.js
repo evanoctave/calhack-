@@ -48,7 +48,7 @@ document.addEventListener("keydown", e => { if (e.key !== "Enter") return; if (e
 
 async function saveMedical() {
   mdAdd("allergies"); mdAdd("conditions");  // a typed-but-not-added item still counts
-  const btn = $("md-save"); btn.disabled = true; $("md-stat").textContent = "Saving…";
+  const btn = $("md-save"); btn.disabled = true; $("md-stat").classList.remove("saved"); $("md-stat").textContent = "Saving…";
   const body = {blood_type: Med.rec.blood_type, advance_directive: $("md-directive").value, date_of_birth: $("md-dob").value, allergies: Med.rec.allergies, conditions: Med.rec.conditions};
   for (const [id, k] of Object.entries(MD_FIELDS)) body[k] = $(id).value;
   const h = S.household, prof = {description: {...(h.description || {}), height: $("md-height").value.trim(), weight: $("md-weight").value.trim()}};
@@ -60,7 +60,7 @@ async function saveMedical() {
     const mj = await m.json();
     if (!m.ok) throw new Error(mj.detail || "could not save medical info");
     if (!p.ok) throw new Error(p.detail || "could not save the profile");
-    await refresh(); await loadMedical();
+    await refresh(); await loadMedical(); $("md-stat").classList.add("saved");
   } catch (e) { $("md-stat").textContent = String(e.message || e); }
   btn.disabled = false;
 }

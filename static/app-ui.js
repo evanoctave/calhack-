@@ -2,15 +2,21 @@
 let S = null, member = "", incident = null, feedTimer = null, mapObj = null, mapLayer = null, soundOn = false, acked = false;
 function $(id) { return document.getElementById(id); }
 function go(name) { location.hash = "#" + name; }
-const SCREENS = ["setup", "profile", "medical", "voice", "voices", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "takeover", "brief", "search", "responding", "back", "emergency", "help"];
+const SCREENS = ["setup", "profile", "medical", "report", "voice", "voices", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "takeover", "brief", "search", "responding", "back", "emergency", "help"];
+const navStack = [];
 function show(name) {
   if (name === "respond") name = "call";
   if (!SCREENS.includes(name)) name = "home";
+  // direction for the slide: back if this is the screen before the current one, none on first paint
+  const back = navStack.length > 1 && navStack[navStack.length - 2] === name;
+  if (back) navStack.pop(); else if (navStack[navStack.length - 1] !== name) navStack.push(name);
+  document.documentElement.dataset.nav = navStack.length === 1 && !back ? "none" : back ? "back" : "forward";
   document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === "s-" + name));
   if (name === "brief") setTimeout(renderMap, 50);
   if (name === "area") setTimeout(renderArea, 50);
   if (name === "voices") loadVoices();
   if (name === "medical") loadMedical();
+  if (name === "report") loadReport();
   window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", () => show(location.hash.slice(1) || "home"));

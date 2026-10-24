@@ -28,6 +28,7 @@ from nightfall.api_cam import router as cam_router
 from nightfall.api_enroll import router as enroll_router
 from nightfall.api_live import router as live_router
 from nightfall.api_medical import router as medical_router
+from nightfall.api_report import router as report_router
 from nightfall.api_setup import router as setup_router
 from nightfall.api_voice import router as voice_router
 from nightfall.escalation import LADDER
@@ -385,4 +386,5 @@ app.include_router(app_router)
 app.include_router(live_router)
 app.include_router(enroll_router)
 app.include_router(medical_router)
+app.include_router(report_router)
 app.mount("/", StaticFiles(directory=str(ROOT / "static")), name="static")

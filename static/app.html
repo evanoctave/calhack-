@@ -12,11 +12,10 @@
 
 <section id="s-setup" class="screen">
   <header class="head"><p class="eyebrow">Nightfall</p><h1>Ready for tonight</h1><p class="sub" id="su-sub">Dad's care, in one place.</p></header>
-  <div class="card"><div class="row link" onclick="go('profile')"><div><span class="k" id="su-person">Dad (Robert), 78</span><span class="sub2" id="su-person2">Sarah · Daughter · Care details</span></div></div></div>
-  <div class="card"><div class="row link" onclick="go('medical')"><div><span class="k">Medical info</span><span class="sub2" id="su-medical">Blood type, allergies, conditions</span></div></div></div>
-  <div class="card"><div class="row link" onclick="go('voice')"><div><span class="k">Family voice</span><span class="sub2" id="su-voice">Record or choose a familiar voice</span></div></div></div>
-  <div class="card"><div class="row link" onclick="go('calls')"><div><span class="k">Call order</span><span class="sub2" id="su-calls">1 Sarah → 2 Mike → 3 Linda</span></div></div></div>
-  <div class="card"><div class="row link" onclick="go('places')"><div><span class="k">Home &amp; danger zones</span><span class="sub2" id="su-places">San Francisco Marina · 1.5 mi</span></div></div></div>
+  <p class="label">Dad</p>
+  <div class="card"><div class="row link" onclick="go('profile')"><div><span class="k" id="su-person">Dad (Robert), 78</span><span class="sub2" id="su-person2">Sarah · Daughter · Care details</span></div></div><div class="row link" onclick="go('medical')"><div><span class="k">Medical info</span><span class="sub2" id="su-medical">Blood type, allergies, conditions</span></div></div></div>
+  <p class="label">Tonight</p>
+  <div class="card"><div class="row link" onclick="go('voice')"><div><span class="k">Family voice</span><span class="sub2" id="su-voice">Record or choose a familiar voice</span></div></div><div class="row link" onclick="go('calls')"><div><span class="k">Call order</span><span class="sub2" id="su-calls">1 Sarah → 2 Mike → 3 Linda</span></div></div><div class="row link" onclick="go('places')"><div><span class="k">Home &amp; danger zones</span><span class="sub2" id="su-places">San Francisco Marina · 1.5 mi</span></div></div></div>
   <div class="pair"><button class="btn" onclick="go('camera')">Door camera</button><button class="btn" onclick="showArm()">Phone alerts</button></div>
   <div class="actions"><button class="btn primary" onclick="go('home')">Start night watch</button></div>
 </section>
@@ -65,7 +64,7 @@
     <label class="field"><span class="lbl">Preferred hospital</span><input id="md-hospital"></label>
     <div class="grid2"><label class="field"><span class="lbl">Insurance</span><input id="md-ins"></label><label class="field"><span class="lbl">Member ID</span><input id="md-insid" autocomplete="off"></label></div>
     <div class="row"><div><span class="k" id="md-doc">Doctor</span><span class="sub2" id="md-docphone"></span></div></div>
-    <label class="field"><span class="lbl">Notes for responders</span><textarea id="md-notes" rows="3"></textarea></label></div>
+    <label class="field"><span class="lbl">Notes for responders</span><textarea id="md-notes" rows="4"></textarea></label></div>
   <p class="cap" id="md-stat">Stored on your home server, never in the public repo.</p>
   <div class="actions"><button class="btn primary" id="md-save" onclick="saveMedical()">Save medical info</button></div>
 </section>
@@ -144,9 +143,25 @@
   <p class="media-cap"><span id="h-cam">Front entrance</span> · <span id="h-feedcap">Live</span></p>
   <div class="card pad"><p class="title green" id="h-watch">Watching over Dad</p><p class="body" id="h-event">No exit detected.</p>
     <span id="h-camstat" hidden></span><span id="h-last" hidden></span><span id="h-voice" hidden></span><span id="h-tree" hidden></span></div>
+  <div class="card"><div class="row link" onclick="go('report')"><div><span class="k">Morning report</span><span class="sub2" id="h-report">How last night went</span></div></div></div>
   <button class="btn" onclick="go('setup')">Care settings</button>
   <p class="cap" id="h-demo"></p>
   <div class="actions"><button class="btn primary" onclick="testAlert()">Try the night scenario</button><button class="btn" onclick="go('talk')">Talk to the door</button></div>
+</section>
+
+<section id="s-report" class="screen">
+  <header class="head"><a class="back" onclick="go('home')">Home</a><p class="eyebrow">Morning report</p><h1 id="rp-title">Last night</h1><p class="sub" id="rp-date"></p></header>
+  <div id="rp-sample" class="card pad" hidden><p class="title">Includes sample nights</p><p class="body">Nights without real events are filled with demo data until there are three of your own.</p></div>
+  <div class="card pad"><p class="summary" id="rp-summary">Loading…</p>
+    <div class="inline mt"><button class="btn small" id="rp-listen" onclick="listenReport()">Listen</button><span class="cap" id="rp-source"></span></div></div>
+  <p class="label" id="rp-evlabel">At the door</p>
+  <div class="card" id="rp-events"></div>
+  <p class="label">This week</p>
+  <div class="card pad"><div class="bars" id="rp-bars"></div>
+    <div class="legend"><span><i class="sw exit"></i>Left the house</span><span><i class="sw door"></i>Came to the door</span></div></div>
+  <div class="card"><div class="row"><span class="k" id="rp-nightsk">Nights he left</span><span class="v" id="rp-nights"></span></div>
+    <div class="row"><span class="k">Usual time</span><span class="v" id="rp-usual"></span></div>
+    <div class="row"><span class="k">Typical time outside</span><span class="v" id="rp-typical"></span></div></div>
 </section>
 
 <section id="s-door" class="screen">
@@ -281,13 +296,13 @@
 <audio id="ring" loop hidden></audio>
 
 <!-- Let this phone ring -->
-<div id="arm" class="call-screen" style="background:linear-gradient(180deg,#e8eef4,#dde7f0);color:var(--ink);align-items:stretch;text-align:left;padding-top:calc(env(safe-area-inset-top,0px) + 44px)"><div style="max-width:390px;width:100%;margin:0 auto;display:flex;flex-direction:column;flex:1">
+<div id="arm" class="call-screen gate"><div style="max-width:390px;width:100%;margin:0 auto;display:flex;flex-direction:column;flex:1">
   <h1>Let this phone ring</h1><p class="sub">Tap once to enable Nightfall's alert sound.</p>
   <div class="card pad mt"><div class="avatar" style="width:44px;height:44px">&#9834;</div><p class="title mt" id="arm-who">Sarah · First contact</p><p class="body">When Dad leaves and does not return, your phone rings first.</p><p class="cap mt">Keep this page open and your volume on.</p></div>
   <div class="actions"><button class="btn primary" onclick="armPhone()">Enable sound</button></div></div></div>
 
 <!-- Someone is at the door -->
-<div id="visitor" class="call-screen" hidden style="background:linear-gradient(180deg,#e8eef4,#dde7f0);color:var(--ink);align-items:stretch;text-align:left;padding-top:calc(env(safe-area-inset-top,0px) + 44px)"><div style="max-width:390px;width:100%;margin:0 auto;display:flex;flex-direction:column;flex:1;gap:16px">
+<div id="visitor" class="call-screen gate" hidden><div style="max-width:390px;width:100%;margin:0 auto;display:flex;flex-direction:column;flex:1;gap:16px">
   <div><p class="eyebrow caps">Doorbell</p><h1>Someone is at the door</h1><p class="sub" id="vis-said">Nightfall greeted the visitor.</p></div>
   <div class="media"><img id="vis-feed" class="feed-live" alt="Door camera" style="display:none"><div class="ph"></div></div>
   <div class="pair"><button class="rec" id="vis-talk" onclick="liveToggle('vis-talk','vis-stat')">Talk</button><button class="rec" id="vis-listen" onclick="listenToggle('vis-listen')">Listen</button></div>
@@ -306,5 +321,5 @@
     <button class="answer" onclick="answerFromOverlay()"><span class="disc"><svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg></span>Answer</button>
   </div>
 </div>
-<script src="/app-ui.js"></script><script src="/app-voice.js"></script><script src="/app-medical.js"></script>
+<script src="/app-ui.js"></script><script src="/app-voice.js"></script><script src="/app-medical.js"></script><script src="/app-report.js"></script>
 </body></html>
