@@ -337,8 +337,8 @@ export function DoorPage() {
                 : "Take over the voice"}
           </Button>
           <p className="caption">
-            Talk and Listen can stay on together. Talking pauses the AI while
-            your microphone is live. Use headphones to reduce echo.
+            Talk and Listen can stay enabled together. Talk pauses door audio
+            and Nightfall’s voice. Stop talking to hear the reply.
           </p>
         </div>
       </Card>

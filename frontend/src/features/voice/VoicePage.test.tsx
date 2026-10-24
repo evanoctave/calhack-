@@ -129,7 +129,7 @@ function mount(path = "/voice/record?kind=introduction") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  const tree = () => (
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
@@ -137,8 +137,10 @@ function mount(path = "/voice/record?kind=introduction") {
           <Route path="/setup/contacts" element={<p>Call order</p>} />
         </Routes>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const view = render(tree());
+  return { ...view, refreshContext: () => view.rerender(tree()) };
 }
 
 beforeEach(() => {
@@ -242,6 +244,8 @@ describe("Voice recording lifecycle", () => {
   it("opens a selected voice preview without cloning it again", async () => {
     const state = createPreviewState();
     state.voice.voice_id = "existing-voice-id";
+    state.voice.source = "stock";
+    state.voice.mock = false;
     state.voice.samples = {
       introduction: false,
       reassurance: false,
@@ -255,13 +259,16 @@ describe("Voice recording lifecycle", () => {
     context.current = { ...context.current, state, mutate };
     mount("/voice/samples");
     fireEvent.click(
-      screen.getByRole("button", { name: "Preview current voice" }),
+      screen.getByRole("button", { name: "Preview ready-made voice" }),
     );
     expect(
-      screen.getByRole("heading", { name: "Preview your voice" }),
+      screen.getByRole("heading", { name: "Preview ready-made voice" }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Listen to sample" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Create family AI voice" }),
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Generate a preview" }));
     await waitFor(() =>
@@ -354,9 +361,7 @@ describe("Voice recording lifecycle", () => {
       Blob,
     );
     await act(async () => finishUpload({ ok: true }));
-    await screen.findByText(
-      "Sample saved. Listen back or record another take.",
-    );
+    await screen.findByText("Sample saved. Next, create your family AI voice.");
     expect(
       screen.getByRole("heading", { name: "Review your voice sample" }),
     ).toBeInTheDocument();
@@ -387,9 +392,7 @@ describe("Voice recording lifecycle", () => {
       screen.getByLabelText("Recorded sample waveform"),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry save" }));
-    await screen.findByText(
-      "Sample saved. Listen back or record another take.",
-    );
+    await screen.findByText("Sample saved. Next, create your family AI voice.");
     expect(api.upload).toHaveBeenCalledTimes(2);
     for (const [path, data] of vi.mocked(api.upload).mock.calls) {
       expect(path).toBe("/voice/samples/reassurance");
@@ -426,4 +429,209 @@ describe("Voice recording lifecycle", () => {
       screen.queryByRole("button", { name: "Save sample" }),
     ).not.toBeInTheDocument();
   });
+});
+
+function savedSampleWithStockVoice() {
+  const state = createPreviewState();
+  state.voice.voice_id = "stock-voice";
+  state.voice.source = "stock";
+  state.voice.mock = false;
+  return state;
+}
+
+const stockPreview = {
+  text: "This is the ready-made preview.",
+  line_source: "claude",
+  audio: { source: "cartesia", url: "/audio/stock.wav" },
+};
+
+describe("family voice creation and preview identity", () => {
+  it("distinguishes a saved sample from the selected stock voice and offers creation from preview", async () => {
+    const mutate = vi.fn().mockResolvedValue(stockPreview);
+    context.current = {
+      ...context.current,
+      state: savedSampleWithStockVoice(),
+      mutate,
+    };
+    mount("/voice/samples");
+    expect(screen.getByText(/Ready-made voice selected/)).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Preview ready-made voice" }),
+    );
+    expect(
+      screen.getByText(/This is a ready-made voice, not your recorded voice/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Sarah’s recorded sample/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Generate a preview" }));
+    await screen.findByText(/Voice: Ready-made voice/);
+    expect(mutate).toHaveBeenCalledExactlyOnceWith("/voice/preview", {
+      situation:
+        "He is at the front door at 2 AM and says he needs to go to work.",
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create family AI voice" }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "Create your family voice" }),
+    ).toBeInTheDocument();
+    expect(mutate).not.toHaveBeenCalledWith("/voice/clone", expect.anything());
+    expect(
+      screen.getByRole("button", { name: "Create family AI voice" }),
+    ).toBeDisabled();
+  });
+
+  it("clears the old stock preview when creating a family voice", async () => {
+    const state = savedSampleWithStockVoice();
+    const mutate = vi
+      .fn()
+      .mockResolvedValueOnce(stockPreview)
+      .mockImplementationOnce(async () => {
+        context.current = {
+          ...context.current,
+          state: {
+            ...state,
+            voice: {
+              ...state.voice,
+              source: "clone",
+              voice_id: "family-voice",
+            },
+          },
+        };
+        return {
+          ok: true,
+          voice_id: "family-voice",
+          source: "clone",
+          seconds: 6.12,
+        };
+      });
+    context.current = { ...context.current, state, mutate };
+    mount("/voice/preview");
+    fireEvent.click(screen.getByRole("button", { name: "Generate a preview" }));
+    await screen.findByRole("button", { name: "Play generated speech" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create family AI voice" }),
+    );
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create family AI voice" }),
+    );
+    await screen.findByRole("heading", { name: "Preview family AI voice" });
+    expect(mutate).toHaveBeenLastCalledWith("/voice/clone", { name: "Sarah" });
+    expect(screen.queryByText(/This is the ready-made preview/)).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Play generated speech" }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Generate a preview" }),
+    ).toBeEnabled();
+  });
+
+  it("stops old audio and removes it when the selected voice changes", async () => {
+    const state = savedSampleWithStockVoice();
+    const pause = vi.fn();
+    const play = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal(
+      "Audio",
+      class {
+        pause = pause;
+        play = play;
+      },
+    );
+    context.current = {
+      ...context.current,
+      state,
+      mutate: vi.fn().mockResolvedValue(stockPreview),
+    };
+    const view = mount("/voice/preview");
+    fireEvent.click(screen.getByRole("button", { name: "Generate a preview" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Play generated speech" }),
+    );
+    await screen.findByRole("button", { name: "Pause preview" });
+    context.current = {
+      ...context.current,
+      state: {
+        ...state,
+        voice: { ...state.voice, source: "clone", voice_id: "family-voice" },
+      },
+    };
+    view.refreshContext();
+    expect(pause).toHaveBeenCalledOnce();
+    expect(play).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("button", { name: "Pause preview" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Play generated speech" }),
+    ).toBeNull();
+    expect(screen.queryByText(/This is the ready-made preview/)).toBeNull();
+  });
+
+  it("ignores an old generation response after the voice changes and allows a fresh preview", async () => {
+    const state = savedSampleWithStockVoice();
+    let finishOld!: (value: typeof stockPreview) => void;
+    const mutate = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishOld = resolve;
+          }),
+      )
+      .mockResolvedValueOnce({
+        ...stockPreview,
+        text: "This is the family preview.",
+        audio: { source: "cartesia", url: "/audio/family.wav" },
+      });
+    context.current = { ...context.current, state, mutate };
+    const view = mount("/voice/preview");
+    fireEvent.click(screen.getByRole("button", { name: "Generate a preview" }));
+    expect(screen.getByRole("button", { name: "Generating…" })).toBeDisabled();
+    context.current = {
+      ...context.current,
+      state: {
+        ...state,
+        voice: { ...state.voice, source: "clone", voice_id: "family-voice" },
+      },
+    };
+    view.refreshContext();
+    expect(
+      screen.getByRole("button", { name: "Generate a preview" }),
+    ).toBeEnabled();
+    await act(async () => finishOld(stockPreview));
+    expect(screen.queryByText(/This is the ready-made preview/)).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Play generated speech" }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Generate a preview" }));
+    await screen.findByText(/This is the family preview/);
+    expect(screen.getByText(/Voice: Family AI voice/)).toBeInTheDocument();
+  });
+
+  it.each([
+    { ok: false, voice_id: "family-voice", source: "clone" },
+    { ok: true, voice_id: "stock-voice", source: "stock" },
+    { ok: true, voice_id: "", source: "clone" },
+  ])(
+    "does not present an unconfirmed clone response as success: %j",
+    async (result) => {
+      context.current = {
+        ...context.current,
+        state: savedSampleWithStockVoice(),
+        mutate: vi.fn().mockResolvedValue(result),
+      };
+      mount("/voice/create");
+      fireEvent.click(screen.getByRole("checkbox"));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Create family AI voice" }),
+      );
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Family voice creation was not confirmed",
+      );
+      expect(
+        screen.getByRole("heading", { name: "Create your family voice" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Create family AI voice" }),
+      ).toBeEnabled();
+    },
+  );
 });

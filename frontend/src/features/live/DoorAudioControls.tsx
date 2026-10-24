@@ -45,9 +45,13 @@ export function DoorAudioControls({
           ? "Connecting door audio… "
           : ""}
         {talk === "on" ? "Your microphone is live at the door. " : ""}
-        {listen === "on" ? "Listen is on for the door microphone. " : ""}
+        {listen === "on"
+          ? talk === "on"
+            ? "Listen is enabled, but door audio is paused during Talk. Stop talking to hear the reply. "
+            : "Listening to the door microphone. "
+          : ""}
         {talk === "off" && listen === "off"
-          ? "Talk to the door, listen, or turn on both."
+          ? "Use Listen to hear the door and Talk to speak."
           : ""}
       </p>
       {audio.error && <Notice tone="warning">{audio.error}</Notice>}

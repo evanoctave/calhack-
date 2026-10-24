@@ -100,12 +100,30 @@ export function VoicePage() {
   const started = useRef(0);
   const live = useRef(true);
   const uploading = useRef(false);
+  const previewRun = useRef(0);
+  const previewPending = useRef(false);
   const consentRef = useRef(consent);
   consentRef.current = consent;
   const capTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const owner = state?.household.caregiver_name || "Sarah";
   const dad = state?.household.person_name || "Dad";
   const voice = state?.voice;
+  const familyVoice = voice?.source === "clone" && !voice.mock && !preview;
+  const stockVoice = voice?.source === "stock" && !voice.mock && !preview;
+  const voiceLabel = familyVoice
+    ? "Family AI voice"
+    : stockVoice
+      ? "Ready-made voice"
+      : "Current voice";
+  const voiceKey = JSON.stringify([
+    preview,
+    voice?.voice_id,
+    voice?.source,
+    voice?.mock,
+    voice?.style,
+  ]);
+  const voiceKeyRef = useRef(voiceKey);
+  voiceKeyRef.current = voiceKey;
   const line = (k: SampleKind) =>
     samples[k].line.replace("Sarah", owner).replaceAll("Dad", dad);
   const count = kinds.filter(
@@ -133,10 +151,19 @@ export function VoicePage() {
     audio.current = null;
     setPlaying(false);
   }
+  function cancelPreviewRequest() {
+    previewRun.current++;
+    if (previewPending.current) {
+      previewPending.current = false;
+      setBusy(false);
+    }
+  }
   useEffect(() => {
     live.current = true;
     return () => {
       live.current = false;
+      previewRun.current++;
+      previewPending.current = false;
       if (recorder.current) {
         recorder.current.onstop = null;
         if (recorder.current.state !== "inactive") recorder.current.stop();
@@ -149,6 +176,7 @@ export function VoicePage() {
   useEffect(() => {
     setError("");
     setNote("");
+    cancelPreviewRequest();
     stopPlayback();
     if (step !== "record" && recorder.current?.state === "recording") {
       recorder.current.onstop = null;
@@ -157,6 +185,12 @@ export function VoicePage() {
       setRecordingNow(false);
     }
   }, [step]);
+  useEffect(() => {
+    cancelPreviewRequest();
+    stopPlayback();
+    setGenerated(null);
+    setClone(null);
+  }, [voiceKey]);
   useEffect(() => {
     if (!recordingNow) return;
     const tick = setInterval(
@@ -289,16 +323,20 @@ export function VoicePage() {
     }
     const sound = new Audio(url);
     audio.current = sound;
-    sound.onended = () => setPlaying(false);
+    sound.onended = () => {
+      if (audio.current === sound) setPlaying(false);
+    };
     sound.onerror = () => {
+      if (audio.current !== sound) return;
       setPlaying(false);
       setError("This audio could not be played. Try again.");
     };
     try {
       await sound.play();
-      setPlaying(true);
+      if (audio.current === sound) setPlaying(true);
     } catch {
-      setError("Tap Play again to allow sound in this browser.");
+      if (audio.current === sound)
+        setError("Tap Play again to allow sound in this browser.");
     }
   }
   async function saveSample(take = recording) {
@@ -345,34 +383,59 @@ export function VoicePage() {
     }
   }
   async function cloneVoice() {
+    if (busy) return;
     if (!consent) {
       setError(
         "Please give permission to create speech using your voice first.",
       );
       return;
     }
+    cancelPreviewRequest();
+    stopPlayback();
+    setGenerated(null);
+    setClone(null);
     setBusy(true);
     setError("");
     try {
       const result = await mutate<CloneResult>("/voice/clone", { name: owner });
+      if (!live.current || stepRef.current !== "create") return;
+      if (
+        !result?.ok ||
+        !result.voice_id ||
+        !["clone", "mock"].includes(result.source)
+      )
+        throw new Error(
+          "Family voice creation was not confirmed. Your saved samples are still available. Try again.",
+        );
       setClone(result);
       if (live.current && stepRef.current === "create")
         navigate("/voice/preview");
     } catch (e) {
-      setError(fail(e));
+      if (live.current && stepRef.current === "create") setError(fail(e));
     } finally {
-      setBusy(false);
+      if (live.current) setBusy(false);
     }
   }
   async function generate() {
+    if (busy) return;
+    const run = ++previewRun.current;
+    const key = voiceKey;
+    const isCurrent = () =>
+      live.current &&
+      run === previewRun.current &&
+      key === voiceKeyRef.current &&
+      stepRef.current === "preview";
+    previewPending.current = true;
     setBusy(true);
     setError("");
     setNote("");
     stopPlayback();
+    setGenerated(null);
     try {
       const result = await mutate<VoicePreview>("/voice/preview", {
         situation,
       });
+      if (!isCurrent()) return;
       setGenerated(result);
       if (!result.audio?.url)
         setNote(
@@ -381,9 +444,12 @@ export function VoicePage() {
             : "The server returned a text-only preview. No generated audio is available.",
         );
     } catch (e) {
-      setError(fail(e));
+      if (isCurrent()) setError(fail(e));
     } finally {
-      setBusy(false);
+      if (isCurrent()) {
+        previewPending.current = false;
+        setBusy(false);
+      }
     }
   }
   async function removeSample(k: SampleKind) {
@@ -544,7 +610,7 @@ export function VoicePage() {
               <Notice tone="success">
                 {preview
                   ? "Sample saved to this preview only."
-                  : "Sample saved. Listen back or record another take."}
+                  : "Sample saved. Next, create your family AI voice."}
               </Notice>
             )}
             {uploadError && (
@@ -556,8 +622,8 @@ export function VoicePage() {
             <div>
               <h2>Used as a voice reference</h2>
               <p className="caption muted">
-                AI uses your saved samples as a voice reference to generate new
-                words and tone.
+                Saving a sample does not change the door voice. Create your
+                family AI voice next to use this recording as its reference.
               </p>
             </div>
             {notices}
@@ -683,10 +749,29 @@ export function VoicePage() {
     return (
       <div className={styles.page}>
         <PageHeader
-          title="Preview your voice"
+          title={
+            familyVoice
+              ? "Preview family AI voice"
+              : stockVoice
+                ? "Preview ready-made voice"
+                : "Preview current voice"
+          }
           description="Hear how your selected voice responds to a new situation."
           back="/voice/samples"
         />
+        {stockVoice && (
+          <Notice>
+            <p>
+              This is a ready-made voice, not your recorded voice. Saving a
+              sample does not create a family AI voice.
+            </p>
+            {count > 0 && (
+              <Button disabled={busy} onClick={() => navigate("/voice/create")}>
+                Create family AI voice
+              </Button>
+            )}
+          </Notice>
+        )}
         {(clone?.source === "mock" || voice?.mock || preview) && (
           <Notice tone="warning">
             {preview
@@ -697,7 +782,7 @@ export function VoicePage() {
         {referenceKind && (
           <Card>
             <p className="caption muted">
-              {owner}’s voice · {samples[referenceKind].title}
+              {owner}’s recorded sample · {samples[referenceKind].title}
             </p>
             {availableSamples.length > 1 && (
               <label className={styles.selectField}>
@@ -737,7 +822,7 @@ export function VoicePage() {
             <>
               <p className={styles.quote}>“{generated.text}”</p>
               <p className="caption muted">
-                Words: {generated.line_source} · Voice:{" "}
+                Words: {generated.line_source} · Voice: {voiceLabel} ·{" "}
                 {generated.audio?.source || generated.audio?.mode || "No audio"}
               </p>
               {generated.audio?.url && (
@@ -784,7 +869,9 @@ export function VoicePage() {
           </Button>
           <Button onClick={() => navigate("/setup/contacts")}>
             {voice?.voice_id && !voice.mock
-              ? "Continue with this voice"
+              ? stockVoice
+                ? "Continue with ready-made voice"
+                : "Continue with this voice"
               : "Continue setup"}
           </Button>
         </div>
@@ -856,7 +943,13 @@ export function VoicePage() {
       </p>
       <p className="caption muted">Voice · Cartesia / Dialogue · Claude</p>
       {voice?.voice_id && !voice.mock && (
-        <Notice tone="success">A voice is selected for the door.</Notice>
+        <Notice tone={stockVoice ? "info" : "success"}>
+          {stockVoice
+            ? "Ready-made voice selected. Create a family AI voice to use your saved samples."
+            : familyVoice
+              ? "Family AI voice selected for the door."
+              : "A voice is selected for the door."}
+        </Notice>
       )}
       {notices}
       <div className="actions">
@@ -866,7 +959,11 @@ export function VoicePage() {
             disabled={busy}
             onClick={() => navigate("/voice/preview")}
           >
-            Preview current voice
+            {stockVoice
+              ? "Preview ready-made voice"
+              : familyVoice
+                ? "Preview family AI voice"
+                : "Preview current voice"}
           </Button>
         )}
         <Button
@@ -887,7 +984,9 @@ export function VoicePage() {
           {count ? "Create family AI voice" : "Record a voice sample"}
         </Button>
         <Button variant="quiet" onClick={() => navigate("/setup/contacts")}>
-          Continue with current voice
+          {stockVoice
+            ? "Continue with ready-made voice"
+            : "Continue with current voice"}
         </Button>
       </div>
     </div>

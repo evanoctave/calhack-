@@ -50,7 +50,7 @@ Automatic `speak` events and door telemetry, including enrollment results, are f
 
 Sample upload, deletion, Cartesia cloning, voice selection and generated preview endpoints exist. The clone request selects the new voice immediately; there is no separate draft/approve transaction and no progress job endpoint. Show indeterminate pending state. `source:'mock'` means no real clone was created.
 
-The voice preview now plays the chosen available reference sample rather than assuming an introduction sample exists. Generated preview uses the currently selected backend voice and only plays returned audio. Preset selection metadata (`voice_source`/`voice_name`) can still describe the previous voice; `/voice/select` needs to update those fields before relying on them as authoritative display metadata.
+The voice preview now plays the chosen available reference sample rather than assuming an introduction sample exists. Generated preview uses the currently selected backend voice and only plays returned audio. On this integration branch, `/voice/select` clears the previous clone metadata in memory and the persisted environment file. Ready-made and cloned-family voices are labeled separately; changed voice settings invalidate older generated previews.
 
 If consent needs to be retained by the service, add an explicit consent record to the clone contract. The existing request accepts only `{name}`. Sample names are three fixed slots and one recording per slot; multiple retained takes require a new storage contract.
 
