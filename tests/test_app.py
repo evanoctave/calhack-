@@ -44,7 +44,16 @@ def _wav(seconds: float = 1.2) -> bytes:
     return r.stdout
 
 
+def _align_caregiver_with_first_member() -> None:
+    """A profile rename follows the tree member who carries the caregiver's name; make that the first member."""
+    from dataclasses import replace
+
+    store = api_app._store()
+    store.hh = replace(store.hh, caregiver_name=store.hh.tree[0].name)
+
+
 def test_app_state_and_profile(client: TestClient) -> None:
+    _align_caregiver_with_first_member()
     s = client.get("/app/state?member=TM-PRIMARY").json()
     assert s["household"]["person_full_name"] and s["incident"] is None and s["voice"]["mock"]
     r = client.post(
@@ -92,6 +101,7 @@ def test_caregiver_rename_renames_tree_member(client: TestClient, monkeypatch: p
     from nightfall import api_app
 
     monkeypatch.setattr(api_app, "_persist_household", lambda hh: None)
+    _align_caregiver_with_first_member()
     before = client.get("/app/state?member=TM-PRIMARY").json()["household"]["caregiver_name"]
     client.post("/profile", json={"caregiver_name": "Evan"})
     hh = api_app._store().hh

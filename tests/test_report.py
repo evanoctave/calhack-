@@ -50,11 +50,13 @@ def test_sample_nights_fill_in_until_the_family_has_three(hist) -> None:
     r = report.build(hh, NOW)
     assert r["includes_sample"] and r["night_label"] == "Last night" and len(r["week"]) == 7
     assert all(e["sample"] for e in r["events"])
-    real = [_row(datetime(2026, 10, d, 2, 15, tzinfo=TZ), "acked", 8, "TM-SARAH") for d in (22, 23, 24)]
+    real = [_row(datetime(2026, 10, d, 2, 15, tzinfo=TZ), "acked", 8, "TM-PRIMARY") for d in (22, 23, 24)]
     hist(*real)
     r = report.build(hh, NOW)
     assert not r["includes_sample"]
-    assert r["events"][0]["answered_by"] == hh.member("TM-SARAH").name and r["events"][0]["label"] == "Family answered"
+    assert (
+        r["events"][0]["answered_by"] == hh.member("TM-PRIMARY").name and r["events"][0]["label"] == "Family answered"
+    )
     assert r["facts"]["week"]["nights_he_left"] == 3 and r["facts"]["week"]["usual_time"] == "around 2 AM"
 
 
