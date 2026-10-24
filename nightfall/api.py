@@ -24,7 +24,9 @@ from starlette.datastructures import UploadFile
 from nightfall import brief as briefmod
 from nightfall import engine
 from nightfall import snapshot
+from nightfall.actions import cancel_descriptions as _cancel_descriptions
 from nightfall.actions import emit as _emit
+from nightfall.actions import schedule_description as _schedule_description
 from nightfall.actions import run_actions as _run_actions
 from nightfall.escalation import LADDER
 from nightfall.household import TreeMember, load
@@ -44,6 +46,7 @@ async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         store.tick_task.cancel()
+        await _cancel_descriptions(store)
         if store.inc is not None:
             await store.runner.cancel(store.inc.id)
 
@@ -170,6 +173,7 @@ async def frames(incident_id: str, request: Request) -> dict[str, Any]:
         store.snapshots[incident_id] = store.snapshots.get(incident_id, []) + saved
     if incident_id in store.briefs:
         store.briefs[incident_id]["exit_frames"] = store.frames[incident_id]
+    _schedule_description(store, incident_id)
     return {"frame_ids": [f"FR-{i}" for i in range(len(store.frames[incident_id]))]}
 
 
@@ -213,6 +217,7 @@ async def sse_phone(member_id: str) -> StreamingResponse:
 async def reset() -> dict[str, Any]:
     if store.inc is not None:
         await store.runner.cancel(store.inc.id)
+    await _cancel_descriptions(store)
     store.inc, store.log, store.frames, store.briefs = None, [], {}, {}
     store.snapshots.clear()
     store.runner.rings.clear()

@@ -31,6 +31,8 @@ class Store:
         self.log: list[dict[str, Any]] = []
         self.frames: dict[str, list[str]] = {}
         self.snapshots: dict[str, list[str]] = {}
+        self.vision_tasks: dict[str, asyncio.Task[None]] = {}
+        self.described: set[str] = set()
         self.briefs: dict[str, dict[str, Any]] = {}
         self.night_mode: bool = True
         self.hub = Hub()

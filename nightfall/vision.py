@@ -8,6 +8,7 @@ validated against R8.
 from __future__ import annotations
 
 import base64
+import os
 from dataclasses import dataclass, field
 from typing import Any, Final
 
@@ -20,6 +21,8 @@ HEADWEAR: Final = frozenset({"none", "cap", "beanie", "hat", "hood up", "not vis
 EYEWEAR: Final = frozenset({"none", "glasses", "sunglasses", "not visible"})
 BUILD: Final = frozenset({"slight", "average", "heavy", "not visible"})
 CARRIED: Final = frozenset({"none", "bag", "backpack", "purse", "cane", "walker", "umbrella", "phone", "not visible"})
+
+DEFAULT_MIN_LUMINANCE: Final[float] = 20.0  # 0-255. Below this a frame holds no describable detail.
 
 PROMPT: Final[str] = (
     "You are helping a family search for a missing adult who walked out of their home at night. "
@@ -95,13 +98,50 @@ def fixture() -> ClothingReport:
     )
 
 
+def min_luminance() -> float:
+    """Darkness floor, read at call time so a test can move it without reimporting."""
+    try:
+        return float(os.environ.get("MIN_LUMINANCE", DEFAULT_MIN_LUMINANCE))
+    except ValueError:
+        return DEFAULT_MIN_LUMINANCE
+
+
+def mean_luminance(jpeg: bytes) -> float | None:
+    """Mean brightness 0-255, or None when it cannot be measured. Never raises."""
+    try:
+        import io
+
+        from PIL import Image, ImageStat  # lazy: absent package must not break mock mode
+
+        with Image.open(io.BytesIO(jpeg)) as im:
+            return float(ImageStat.Stat(im.convert("L")).mean[0])
+    except Exception:
+        return None
+
+
+def _as_bytes(jpeg: bytes | str) -> bytes:
+    """Accept raw bytes, bare base64, or a data URI. Returns the decoded image."""
+    if isinstance(jpeg, bytes):
+        return jpeg
+    payload = jpeg.split(",", 1)[-1] if jpeg.startswith("data:") else jpeg
+    try:
+        return base64.b64decode(payload, validate=False)
+    except Exception:
+        return b""
+
+
 def describe_clothing(jpeg: bytes | str) -> ClothingReport:
     """Describe one exit frame. Falls back to the fixture on any failure, and says so."""
     if not jpeg:
         return _fallback("no exit frame captured")
-    data = jpeg if isinstance(jpeg, str) else base64.b64encode(jpeg).decode()
-    if data.startswith("data:"):
-        data = data.split(",", 1)[-1]
+    raw = _as_bytes(jpeg)
+    lux = mean_luminance(raw)
+    floor = min_luminance()
+    if lux is not None and lux < floor:
+        return _fallback(f"frame too dark to describe (luminance {lux:.0f} below {floor:g})")
+    data = base64.b64encode(raw).decode() if raw else ""
+    if not data:
+        return _fallback("frame could not be decoded")
     try:
         raw = anthropic_vision.describe(data, PROMPT, SCHEMA)
     except Exception as e:  # any failure: no key, no SDK, timeout, refusal, bad JSON

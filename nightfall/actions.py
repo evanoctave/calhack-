@@ -5,10 +5,12 @@ Cartesia audio and the ring action for the Twilio call agent without touching en
 """
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from nightfall import brief as briefmod
 from nightfall import engine
+from nightfall import vision
 from nightfall.script import SCRIPT, fill
 from nightfall.store import Store
 
@@ -32,6 +34,7 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
             store.briefs[inc.id] = briefmod.build(store.hh, inc, briefmod.mock_clothing(), store.places,
                                                   store.frames.get(inc.id, []), store.now())
             emit(store, {"type": "brief_ready", "incident_id": inc.id})
+            schedule_description(store, inc.id)
         elif a == "start_escalation":
             t = (inc.exited_at or store.now()).strftime("%-I:%M %p")
             msg = f"{store.hh.person_name} has left the house at {t}. Open the brief."
@@ -45,3 +48,56 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
             store.frames.pop(inc.id, None)
 
 
+
+
+def schedule_description(store: Store, incident_id: str) -> None:
+    """Start the vision call once per incident, whichever lands last: the frames or the brief.
+
+    The brief is built at exit but frames arrive afterwards on their own request, so neither event
+    is reliably last. Both call this; the guards below make it idempotent.
+    """
+    if incident_id in store.described or incident_id in store.vision_tasks:
+        return
+    if not store.frames.get(incident_id) or incident_id not in store.briefs:
+        return
+    store.vision_tasks[incident_id] = asyncio.create_task(_describe(store, incident_id))
+
+
+async def _describe(store: Store, incident_id: str) -> None:
+    """Describe the frame closest to the exit and patch the brief in place.
+
+    The brief is already on every phone with the fixture in it; this only replaces the clothing.
+    The SDK call is synchronous, so it runs in a thread: blocking here would stall SSE and the
+    one second ticker for the length of the call.
+    """
+    try:
+        frames = store.frames.get(incident_id) or []
+        report = await asyncio.to_thread(vision.describe_clothing, frames[-1])
+        b = store.briefs.get(incident_id)
+        if b is not None:
+            b["clothing"] = report.brief
+            b["clothing_line"] = briefmod.clothing_line(report.brief)
+            emit(store, {"type": "brief_ready", "incident_id": incident_id,
+                         "clothing_source": report.source, "clothing_line": b["clothing_line"]})
+        store.described.add(incident_id)
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:  # the brief keeps the fixture; never take the demo down
+        print(f"describe_exit_frame fallback: {type(e).__name__}: {e}")
+    finally:
+        store.vision_tasks.pop(incident_id, None)
+
+
+async def cancel_descriptions(store: Store) -> None:
+    """Cancel every in-flight vision call. Used by /reset and shutdown."""
+    for task in list(store.vision_tasks.values()):
+        task.cancel()
+    for task in list(store.vision_tasks.values()):
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            pass
+    store.vision_tasks.clear()
+    store.described.clear()
