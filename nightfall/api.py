@@ -122,7 +122,7 @@ async def _warm_memory() -> None:
 
 async def _ticker() -> None:
     while True:
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.5)
         inc = store.inc
         if inc is not None and inc.state in (
             engine.State.CONVERSATION,
