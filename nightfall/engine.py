@@ -28,6 +28,27 @@ class State(str, Enum):
 DOOR_WAIT_S: Final[float] = float(os.environ.get("DOOR_WAIT_S", "20"))
 DEADLINE_S: Final[float] = 15 * 60
 MAX_LINES: Final[int] = 4
+DEFAULT_ABSENCE_S: Final[float] = 10.0
+DEFAULT_CONVERSATION_TIMEOUT_S: Final[float] = 90.0
+DOOR_ZONE: Final[str] = "door"
+
+
+def _env_float(name: str, default: float) -> float:
+    """Read a tuning value per call, not at import, so a test can change it without reimporting."""
+    try:
+        return float(os.environ.get(name, default))
+    except ValueError:
+        return default
+
+
+def absence_s() -> float:
+    """Seconds with nobody visible, after a sighting at the door, before it counts as an exit."""
+    return _env_float("ABSENCE_S", DEFAULT_ABSENCE_S)
+
+
+def conversation_timeout_s() -> float:
+    """R1: the conversation goes quiet after this long with no sighting at the door."""
+    return _env_float("CONVERSATION_TIMEOUT_S", DEFAULT_CONVERSATION_TIMEOUT_S)
 
 
 @dataclass
@@ -48,6 +69,8 @@ class Incident:
     acked_by: str | None = None
     lines_spoken: int = 0
     seen_inside: bool = False
+    last_person_at: datetime | None = None
+    last_zone: str = ""
 
     @property
     def deadline_at(self) -> datetime | None:
@@ -97,9 +120,29 @@ def _reply(inc: Incident, ev: Event) -> Transition:
 
 
 def _seen_inside_conv(inc: Incident, ev: Event) -> Transition:
+    """A sighting away from the door means they went back in. At the door it only resets the clock."""
+    inc.last_person_at = ev.ts
+    inc.last_zone = str(ev.payload.get("zone", "") or "")
     if not ev.payload.get("inside", True):
-        return _ignored(inc, ev, "seen but not inside")
+        return _ignored(inc, ev, f"at the {inc.last_zone or 'door'}, still watching")
     return _t(inc, State.RETURNED, ("log:returned",), "R2", "returned before door")
+
+
+def _tick_conversation(inc: Incident, ev: Event) -> Transition:
+    """R2 by absence: last seen at the door, then nobody, for long enough, means they went out.
+
+    Without a sighting at the door there is nothing to escalate on, so the conversation simply
+    goes quiet (R1) and the incident ends. That also stops CONVERSATION being a state with no exit.
+    """
+    if inc.last_person_at is not None and inc.last_zone == DOOR_ZONE:
+        gone = (ev.ts - inc.last_person_at).total_seconds()
+        if gone >= absence_s():
+            return _exit(inc, ev, f"last seen at the door, gone {gone:.0f} s")
+        return _ignored(inc, ev, f"at the door, gone {gone:.0f}/{absence_s():.0f} s")
+    since = (ev.ts - inc.opened_at).total_seconds() if inc.opened_at else 0.0
+    if since >= conversation_timeout_s():
+        return _t(inc, State.RETURNED, ("log:returned",), "R1", f"quiet after {since:.0f} s, never at the door")
+    return _ignored(inc, ev, f"talking {since:.0f}/{conversation_timeout_s():.0f} s")
 
 
 def _door_open(inc: Incident, ev: Event) -> Transition:
@@ -159,6 +202,8 @@ TRANSITIONS: Final[dict[tuple[State, str], Handler]] = {
     (State.ARMED_IDLE, "motion"): _motion,
     (State.ARMED_IDLE, "door_open"): _door_open,
     (State.CONVERSATION, "reply"): _reply,
+    (State.CONVERSATION, "tick"): _tick_conversation,
+    (State.CONVERSATION, "close"): _close,
     (State.CONVERSATION, "person_seen"): _seen_inside_conv,
     (State.CONVERSATION, "door_open"): _door_open,
     (State.DOOR_OPEN, "door_close"): _door_close,

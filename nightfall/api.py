@@ -92,7 +92,8 @@ async def _step(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
 async def _ticker() -> None:
     while True:
         await asyncio.sleep(1)
-        if store.inc is not None and store.inc.state in (engine.State.DOOR_OPEN, engine.State.ESCALATING):
+        if store.inc is not None and store.inc.state in (engine.State.CONVERSATION, engine.State.DOOR_OPEN,
+                                                        engine.State.ESCALATING):
             await _step("tick", {})
 
 
