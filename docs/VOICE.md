@@ -7,6 +7,8 @@ Three voice jobs, all behind mocks, all validated by code. The model never sets 
 - `voice.say(line, persona)` -> `AudioRef {mode, text, url, source}`. Real: Cartesia Sonic `POST /tts/bytes`
   (`Authorization: Bearer`, `Cartesia-Version: 2026-08-14`, `model_id: sonic-3`, WAV 24 kHz) cached by sha1
   in `out/voice/` (LRU 64), served at `/voice/<sha>.wav`. Mock: the dashboard speaks with SpeechSynthesis.
+  Completed audio is rewritten with finite RIFF and data lengths before caching; versioned cache keys bypass
+  older streaming WAVs whose length placeholders can break telephone playback.
 - `voice.pre_synthesize(hh)` runs at boot so the first line at the door never waits on the network.
 - `voice.hear(audio, typed)` -> text. Real: Cartesia Ink `POST /stt` (`model=ink-whisper`). Mock: the typed reply.
 - `llm.next_line(hh, history, memory_hits)` -> `(line, source)`. Real: Claude (`claude-opus-5`, override with
@@ -14,7 +16,8 @@ Three voice jobs, all behind mocks, all validated by code. The model never sets 
   no banned phrase, no digits except a time, terminal punctuation). Any failure -> scripted fallback
   (`closed_place` when the reply mentions a store or work, `again`, then `comfort`).
 - Persona: `household.persona` is `caregiver_clone` (consented clone id in `CARTESIA_VOICE_ID`) or `assistant`.
-  The family-call agent always uses the assistant voice (`CARTESIA_ASSISTANT_VOICE_ID`), never the clone.
+  The telephone opening uses Twilio's neutral voice; later call-agent lines use the assistant voice
+  (`CARTESIA_ASSISTANT_VOICE_ID`).
 
 ## 2. Family call agent
 
@@ -28,6 +31,11 @@ Transports, same brain:
 - Twilio: `TwilioNotifier` calls every member with an E.164 phone. Twilio fetches `POST /twiml/{inc}/{member}`
   (opening + `<Gather input="speech" speechTimeout="auto">`), posts `SpeechResult` to `/twiml/.../turn`, loops
   until ack or goodbye (`<Hangup/>`). The link also goes by SMS. Any Twilio error -> SSE only, logged on the dashboard.
+  The pickup response uses `<Say voice="Polly.Joanna">` immediately, without waiting for Cartesia synthesis or an
+  audio-file download. Later replies retain Cartesia, with reasoning and synthesis off the server event loop so
+  one slow call does not block another call's opening or incident handling.
+  Telephone reasoning has a five-second budget and speech generation a two-second budget. Slow reasoning returns
+  a spoken brief/help prompt; slow synthesis speaks the answer with Twilio's voice and keeps listening.
 - Phone page (mock and fallback): `GET /agent/opening/{inc}/{member}`, `POST /agent/turn` with browser speech
   recognition in and TTS or Cartesia audio out. A spoken ack calls `/ack` exactly like the button.
 

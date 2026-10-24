@@ -44,8 +44,17 @@ def _wav(seconds: float = 1.2) -> bytes:
     return r.stdout
 
 
+def _align_caregiver_with_first_member() -> None:
+    """A profile rename follows the tree member who carries the caregiver's name; make that the first member."""
+    from dataclasses import replace
+
+    store = api_app._store()
+    store.hh = replace(store.hh, caregiver_name=store.hh.tree[0].name)
+
+
 def test_app_state_and_profile(client: TestClient) -> None:
-    s = client.get("/app/state?member=TM-SARAH").json()
+    _align_caregiver_with_first_member()
+    s = client.get("/app/state?member=TM-PRIMARY").json()
     assert s["household"]["person_full_name"] and s["incident"] is None and s["voice"]["mock"]
     r = client.post(
         "/profile", json={"person_full_name": "Robert Miller", "person_age": 74, "caregiver_name": "Sarah"}
@@ -55,7 +64,7 @@ def test_app_state_and_profile(client: TestClient) -> None:
     client.post("/event", json={"kind": "person_enter"})
     client.post("/event", json={"kind": "person_lost"})
     client.post("/event", json={"kind": "door_close"})
-    s = client.get("/app/state?member=TM-SARAH").json()
+    s = client.get("/app/state?member=TM-PRIMARY").json()
     assert (
         s["incident"]["state"] == "ESCALATING"
         and s["incident"]["brief_link"].startswith("http")
@@ -92,7 +101,8 @@ def test_caregiver_rename_renames_tree_member(client: TestClient, monkeypatch: p
     from nightfall import api_app
 
     monkeypatch.setattr(api_app, "_persist_household", lambda hh: None)
-    before = client.get("/app/state?member=TM-SARAH").json()["household"]["caregiver_name"]
+    _align_caregiver_with_first_member()
+    before = client.get("/app/state?member=TM-PRIMARY").json()["household"]["caregiver_name"]
     client.post("/profile", json={"caregiver_name": "Evan"})
     hh = api_app._store().hh
     assert hh.caregiver_name == "Evan" and hh.tree[0].name == "Evan" and hh.tree[1].name == "Mike"
@@ -108,7 +118,7 @@ def test_family_ack_on_old_call_silences_new_incident(client: TestClient) -> Non
     client.post("/event", json={"kind": "person_back"})
     client.post("/event", json={"kind": "person_enter"})  # Dad back out at the door: a new incident talks
     assert api.store.inc.id != old and api.store.inc.state.value == "CONVERSATION"
-    assert client.post("/ack", json={"incident_id": old, "member_id": "TM-SARAH"}).status_code == 404
+    assert client.post("/ack", json={"incident_id": old, "member_id": "TM-PRIMARY"}).status_code == 404
     assert api.store.inc.state.value == "RETURNED"
     r = client.post("/event", json={"kind": "person_enter"}).json()
     assert r.get("ignored") == "quiet after family ack"

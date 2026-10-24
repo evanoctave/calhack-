@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import io
 import os
+import wave
 from typing import Final
 
 import httpx
@@ -29,6 +31,22 @@ def _headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {key}", "Cartesia-Version": VERSION}
 
 
+def finalize_wav(data: bytes) -> bytes:
+    """Replace streaming WAV length placeholders with the actual PCM frame count."""
+    output = io.BytesIO()
+    with wave.open(io.BytesIO(data), "rb") as source:
+        frames = source.readframes(source.getnframes())
+        frame_size = source.getnchannels() * source.getsampwidth()
+        if not frames or len(frames) % frame_size:
+            raise ValueError("Cartesia returned empty or incomplete audio frames")
+        with wave.open(output, "wb") as target:
+            target.setnchannels(source.getnchannels())
+            target.setsampwidth(source.getsampwidth())
+            target.setframerate(source.getframerate())
+            target.writeframes(frames)
+    return output.getvalue()
+
+
 def tts_wav(text: str, voice_id: str | None = None, speed: float = 1.0, emotion: str = "happy") -> bytes:
     """Synthesize one line to 24 kHz 16-bit WAV. Raises on any HTTP or network error."""
     vid = voice_id or os.environ.get("CARTESIA_VOICE_ID", "")
@@ -44,7 +62,7 @@ def tts_wav(text: str, voice_id: str | None = None, speed: float = 1.0, emotion:
     }
     r = httpx.post(f"{BASE}/tts/bytes", headers=_headers(), json=body, timeout=10.0)
     r.raise_for_status()
-    return r.content
+    return finalize_wav(r.content)
 
 
 def stt(audio: bytes, filename: str = "reply.wav") -> str:

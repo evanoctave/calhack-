@@ -22,7 +22,7 @@ function show(name) {
 window.addEventListener("hashchange", () => show(location.hash.slice(1) || "home"));
 async function resolveMember() {
   const want = (new URLSearchParams(location.search).get("me") || "").trim();
-  if (!want) { member = "TM-SARAH"; return; }
+  if (!want) { member = "TM-PRIMARY"; return; }
   let id = ""; try { id = localStorage.getItem("nf-member-" + want) || ""; } catch (e) {}
   const st = await (await fetch("/state")).json();
   if (!st.household.tree.some(m => m.id === id)) { const r = await post("/tree", {name: want, phone: "web", tier: 1}); id = r.member_id; try { localStorage.setItem("nf-member-" + want, id); } catch (e) {} }

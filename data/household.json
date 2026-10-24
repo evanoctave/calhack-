@@ -2,7 +2,7 @@
   "id": "HH-DEMO",
   "person_name": "Dad",
   "person_photo": "/robert.svg",
-  "caregiver_name": "Evan",
+  "caregiver_name": "Nam",
   "night_start": "21:00",
   "night_end": "06:00",
   "home_lat": 37.8,
@@ -11,8 +11,8 @@
   "meds_opt_in": true,
   "tree": [
     {
-      "id": "TM-SARAH",
-      "name": "Evan",
+      "id": "TM-PRIMARY",
+      "name": "Nam",
       "phone": "web",
       "tier": 1
     },

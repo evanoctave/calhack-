@@ -98,7 +98,7 @@ def _ts(v: Any) -> datetime | None:
 
 
 def _clock(t: datetime) -> str:
-    return t.strftime("%-I:%M %p")
+    return t.strftime("%I:%M %p").lstrip("0")
 
 
 def _window(hours: list[float]) -> str:
