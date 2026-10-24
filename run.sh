@@ -31,7 +31,15 @@ while IFS= read -r line || [ -n "$line" ]; do
     ''|'#'*|' '*'#'*) continue ;;
   esac
   key=${line%%=*}
+  key=${key#"${key%%[![:space:]]*}"}
+  key=${key%"${key##*[![:space:]]}"}
   value=${line#*=}
+  value=${value#"${value%%[![:space:]]*}"}
+  case "$value" in
+    \"*\"|\'*\') value=${value#?}; value=${value%?} ;;        # quoted: keep verbatim
+    *) value=${value%%[[:space:]]#*}                        # drop "VALUE  # comment"
+       value=${value%"${value##*[![:space:]]}"} ;;          # and trailing spaces
+  esac
   # An inline value wins, so `DOOR_WAIT_S=5 ./run.sh` still shortens the demo.
   if [ "$key" != "$line" ] && [ -n "$value" ] && [ -z "${!key:-}" ]; then
     export "$key=$value"

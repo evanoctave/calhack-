@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -27,7 +28,11 @@ def load_dotenv(path: Path) -> list[str]:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, value = line.partition("=")
-        key, value = key.strip(), value.strip().strip("'\"")
+        key, value = key.strip(), value.strip()
+        if len(value) > 1 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]                      # quoted: keep verbatim
+        else:
+            value = re.split(r"\s#", value, maxsplit=1)[0].strip()  # drop inline comment
         if value and key not in os.environ:
             os.environ[key] = value
             loaded.append(key)
