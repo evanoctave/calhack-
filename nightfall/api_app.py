@@ -90,6 +90,7 @@ async def app_state(member: str = "") -> dict[str, Any]:
             "acked_by": inc.acked_by,
             "acked_by_name": next((m.name for m in hh.tree if m.id == inc.acked_by), None),
             "lines_spoken": inc.lines_spoken,
+            "last_line": next((t for who, t in reversed(store.history) if who == "system"), ""),
             "person_in_frame": inc.person_in_frame,
             "door_opened_at": inc.door_opened_at.isoformat() if inc.door_opened_at else None,
             "heading": inc.heading,

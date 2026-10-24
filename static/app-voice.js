@@ -45,7 +45,8 @@ async function sendTurn(text) { const r = await post("/agent/turn", {incident_id
 function listenOnce() { const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR || listening || speaking) return; const r = new SR(); r.lang = "en-US"; listening = true; $("r-listen").textContent = "Listening…";
   r.onresult = ev => { listening = false; sendTurn(ev.results[0][0].transcript); }; r.onend = () => { listening = false; $("r-listen").textContent = "Tap, then speak"; }; r.onerror = () => { listening = false; }; try { r.start(); } catch (e) { listening = false; } }
 async function askTyped() { const t = $("r-ask").value.trim(); if (t) { $("r-ask").value = ""; sendTurn(t); } }
-async function toggleTakeover() { const on = $("r-takeover").hidden; await post("/takeover", {member_id: member, on}); $("r-takeover").hidden = !on; $("r-tobtn").textContent = on ? "Hand back to the AI" : "Take over the voice"; refresh(); }
+async function toggleTakeover() { const on = !(S && S.takeover_by === member); await post("/takeover", {member_id: member, on}); $("r-tobtn").textContent = on ? "Hand back to Nightfall" : "Take over the voice";
+  if ($("tk-eyebrow")) { $("tk-eyebrow").textContent = meName() + " is speaking"; $("tk-who").textContent = meName() + " took over the voice at the door"; } await refresh(); go(on ? "takeover" : "talk"); }
 async function sayText(t) { const r = await post("/say", {member_id: member, text: t}); $("r-pttstat").textContent = r.ok ? "Played at the door (" + r.audio.source + ")." : "Failed."; }
 async function sayTyped() { const t = $("r-text").value.trim(); if (t) { $("r-text").value = ""; sayText(t); } }
 function pttTap(ev) { ev.preventDefault(); recToggle($("r-ptt"), $("r-pttstat"), async (blob, type) => {
