@@ -319,6 +319,12 @@ async def sse_phone(member_id: str) -> StreamingResponse:
     return StreamingResponse(_sse(f"phone:{member_id}"), media_type="text/event-stream")
 
 
+@app.get("/log")
+async def full_log() -> list[dict[str, Any]]:
+    """Every event since the last reset, for scripts/timings.py (the /state view keeps only the last 50)."""
+    return store.log
+
+
 @app.post("/reset")
 async def reset() -> dict[str, Any]:
     if store.inc is not None:
