@@ -11,6 +11,7 @@ import os
 import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
@@ -69,6 +70,9 @@ class AckIn(BaseModel):
     member_id: str
 
 
+QUIET_AFTER_ACK_S = float(os.environ.get("QUIET_AFTER_ACK_S", "300"))
+
+
 class TreeIn(BaseModel):
     name: str
     phone: str = "web"
@@ -90,6 +94,13 @@ async def _step(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
         )
         fresh = kind in ("motion", "person_enter", "door_open", "sos")
         watch_only = False
+        quiet = store.quiet_until is not None and store.now() < store.quiet_until
+        if (
+            quiet
+            and kind in ("motion", "person_enter", "door_open", "person_lost", "reply")
+            and (store.inc is None or store.inc.state in done)
+        ):
+            return {"incident_id": store.inc.id if store.inc else None, "ignored": "quiet after family ack"}
         if (
             store.inc is None
             or store.inc.state == engine.State.CLOSED
@@ -236,9 +247,22 @@ async def event(body: EventIn) -> dict[str, Any]:
 async def ack(body: AckIn) -> dict[str, Any]:
     if store.hh.member(body.member_id) is None:
         raise HTTPException(403, "not a tree member")
-    if store.inc is None or store.inc.id != body.incident_id:
+    if store.inc is None:
+        raise HTTPException(404, "no such incident")
+    if store.inc.id != body.incident_id:
+        # the call belongs to an earlier incident (Dad came back in, then out again): the family's word still
+        # stands for whatever is running now, and the door goes quiet
+        if store.inc.state in (
+            engine.State.CONVERSATION,
+            engine.State.DOOR_OPEN,
+            engine.State.WATCHING,
+            engine.State.ESCALATING,
+        ):
+            await _step("stand_down", {"checkin": "self_other", "who": store.hh.member(body.member_id).name})
+        store.quiet_until = store.now() + timedelta(seconds=QUIET_AFTER_ACK_S)
         raise HTTPException(404, "no such incident")
     first = await store.runner.ack(body.incident_id, body.member_id)
+    store.quiet_until = store.now() + timedelta(seconds=QUIET_AFTER_ACK_S)
     if first:
         await _step("ack", {"member_id": body.member_id})
         for m in store.hh.tree:
@@ -300,6 +324,7 @@ async def reset() -> dict[str, Any]:
     if store.inc is not None:
         await store.runner.cancel(store.inc.id)
     store.inc, store.frames, store.briefs = None, {}, {}
+    store.quiet_until = None
     store.log.clear()
     store.history, store.frame_bytes = [], {}
     store.takeover_by, store.call_911_sent, store.latest_frame = None, False, b""

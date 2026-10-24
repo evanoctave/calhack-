@@ -113,6 +113,19 @@ async def door_telemetry(body: TelemetryIn) -> dict[str, Any]:
 
     emit(store, {"type": "door", "event": body.event[:40], "detail": body.detail[:200]})
     print(f"door: {body.event} {body.detail[:120]}")
+    if body.event == "door_started":
+        # a restarted door is a fresh session: end a conversation still running from before the reload,
+        # but never an escalation (a door reboot must not cancel the family's calls)
+        from nightfall import engine
+        from nightfall.api import _step
+
+        store.quiet_until = None
+        if store.inc is not None and store.inc.state in (
+            engine.State.CONVERSATION,
+            engine.State.DOOR_OPEN,
+            engine.State.WATCHING,
+        ):
+            await _step("stand_down", {"checkin": "self_other", "who": "door restarted"})
     return {"ok": True}
 
 

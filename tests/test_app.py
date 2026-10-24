@@ -97,3 +97,29 @@ def test_caregiver_rename_renames_tree_member(client: TestClient, monkeypatch: p
     hh = api_app._store().hh
     assert hh.caregiver_name == "Evan" and hh.tree[0].name == "Evan" and hh.tree[1].name == "Mike"
     client.post("/profile", json={"caregiver_name": before})
+
+
+def test_family_ack_on_old_call_silences_new_incident(client: TestClient) -> None:
+    from nightfall import api
+
+    for k in ("person_enter", "person_lost", "door_close"):
+        client.post("/event", json={"kind": k})
+    old = api.store.inc.id
+    client.post("/event", json={"kind": "person_back"})
+    client.post("/event", json={"kind": "person_enter"})  # Dad back out at the door: a new incident talks
+    assert api.store.inc.id != old and api.store.inc.state.value == "CONVERSATION"
+    assert client.post("/ack", json={"incident_id": old, "member_id": "TM-SARAH"}).status_code == 404
+    assert api.store.inc.state.value == "RETURNED"
+    r = client.post("/event", json={"kind": "person_enter"}).json()
+    assert r.get("ignored") == "quiet after family ack"
+    client.post("/door/telemetry", json={"event": "door_started"})
+    assert api.store.quiet_until is None
+
+
+def test_door_restart_ends_conversation(client: TestClient) -> None:
+    from nightfall import api
+
+    client.post("/event", json={"kind": "person_enter"})
+    assert api.store.inc.state.value == "CONVERSATION"
+    client.post("/door/telemetry", json={"event": "door_started"})
+    assert api.store.inc.state.value == "RETURNED"
