@@ -28,7 +28,7 @@ input { padding: 10px 14px; font-size: 15px; } .tabs { display: none; }
 <div class="phone">
 <header>
   <div><h1 id="hdr">Night watch is on</h1><div class="sub" style="margin:0" id="hdrsub">Front entrance · door device</div></div>
-  <div class="rowb"><span id="clock" class="mono"></span><span id="night" class="pill"></span><span id="integ" class="pill"></span><a class="btn small" href="/app?me=Judge" target="_blank">Phone app</a><a class="btn small" href="/setup.html">Setup</a><a class="btn small" href="/voices.html">Voices</a><button class="btn small" onclick="toggleTheme()">Theme</button><button class="btn small" onclick="reset()">Reset</button></div>
+  <div class="rowb"><span id="clock" class="mono"></span><span id="night" class="pill"></span><span id="integ" class="pill"></span><span id="nowplaying" class="pill">door speaker idle</span><a class="btn small" href="/app?me=Judge" target="_blank">Phone app</a><a class="btn small" href="/setup.html">Setup</a><a class="btn small" href="/voices.html">Voices</a><button class="btn small" onclick="toggleTheme()">Theme</button><button class="btn small" onclick="reset()">Reset</button></div>
 </header>
 <div class="grid">
   <section class="card">
@@ -95,6 +95,15 @@ function line(e) {
   else body = `<span class="pill">${esc(e.type)}</span>`;
   return `<li><span class="mono muted">${esc(fmtTime(e.ts))}</span><span>${body}</span></li>`;
 }
+let pending = null, audioOk = false;
+function nowPlaying(t, bad) { const el = document.getElementById("nowplaying"); if (el) { el.textContent = t; el.className = "pill " + (bad ? "danger" : "ok"); } }
+function playAtDoor(e) {
+  const label = e.mode === "clip" ? e.text : '"' + e.text.slice(0, 60) + '"';
+  if (e.url) { const a = new Audio(e.url); a.onplay = () => { audioOk = true; nowPlaying("door speaker: " + label); }; a.onended = () => nowPlaying("door speaker idle");
+    a.play().catch(err => { pending = e; nowPlaying("audio blocked by the browser: click anywhere on this page to unlock", true); if (e.mode !== "clip") speak(e.text); }); }
+  else { nowPlaying("door speaker (browser voice): " + label); speak(e.text); }
+}
+document.addEventListener("click", () => { if (pending) { const e = pending; pending = null; playAtDoor(e); } else if (!audioOk) { try { const c = new (window.AudioContext || window.webkitAudioContext)(); c.resume(); audioOk = true; } catch (err) {} } }, true);
 async function refresh() { last = await (await fetch("/state")).json(); window.lastState = last; render(last); }
 async function ev(kind, payload) { await post("/event", {kind, payload: payload || {}}); refresh(); }
 async function reply() { const t = document.getElementById("replytext").value.trim(); if (t) await ev("reply", {text: t}); }
@@ -106,7 +115,7 @@ async function addJudge() {
   refresh();
 }
 sse("/sse/dashboard", async e => {
-  if (e.type === "speak") { if (e.url) { new Audio(e.url).play().catch(() => { if (e.mode !== "clip") speak(e.text); }); } else speak(e.text); }
+  if (e.type === "speak") playAtDoor(e);
   if (e.type === "takeover") { const b = document.getElementById("takeover"); b.hidden = !e.on; b.textContent = e.on ? e.by + " has taken over the voice at the door. AI lines paused." : ""; }
   if (e.type === "exit_frames_request") postFrames(e.incident_id);
   refresh();

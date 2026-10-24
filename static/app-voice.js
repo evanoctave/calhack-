@@ -11,18 +11,27 @@ function renderSamples() {
   $("v-clone").disabled = n === 0; $("v-clone").textContent = v.source === "clone" ? "Re-create family AI voice" : "Create family AI voice";
   $("v-ready").hidden = v.source !== "clone"; $("v-readyt").textContent = (v.name || S.household.caregiver_name) + "'s AI voice is ready";
 }
-function pickSample(k) { recKind = k; $("v-recpanel").hidden = false; $("v-line").textContent = '"' + SAMPLE_LINES[k][1].replace("Sarah", S.household.caregiver_name) + '"'; $("v-recstat").textContent = "Hold the button, read the line, release."; $("v-recpanel").scrollIntoView({behavior: "smooth"}); }
+function pickSample(k) { recKind = k; $("v-recpanel").hidden = false; $("v-line").textContent = '"' + SAMPLE_LINES[k][1].replace("Sarah", S.household.caregiver_name) + '"'; $("v-recstat").textContent = "Tap the button, read the line, tap again to save."; $("v-recpanel").scrollIntoView({behavior: "smooth"}); }
 function playSample(k) { new Audio("/voice/samples/" + k + ".wav?t=" + Date.now()).play(); }
-async function recStart(ev) { ev.preventDefault(); if (!recKind || rec) return;
-  try { recStream = await navigator.mediaDevices.getUserMedia({audio: true}); } catch (e) { $("v-recstat").textContent = "Microphone blocked. Allow the mic for this site."; return; }
-  const mt = mime(); rec = new MediaRecorder(recStream, mt ? {mimeType: mt} : undefined); chunks = []; rec.ondataavailable = e => chunks.push(e.data);
-  rec.onstop = async () => { recStream.getTracks().forEach(t => t.stop()); const type = rec.mimeType || mt; const blob = new Blob(chunks, {type}); rec = null;
-    if (blob.size < 2000) { $("v-recstat").textContent = "Too short. Hold longer and read the whole line."; return; }
-    $("v-recstat").textContent = "Uploading…"; const fd = new FormData(); fd.append("clip", blob, type.includes("mp4") ? "clip.mp4" : "clip.webm");
-    const r = await fetch("/voice/samples/" + recKind, {method: "POST", body: fd}); const j = await r.json();
-    $("v-recstat").textContent = r.ok ? "Saved, " + j.seconds + " s. Record the next one or create the voice." : "Failed: " + (j.detail || r.status); refresh(); };
-  rec.start(); $("v-recbtn").classList.add("on"); $("v-recbtn").textContent = "Recording… release to stop"; }
-function recStop(ev) { ev.preventDefault(); if (rec && rec.state === "recording") rec.stop(); $("v-recbtn").classList.remove("on"); $("v-recbtn").textContent = "Hold to record"; }
+const Recorder = {stream: null, rec: null, chunks: [], startedAt: 0, busy: false};
+async function micStream() { if (Recorder.stream && Recorder.stream.active) return Recorder.stream; Recorder.stream = await navigator.mediaDevices.getUserMedia({audio: true}); return Recorder.stream; }
+async function recToggle(btn, statEl, onBlob) {
+  if (Recorder.busy) return;
+  if (Recorder.rec && Recorder.rec.state === "recording") {
+    const held = Date.now() - Recorder.startedAt; if (held < 800) { statEl.textContent = "Keep talking, then tap again to send."; return; }
+    Recorder.busy = true; const r = Recorder.rec; r.stop(); btn.classList.remove("on"); btn.textContent = btn.dataset.idle; return;
+  }
+  let stream; try { stream = await micStream(); } catch (e) { statEl.textContent = "Microphone blocked. Allow the mic for this site in Safari settings."; return; }
+  const mt = mime(); const r = new MediaRecorder(stream, mt ? {mimeType: mt} : undefined); Recorder.rec = r; Recorder.chunks = [];
+  r.ondataavailable = e => { if (e.data && e.data.size) Recorder.chunks.push(e.data); };
+  r.onstop = () => { setTimeout(() => { const type = r.mimeType || mt || "audio/webm"; const blob = new Blob(Recorder.chunks, {type}); Recorder.rec = null; Recorder.busy = false;
+    if (blob.size < 1500) { statEl.textContent = "Nothing recorded. Tap, talk for a second or two, tap again."; return; } onBlob(blob, type); }, 250); };
+  r.start(250); Recorder.startedAt = Date.now(); btn.dataset.idle = btn.dataset.idle || btn.textContent; btn.classList.add("on"); btn.textContent = "Recording… tap to send"; statEl.textContent = "Recording. Tap the button again when done.";
+}
+function recTap(ev) { ev.preventDefault(); if (!recKind) return; recToggle($("v-recbtn"), $("v-recstat"), async (blob, type) => {
+  $("v-recstat").textContent = "Uploading…"; const fd = new FormData(); fd.append("clip", blob, type.includes("mp4") ? "clip.mp4" : "clip.webm");
+  const r = await fetch("/voice/samples/" + recKind, {method: "POST", body: fd}); const j = await r.json();
+  $("v-recstat").textContent = r.ok ? "Saved, " + j.seconds + " s. Record the next one or create the voice." : "Failed: " + (j.detail || r.status); refresh(); }); }
 async function cloneVoice() { $("v-clone").disabled = true; $("v-clone").textContent = "Creating voice…";
   const r = await fetch("/voice/clone", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({name: S.household.caregiver_name})}); const j = await r.json();
   if (!r.ok) { alert(j.detail || "clone failed"); $("v-clone").disabled = false; $("v-clone").textContent = "Create family AI voice"; return; }
@@ -39,8 +48,7 @@ async function askTyped() { const t = $("r-ask").value.trim(); if (t) { $("r-ask
 async function toggleTakeover() { const on = $("r-takeover").hidden; await post("/takeover", {member_id: member, on}); $("r-takeover").hidden = !on; $("r-tobtn").textContent = on ? "Hand back to the AI" : "Take over the voice"; refresh(); }
 async function sayText(t) { const r = await post("/say", {member_id: member, text: t}); $("r-pttstat").textContent = r.ok ? "Played at the door (" + r.audio.source + ")." : "Failed."; }
 async function sayTyped() { const t = $("r-text").value.trim(); if (t) { $("r-text").value = ""; sayText(t); } }
-let ptt = null, pttChunks = [];
-async function pttStart(ev) { ev.preventDefault(); if (ptt) return; try { const s = await navigator.mediaDevices.getUserMedia({audio: true}); const mt = mime(); ptt = new MediaRecorder(s, mt ? {mimeType: mt} : undefined); pttChunks = []; ptt.ondataavailable = e => pttChunks.push(e.data);
-  ptt.onstop = async () => { s.getTracks().forEach(t => t.stop()); const blob = new Blob(pttChunks, {type: ptt.mimeType || mt}); ptt = null; const fd = new FormData(); fd.append("member_id", member); fd.append("clip", blob, (mt || "").includes("mp4") ? "clip.mp4" : "clip.webm"); const r = await fetch("/say/clip", {method: "POST", body: fd}); $("r-pttstat").textContent = r.ok ? "Your voice played at the door." : "Clip failed."; };
-  ptt.start(); $("r-ptt").classList.add("on"); $("r-pttstat").textContent = "Recording… release to send."; } catch (e) { $("r-pttstat").textContent = "Microphone not available; type instead."; } }
-function pttStop(ev) { ev.preventDefault(); if (ptt && ptt.state === "recording") ptt.stop(); $("r-ptt").classList.remove("on"); }
+function pttTap(ev) { ev.preventDefault(); recToggle($("r-ptt"), $("r-pttstat"), async (blob, type) => {
+  $("r-pttstat").textContent = "Sending…"; const fd = new FormData(); fd.append("member_id", member); fd.append("clip", blob, type.includes("mp4") ? "clip.mp4" : "clip.webm");
+  const r = await fetch("/say/clip", {method: "POST", body: fd}); const j = await r.json().catch(() => ({}));
+  $("r-pttstat").textContent = r.ok ? "Your voice is playing at the door (" + Math.round(blob.size / 1024) + " KB)." : "Clip failed: " + (j.detail || r.status); }); }

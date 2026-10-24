@@ -124,6 +124,8 @@ async def say_clip(request: Request) -> dict[str, Any]:
     data = await clip.read()
     if len(data) > 2 * 1024 * 1024:
         raise HTTPException(413, "clip over 2 MB")
+    if len(data) < 1500:
+        raise HTTPException(422, "empty clip; record for at least a second")
     CLIP_DIR.mkdir(parents=True, exist_ok=True)
     ext = "mp4" if "mp4" in (clip.content_type or "") else "webm" if "webm" in (clip.content_type or "") else "bin"
     name = f"clip-{int(time.time() * 1000)}.{ext}"

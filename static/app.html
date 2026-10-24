@@ -29,8 +29,8 @@
   <p class="cap">AI uses your samples to create new sentences and choose a reassuring tone. Only record your own voice.</p>
   <div id="v-recpanel" class="card mt" style="padding:16px" hidden>
     <div id="v-line" style="font-size:17px;font-weight:500;margin-bottom:10px"></div>
-    <button id="v-recbtn" class="rec" ontouchstart="recStart(event)" ontouchend="recStop(event)" onmousedown="recStart(event)" onmouseup="recStop(event)">Hold to record</button>
-    <p class="cap" id="v-recstat">Hold, read the line, release.</p>
+    <button id="v-recbtn" class="rec" onclick="recTap(event)">Tap to record</button>
+    <p class="cap" id="v-recstat">Tap, read the line, tap again to save.</p>
   </div>
   <button class="btn primary" id="v-clone" onclick="cloneVoice()">Create family AI voice</button>
   <div id="v-ready" class="card mt" style="padding:16px" hidden>
@@ -106,7 +106,7 @@
   <div class="card" style="padding:14px 18px"><button class="btn small primary" id="r-tobtn" onclick="toggleTakeover()">Take over the voice</button><span class="muted small" id="r-tostat" style="margin-left:8px">AI is speaking for you.</span>
     <div id="r-takeover" hidden><div class="chips mt"><span class="chip" onclick="sayText(this.textContent)">Dad, it's me. Come back inside, I'm on my way.</span><span class="chip" onclick="sayText(this.textContent)">Wait right there by the door. I'll be two minutes.</span><span class="chip" onclick="sayText(this.textContent)">Everything's okay. Let's sit down, I'm coming.</span></div>
       <div style="display:flex;gap:8px;margin-top:10px"><input id="r-text" placeholder="type what to say in your voice"><button class="btn small" onclick="sayTyped()">Say</button></div>
-      <button class="rec mt" id="r-ptt" ontouchstart="pttStart(event)" ontouchend="pttStop(event)" onmousedown="pttStart(event)" onmouseup="pttStop(event)">Hold to talk (your real voice)</button><p class="cap" id="r-pttstat"></p></div></div>
+      <button class="rec mt" id="r-ptt" onclick="pttTap(event)">Tap to talk (your real voice)</button><p class="cap" id="r-pttstat"></p></div></div>
   <div id="r-911" class="banner" hidden>Out of view for a while and still not found. <a href="tel:911" style="color:inherit;font-weight:600">Call 911</a>. You decide; Nightfall never dials.</div>
   <button class="btn ok mt" onclick="gotHim()">I've got him</button>
   <button class="btn" onclick="go('brief')">Open caregiver brief</button>

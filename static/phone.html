@@ -29,7 +29,7 @@
       <button onclick="sayText(this.textContent)">Everything's okay. Let's go sit down, I'm coming.</button>
     </div>
     <div class="row" style="margin-top:8px"><input id="saytext" placeholder="type what to say in your voice" style="flex:1"><button class="primary" onclick="sayTyped()">Say</button></div>
-    <div class="row" style="margin-top:8px"><button id="ptt" class="big">Hold to talk (your real voice)</button></div>
+    <div class="row" style="margin-top:8px"><button id="ptt" class="big" onclick="pttToggle()">Tap to talk, tap to send (your real voice)</button></div>
     <div id="pttstat" class="small muted"></div>
   </div>
   <div class="row" style="margin-top:12px">
@@ -120,10 +120,10 @@ async function sayTyped() { const t = $("saytext").value.trim(); if (t) { $("say
 async function startRec() {
   try { const s = await navigator.mediaDevices.getUserMedia({audio: true}); const mt = MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "audio/webm"; rec = new MediaRecorder(s, {mimeType: mt}); chunks = []; rec.ondataavailable = e => chunks.push(e.data);
     rec.onstop = async () => { s.getTracks().forEach(t => t.stop()); const blob = new Blob(chunks, {type: mt}); const fd = new FormData(); fd.append("member_id", member); fd.append("clip", blob, "clip." + (mt.includes("mp4") ? "mp4" : "webm")); const r = await fetch("/say/clip", {method: "POST", body: fd}); $("pttstat").textContent = r.ok ? "Your voice played at the door." : "Clip failed."; };
-    rec.start(); $("pttstat").textContent = "Recording... release to send."; } catch (e) { $("pttstat").textContent = "Microphone not available; type instead."; }
+    rec.start(250); $("pttstat").textContent = "Recording... tap again to send."; } catch (e) { $("pttstat").textContent = "Microphone not available; type instead."; }
 }
 function stopRec() { if (rec && rec.state === "recording") rec.stop(); }
-const ptt = $("ptt"); ptt.addEventListener("touchstart", e => { e.preventDefault(); startRec(); }); ptt.addEventListener("touchend", e => { e.preventDefault(); stopRec(); }); ptt.addEventListener("mousedown", startRec); ptt.addEventListener("mouseup", stopRec);
+function pttToggle() { if (rec && rec.state === "recording") { stopRec(); $("ptt").textContent = "Tap to talk, tap to send (your real voice)"; } else { startRec(); $("ptt").textContent = "Recording… tap to send"; } }
 async function openingLine() { if (!incident) return; const r = await (await fetch("/agent/opening/" + incident + "/" + member)).json(); $("agentsay").textContent = r.say; await playRef(r.audio, r.say); }
 async function sendTurn(text) {
   $("heard").textContent = 'You: "' + text + '"'; const r = await post("/agent/turn", {incident_id: incident, member_id: member, text});
