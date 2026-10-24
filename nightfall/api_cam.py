@@ -57,6 +57,39 @@ async def cam_latest() -> Response:
     )
 
 
+@router.get("/door")
+async def door_page() -> Response:
+    from fastapi.responses import FileResponse
+
+    return FileResponse(Path(__file__).resolve().parent.parent / "static" / "door.html")
+
+
+class CommandIn(BaseModel):
+    cmd: str
+    label: str = ""
+    name: str = ""
+    edge: str = ""
+    member_id: str = ""
+
+
+@router.post("/door/command")
+async def door_command(body: CommandIn) -> dict[str, Any]:
+    """Phone -> door device: enroll a face, set the door edge, start the camera. Relayed over the dashboard SSE."""
+    store = _store()
+    if body.cmd not in ("enroll", "door_edge", "start", "say_test"):
+        raise HTTPException(422, "unknown command")
+    if body.cmd == "enroll" and (body.label not in ("person", "other") or not body.name.strip()):
+        raise HTTPException(422, "enroll needs label and name")
+    if body.cmd == "door_edge" and body.edge not in ("far", "left", "right", "top"):
+        raise HTTPException(422, "bad edge")
+    obj = {"type": "command", **body.model_dump()}
+    store.hub.publish("dashboard", obj)
+    from nightfall.actions import emit
+
+    emit(store, {"type": "command", "cmd": body.cmd, "name": body.name, "edge": body.edge, "label": body.label})
+    return {"ok": True}
+
+
 class TakeoverIn(BaseModel):
     member_id: str
     on: bool = True

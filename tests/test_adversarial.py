@@ -99,3 +99,19 @@ def test_new_approach_supersedes_watch_only_incident(client: TestClient) -> None
     client.post("/event", json={"kind": "door_close"})
     s = client.get("/app/state").json()
     assert s["incident"]["wander"]["action"] == "escalate" and s["rings"]
+
+
+def test_help_button_rings_now(client: TestClient) -> None:
+    r = client.post("/event", json={"kind": "sos"}).json()
+    assert r["to"] == "ESCALATING" and r["rule"] == "R12"
+    s = client.get("/state").json()
+    assert s["rings"] and s["rings"][0]["tier"] == 1
+    assert client.post("/event", json={"kind": "sos"}).json()["rule"] == "ignored"
+
+
+def test_door_commands(client: TestClient) -> None:
+    assert client.post("/door/command", json={"cmd": "enroll", "label": "person", "name": "Robert"}).json()["ok"]
+    assert client.post("/door/command", json={"cmd": "enroll", "label": "cat", "name": "x"}).status_code == 422
+    assert client.post("/door/command", json={"cmd": "door_edge", "edge": "left"}).json()["ok"]
+    assert client.post("/door/command", json={"cmd": "door_edge", "edge": "diagonal"}).status_code == 422
+    assert client.get("/door").status_code == 200

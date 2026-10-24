@@ -51,6 +51,10 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
             for m in store.hh.tree:
                 store.hub.publish(f"phone:{m.id}", {"type": "watch_only", "incident_id": inc.id, "detail": tr.detail})
             emit(store, {"type": "watch_only", "incident_id": inc.id, "detail": tr.detail})
+        elif a == "notify:sos":
+            for m in store.hh.tree:
+                store.hub.publish(f"phone:{m.id}", {"type": "sos", "incident_id": inc.id})
+            emit(store, {"type": "sos", "incident_id": inc.id})
         elif a == "notify:returned":
             for m in store.hh.tree:
                 store.hub.publish(f"phone:{m.id}", {"type": "returned", "incident_id": inc.id})

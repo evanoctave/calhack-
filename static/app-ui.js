@@ -104,6 +104,11 @@ function tickCountdown() {
 }
 setInterval(tickCountdown, 200);
 function notice(t, sub) { $("h-noticet").textContent = t; $("h-notices").textContent = sub; $("h-notice").hidden = false; setTimeout(() => { $("h-notice").hidden = true; }, 60000); if (!["respond"].includes(location.hash.slice(1))) go("home"); }
+async function doorCmd(c) { const r = await post("/door/command", c); if (!r.ok) alert(r.detail || "command failed"); }
+async function enrollCmd(label) { const name = $("h-enrollname").value.trim(); if (!name) { alert("Type the name first"); return; } await doorCmd({cmd: "enroll", label, name}); $("h-enrollname").value = ""; setTimeout(loadEnrolled, 2500); }
+async function loadEnrolled() { try { const f = (await (await fetch("/enroll")).json()).faces; $("h-enrolled").textContent = f.length ? f.map(x => x.name + (x.label === "person" ? " (watched)" : "")).join(", ") : "none"; } catch (e) {} }
+let homeFeed = null;
+function startHomeFeed() { if (homeFeed) return; homeFeed = setInterval(() => { const u = "/cam/latest.jpg?t=" + Date.now(); const p = new Image(); p.onload = () => { const img = $("h-feed"); img.src = u; img.style.display = "block"; $("h-door").style.display = "none"; $("h-feedcap").textContent = "Front door camera · live"; }; p.onerror = () => { $("h-feedcap").textContent = "Front door camera · no frame (start the door screen on the laptop)"; }; p.src = u; }, 1000); }
 function cap(s) { s = s.replace(/unknown ?/g, "").trim(); return s ? s[0].toUpperCase() + s.slice(1) : "See photo"; }
 function setHero(id, inc) { const el = $(id); const f = inc && inc.exit_frame; el.innerHTML = f ? `<img src="${esc(f)}" alt="exit frame">` : '<div class="door"></div><div class="line"></div>'; }
 let briefLoaded = "";
@@ -161,10 +166,12 @@ function onEvent(e) {
   if (e.type === "ring") { ringNow(e.incident_id, e.message); refresh(); }
   if (e.type === "acked" || e.type === "returned") { stopRing(); refresh(); }
   if (e.type === "brief_updated" || e.type === "deadline" || e.type === "call_911_option" || e.type === "takeover") refresh();
+  if (e.type === "sos") { ringNow(e.incident_id, "Help button pressed at the door."); refresh(); }
   if (e.type === "stand_down") { stopRing(); $("incoming").hidden = true; notice((e.who || "A household member") + " stepped out", "No alert. " + (e.detail || "")); refresh(); }
   if (e.type === "watch_only") { notice("Someone left, watching only", "Nightfall is not ringing the family for this one. " + (e.detail || "")); refresh(); }
 }
 (async function main() {
-  await resolveMember(); await refresh(); connect(); setInterval(refresh, 2000);
+  await resolveMember(); await refresh(); connect(); setInterval(refresh, 2000); startHomeFeed(); loadEnrolled(); try { $("h-edge").value = localStorage.getItem("nf-door-edge-phone") || "far"; } catch (e) {}
+  $("h-edge").addEventListener("change", () => { try { localStorage.setItem("nf-door-edge-phone", $("h-edge").value); } catch (e) {} });
   show(location.hash.slice(1) || (S.household.person_full_name ? "home" : "profile"));
 })();

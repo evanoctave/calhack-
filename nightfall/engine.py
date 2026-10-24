@@ -271,6 +271,22 @@ def _features(inc: Incident, ev: Event) -> Transition:
     return Transition(inc.state, inc.state, (), "R11", f"score {v.score} ({v.action}): " + "; ".join(v.reasons))
 
 
+def _sos(inc: Incident, ev: Event) -> Transition:
+    """Help button on the door device: ring the family now, whatever the score says."""
+    if inc.state in (State.ESCALATING, State.ACKED, State.EXHAUSTED):
+        return _ignored(inc, ev, "already escalated")
+    inc.opened_at = inc.opened_at or ev.ts
+    inc.exited_at = ev.ts
+    inc.identity = "match"
+    return _t(
+        inc,
+        State.ESCALATING,
+        ("build_brief", "start_escalation", "notify:sos"),
+        "R12",
+        "help button pressed at the door",
+    )
+
+
 def _close(inc: Incident, ev: Event) -> Transition:
     return _t(inc, State.CLOSED, ("delete_frames",), "R10", "closed")
 
@@ -300,6 +316,10 @@ TRANSITIONS: Final[dict[tuple[State, str], Handler]] = {
     (State.ESCALATING, "ack"): _ack,
     (State.ESCALATING, "tick"): _tick_escalating,
     (State.EXHAUSTED, "ack"): _ack,
+    (State.ARMED_IDLE, "sos"): _sos,
+    (State.CONVERSATION, "sos"): _sos,
+    (State.DOOR_OPEN, "sos"): _sos,
+    (State.RETURNED, "sos"): _sos,
     (State.ACKED, "close"): _close,
     (State.EXHAUSTED, "close"): _close,
     (State.RETURNED, "close"): _close,
@@ -320,6 +340,7 @@ EVENT_KINDS: Final[frozenset[str]] = frozenset(
         "person_back",
         "stand_down",
         "features",
+        "sos",
     }
 )
 

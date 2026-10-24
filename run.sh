@@ -15,7 +15,9 @@ case "${1:-serve}" in
     IP=$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}')
     export PUBLIC_URL="${PUBLIC_URL:-http://${IP:-127.0.0.1}:${PORT:-8000}}" DOOR_WAIT_S="${DOOR_WAIT_S:-5}" ESCALATION_STEP_S="${ESCALATION_STEP_S:-15}"
     echo "places:    ${PLACES_FILE:-data/places.marina.json}"
-    echo "dashboard: http://localhost:${PORT:-8000}"
+    echo "door:      http://localhost:${PORT:-8000}   (laptop = doorbell camera + speaker)"
+    echo "admin:     http://localhost:${PORT:-8000}/dashboard.html"
+    echo "phone app: $PUBLIC_URL/app?me=Sarah"
     echo "phone:     $PUBLIC_URL/phone.html#TM-SARAH"
     exec $PY -m uvicorn nightfall.api:app --host 0.0.0.0 --port "${PORT:-8000}" ;;
   test) MOCK=1 exec $PY -m pytest -q ;;

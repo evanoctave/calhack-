@@ -82,7 +82,7 @@ class ArmIn(BaseModel):
 async def _step(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
     async with store.lock:
         done = (engine.State.CLOSED, engine.State.RETURNED, engine.State.ACKED, engine.State.EXHAUSTED)
-        fresh = kind in ("motion", "person_enter", "door_open")
+        fresh = kind in ("motion", "person_enter", "door_open", "sos")
         watch_only = (
             store.inc is not None
             and store.inc.state == engine.State.ESCALATING
@@ -310,7 +310,7 @@ async def reset() -> dict[str, Any]:
 
 @app.get("/")
 async def index() -> FileResponse:
-    return FileResponse(ROOT / "static" / "dashboard.html")
+    return FileResponse(ROOT / "static" / "door.html")
 
 
 app.include_router(voice_router)

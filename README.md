@@ -19,6 +19,10 @@ Cal Hacks 13.0. See `NIGHTFALL-MASTER-PROMPT.md` for the full spec and team lane
 
 Demo knobs: `DOOR_WAIT_S=5 ESCALATION_STEP_S=10 ./run.sh` shortens the waits.
 
+## Devices
+
+Life Alert inside a doorbell camera. The laptop at `/` is the door device: camera, speaker, one red HELP button, nothing else to click. The phone at `/app?me=<name>` is the caregiver's dashboard: live feed, alert, brief, search, live voice, door settings and face enrollment. `/dashboard.html` is the admin view.
+
 ## The moment
 
 1. `./run.sh demo`. Open the dashboard on the laptop, Enable camera (TensorFlow.js person detector loads). Add yourself in the judge box, open the phone link on a phone, tap Enable sound.

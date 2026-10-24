@@ -1,0 +1,104 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nightfall door</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app.css"><script src="/app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4.1646425229/face_detection.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-detection@1.0.3/dist/face-detection.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
+<script src="/cam.js"></script>
+<style>
+html, body { height: 100%; } body { padding: 0; background: #06101d; color: #eef2f8; overflow: hidden; }
+.device { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr auto; }
+.top { display: flex; justify-content: space-between; align-items: center; padding: 18px 28px; }
+.brand { font-weight: 700; letter-spacing: .02em; font-size: 20px; } .brand span { color: #7fa7ff; }
+.led { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #4cc17a; box-shadow: 0 0 14px #4cc17a; margin-right: 10px; vertical-align: middle; }
+.led.danger { background: #ff6b6b; box-shadow: 0 0 16px #ff6b6b; } .led.warn { background: #e0a84a; box-shadow: 0 0 16px #e0a84a; } .led.accent { background: #7fa7ff; box-shadow: 0 0 14px #7fa7ff; }
+.stage { position: relative; display: flex; align-items: center; justify-content: center; }
+.camwrap { position: relative; width: min(100%, calc((100vh - 220px) * 4 / 3)); aspect-ratio: 4 / 3; border-radius: 24px; overflow: hidden; background: #0b1626; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+#cam, #overlay { position: absolute; inset: 0; width: 100%; height: 100%; } #overlay { pointer-events: none; }
+.caption { position: absolute; left: 20px; bottom: 18px; right: 20px; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+.pillrow { display: flex; gap: 8px; flex-wrap: wrap; } .dpill { background: rgba(0,0,0,.45); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: 6px 12px; font-size: 13px; }
+.speak { position: absolute; left: 20px; top: 18px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.12); border-radius: 16px; padding: 10px 14px; max-width: 70%; font-size: 15px; display: none; }
+.speak.on { display: block; } .speak b { color: #7fa7ff; font-weight: 600; display: block; font-size: 12px; margin-bottom: 4px; letter-spacing: .04em; text-transform: uppercase; }
+.count { position: absolute; right: 20px; top: 18px; background: rgba(198,40,40,.85); border-radius: 16px; padding: 10px 16px; text-align: center; display: none; }
+.count.on { display: block; } .count .n { font-size: 34px; font-weight: 700; line-height: 1; } .count .l { font-size: 12px; opacity: .9; }
+.bottom { display: flex; justify-content: space-between; align-items: center; padding: 18px 28px 26px; gap: 16px; }
+.help { width: 150px; height: 150px; border-radius: 50%; border: 6px solid rgba(255,255,255,.12); background: radial-gradient(circle at 35% 30%, #ff8a8a, #c62828 60%, #8f1c1c); color: #fff; font: 700 20px/1.1 var(--font); cursor: pointer; box-shadow: 0 16px 40px rgba(198,40,40,.45); }
+.help:active { transform: scale(.97); } .help small { display: block; font-weight: 500; font-size: 12px; opacity: .9; margin-top: 6px; }
+.status { color: #9fb0c8; font-size: 14px; max-width: 60%; }
+.start { position: fixed; inset: 0; background: rgba(6,16,29,.96); display: flex; align-items: center; justify-content: center; z-index: 20; }
+.start .box { text-align: center; max-width: 420px; padding: 24px; } .start h1 { font-size: 28px; margin: 0 0 8px; } .start p { color: #9fb0c8; }
+.start button { margin-top: 18px; padding: 16px 28px; border-radius: 999px; border: 0; background: #7fa7ff; color: #06101d; font: 600 17px var(--font); cursor: pointer; }
+.hidden { display: none !important; } #camstat, #persondot, #persontxt, #idtxt, #enrolled { font-size: 13px; }
+.live { position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%); background: rgba(76,193,122,.9); color: #06101d; border-radius: 999px; padding: 8px 16px; font-weight: 600; display: none; } .live.on { display: block; }
+</style></head><body>
+<div class="start" id="start"><div class="box"><h1>Nightfall door</h1><p>This screen is the doorbell camera and speaker. It watches the front door, talks in the family's voice, and the red button calls the family. Tap to start.</p><button onclick="startDoor()">Start the door</button></div></div>
+<div class="device">
+  <div class="top"><div class="brand"><span class="led" id="led"></span>Night<span>fall</span> · <span id="mode">Night watch is on</span></div><div class="status" id="watching">Watching the front door</div></div>
+  <div class="stage"><div class="camwrap">
+    <video id="cam" autoplay muted playsinline width="320" height="240"></video><canvas id="overlay" width="320" height="240"></canvas>
+    <div class="speak" id="speak"><b id="speakwho">Nightfall</b><span id="speaktxt"></span></div>
+    <div class="count" id="count"><div class="n" id="countn">3.0</div><div class="l" id="countl">calling family in</div></div>
+    <div class="live" id="livepill">LIVE · family speaking</div>
+    <div class="caption"><div class="pillrow"><span class="dpill"><span id="persondot" class="dot"></span><span id="persontxt">no person</span></span><span class="dpill" id="idtxt">identity: unknown</span><span class="dpill" id="camstat">camera off</span></div></div>
+  </div></div>
+  <div class="bottom"><div class="status"><div id="enrolled">nobody enrolled</div><div id="integ"></div><div class="small">Controls live on the caregiver's phone. <a href="/dashboard.html" style="color:#7fa7ff">admin</a></div></div>
+    <button class="help" onclick="sos()">HELP<small>calls the family</small></button></div>
+</div>
+<script>
+let last = null, serverOffset = 0, pending = null, audioOk = false;
+function $(id) { return document.getElementById(id); }
+window.refresh = async function () { last = await (await fetch("/state")).json(); window.lastState = last; serverOffset = new Date(last.now).getTime() - Date.now(); render(); };
+function render() {
+  const inc = last.incident, st = inc ? inc.state : "ARMED_IDLE";
+  $("mode").textContent = last.night_mode ? "Night watch is on" : "Night watch is off";
+  $("led").className = "led " + ({ESCALATING: "danger", EXHAUSTED: "danger", DOOR_OPEN: "warn", CONVERSATION: "accent"}[st] || "");
+  $("watching").textContent = {CONVERSATION: "Talking to " + last.household.person_name + " at the door", DOOR_OPEN: "Out of view", ESCALATING: inc && inc.acked_by ? "Family is on the line" : "Calling the family", EXHAUSTED: "Family told to call 911", RETURNED: "Back inside", ACKED: "Family is on the line"}[st] || "Watching the front door";
+}
+function tick() {
+  if (!last) return; const inc = last.incident, box = $("count");
+  if (!inc || inc.state !== "DOOR_OPEN" || !inc.door_opened_at) { box.classList.remove("on"); return; }
+  const left = Math.max(0, (new Date(inc.door_opened_at).getTime() + last.door_wait_s * 1000 - (Date.now() + serverOffset)) / 1000);
+  box.classList.add("on"); $("countn").textContent = left.toFixed(1) + " s";
+}
+setInterval(tick, 200);
+function showSpeak(who, text) { $("speakwho").textContent = who; $("speaktxt").textContent = text; $("speak").classList.add("on"); clearTimeout(showSpeak.t); showSpeak.t = setTimeout(() => $("speak").classList.remove("on"), 9000); }
+function playAtDoor(e) {
+  const who = e.line_source && e.line_source.startsWith("human:") ? e.line_source.slice(6) + " (family)" : "Nightfall · " + (last && last.household.caregiver_name || "family") + "'s voice";
+  showSpeak(who, e.mode === "clip" ? "your family member's voice" : e.text);
+  if (e.url) { const a = new Audio(e.url); a.onplay = () => { audioOk = true; }; a.play().catch(() => { pending = e; if (e.mode !== "clip") speak(e.text); }); } else speak(e.text);
+}
+document.addEventListener("click", () => { if (pending) { const e = pending; pending = null; playAtDoor(e); } }, true);
+sse("/sse/dashboard", e => {
+  if (e.type === "speak") playAtDoor(e);
+  if (e.type === "command") runCommand(e);
+  if (e.type === "takeover" || e.type === "live") { $("livepill").classList.toggle("on", !!e.on); if (e.on) $("livepill").textContent = "LIVE · " + e.by + " speaking"; }
+  refresh();
+});
+async function runCommand(c) {
+  if (c.cmd === "enroll") { camStatus("enrolling " + c.name + "…"); await enrollNamed(c.label, c.name); }
+  if (c.cmd === "door_edge") setDoorEdge(c.edge);
+  if (c.cmd === "start") startCam();
+  if (c.cmd === "say_test") speak("This is the Nightfall door speaker.");
+}
+async function sos() { await post("/event", {kind: "sos"}); showSpeak("Nightfall", "Calling the family now."); refresh(); }
+async function startDoor() { $("start").classList.add("hidden"); try { const c = new (window.AudioContext || window.webkitAudioContext)(); c.resume(); } catch (e) {} startCam(); doorConnect(); }
+// Live voice from the phone (PCM over /ws/door)
+const Door = {ws: null, ctx: null, t: 0};
+function doorConnect() {
+  const proto = location.protocol === "https:" ? "wss" : "ws"; const ws = new WebSocket(`${proto}://${location.host}/ws/door`); ws.binaryType = "arraybuffer"; Door.ws = ws;
+  ws.onmessage = ev => {
+    if (typeof ev.data === "string") { const m = JSON.parse(ev.data); if (m.type === "live") { $("livepill").classList.toggle("on", !!m.on); if (m.on) $("livepill").textContent = "LIVE · " + m.by + " speaking through the door"; } return; }
+    if (!Door.ctx) { Door.ctx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 16000}); Door.t = 0; }
+    const pcm = new Int16Array(ev.data), buf = Door.ctx.createBuffer(1, pcm.length, 16000), ch = buf.getChannelData(0);
+    for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
+    const src = Door.ctx.createBufferSource(); src.buffer = buf; src.connect(Door.ctx.destination);
+    const now = Door.ctx.currentTime; if (Door.t < now + 0.05) Door.t = now + 0.12; src.start(Door.t); Door.t += buf.duration;
+    if (Door.ctx.state === "suspended") Door.ctx.resume();
+  };
+  ws.onclose = () => setTimeout(doorConnect, 2000);
+}
+fetch("/health").then(r => r.json()).then(h => { const live = Object.keys(h.mock).filter(k => !h.mock[k]); $("integ").textContent = live.length ? "live: " + live.join(", ") : "mock mode"; });
+refresh(); setInterval(refresh, 5000);
+</script></body></html>

@@ -46,7 +46,9 @@
   <h1 id="h-title">Night watch is on</h1><p class="sub" id="h-greet">Good evening, Sarah</p>
   <div id="h-notice" class="ok-card" hidden style="margin:0 0 12px"><b id="h-noticet">Mike stepped out</b><span id="h-notices">No alert. The door asked, and a household member answered.</span></div>
   <div id="h-cd" class="banner" hidden style="margin:0 0 12px"><b id="h-cdt">Out of view</b><div id="h-cds" class="small"></div></div>
-  <div class="card"><div class="row big"><div><span class="k" id="h-watch">Watching over Robert</span><span class="sub2" id="h-cam">Front entrance camera</span></div><span id="h-check" style="color:var(--ok);font-size:20px">✓</span></div></div>
+  <div class="hero" style="height:200px"><img id="h-feed" alt="front door camera" style="display:none"><div class="door" id="h-door"></div><div class="line"></div></div>
+  <p class="cap" id="h-feedcap">Front door camera · connecting…</p>
+  <div class="card mt"><div class="row big"><div><span class="k" id="h-watch">Watching over Robert</span><span class="sub2" id="h-cam">Front entrance camera</span></div><span id="h-check" style="color:var(--ok);font-size:20px">✓</span></div></div>
   <div class="label">Tonight</div>
   <div class="card"><div class="row"><span class="k">Latest event</span><span class="v" id="h-event">No exit detected</span></div>
     <div class="row"><span class="k">Camera</span><span class="v ok" id="h-camstat">Connected</span></div>
@@ -54,6 +56,13 @@
   <div class="label">Your care setup</div>
   <div class="card"><div class="row link" onclick="go('voice')"><div><span class="k">Family AI voice</span><span class="sub2" id="h-voice">Stock voice · Demo profile</span></div></div>
     <div class="row link" onclick="go('profile')"><div><span class="k">Care circle</span><span class="sub2" id="h-tree">1 Sarah → 2 James</span></div></div></div>
+  <div class="label">Door device</div>
+  <div class="card">
+    <div class="row"><span class="k">Door is at the</span><span class="v"><select id="h-edge" onchange="doorCmd({cmd:'door_edge', edge:this.value})" style="width:auto;padding:6px 10px"><option value="far">far end</option><option value="left">left edge</option><option value="right">right edge</option><option value="top">top edge</option></select></span></div>
+    <div class="row"><span class="k">Faces enrolled</span><span class="v" id="h-enrolled">none</span></div>
+    <div class="row"><div><span class="k">Enroll a face</span><span class="sub2">Have them face the door camera, then tap.</span></div></div>
+    <div style="padding:0 18px 14px;display:flex;gap:8px;flex-wrap:wrap"><input id="h-enrollname" placeholder="Name" style="flex:1;min-width:120px"><button class="btn small primary" onclick="enrollCmd('person')">The person we watch</button><button class="btn small" onclick="enrollCmd('other')">Household member</button></div>
+  </div>
   <button class="btn" onclick="testAlert()">Run a test alert</button>
   <p class="demo" id="h-demo">Demo session · Sample data</p>
 </section>

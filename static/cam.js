@@ -39,7 +39,8 @@ async function camTick() {
     if (present) { Cam.hits++; Cam.lastSeenAt = now; trackAway(boxes, now); await checkFace(true, now); await identify(now); } else { Cam.hits = 0; Cam.heights = []; Cam.faceMisses = 0; Cam.awaySince = 0; Cam.awayLostSent = false; }
     if (!Cam.present && Cam.hits >= 2) { Cam.present = true; await onEnter(); }
     if (Cam.present && now - Cam.lastSeenAt >= Cam.lostMs) { Cam.present = false; await onLost(); }
-    if (blob && now - Cam.relayAt > 400 && window.lastState && window.lastState.incident && !["CLOSED"].includes(window.lastState.incident.state)) {
+    const active = window.lastState && window.lastState.incident && !["CLOSED", "RETURNED", "ACKED"].includes(window.lastState.incident.state);
+    if (blob && now - Cam.relayAt > (active ? 400 : 1000)) {
       Cam.relayAt = now; const fd = new FormData(); fd.append("f", blob, "f.jpg"); fetch("/cam/frame", {method: "POST", body: fd}).catch(() => {});
     }
   } finally { Cam.busy = false; }
@@ -145,6 +146,10 @@ async function identify(now) {
 }
 async function enroll(label) {
   const name = prompt(label === "person" ? "Name of the person being watched over (e.g. Robert)" : "Household member's name (e.g. Mike)"); if (!name) return;
+  return enrollNamed(label, name);
+}
+async function enrollNamed(label, name) {
+  if (!Face.ready) { camStatus("face recognition not ready yet"); return; }
   camStatus("look at the camera…"); const samples = [];
   for (let i = 0; i < 4 && samples.length < 3; i++) { const d = await descriptorNow(); if (d) samples.push(d); await new Promise(r => setTimeout(r, 350)); }
   if (!samples.length) { camStatus("no face found; face the camera and try again"); return; }
