@@ -5,6 +5,7 @@ vectors. Both expose ensure() and search(query, k). Used by the redirect line ("
 Dad"), the brief (habits section) and the call agent's fact sheet. Rejected: embedding with Claude;
 notes are tiny and Moss is the sponsor track.
 """
+
 from __future__ import annotations
 
 import math
@@ -16,14 +17,24 @@ from nightfall.household import Household
 from nightfall.integrations import moss
 
 _TOK = re.compile(r"[a-z0-9]+")
-_STOP = frozenset({"the", "a", "an", "to", "he", "she", "on", "at", "in", "of", "and", "is", "was", "i", "go", "went", "every"})
+_STOP = frozenset(
+    {"the", "a", "an", "to", "he", "she", "on", "at", "in", "of", "and", "is", "was", "i", "go", "went", "every"}
+)
 
 
 def notes_from(hh: Household) -> list[dict[str, Any]]:
     """Flatten household notes and familiar places into documents."""
     docs: list[dict[str, Any]] = []
     for i, p in enumerate(hh.familiar_places):
-        docs.append({"id": f"NT-place-{i}", "text": p["name"], "kind": "familiar_place", "lat": p.get("lat"), "lng": p.get("lng")})
+        docs.append(
+            {
+                "id": f"NT-place-{i}",
+                "text": p["name"],
+                "kind": "familiar_place",
+                "lat": p.get("lat"),
+                "lng": p.get("lng"),
+            }
+        )
     for i, n in enumerate(hh.notes):
         docs.append({"id": f"NT-note-{i}", "text": n["text"], "kind": n.get("kind", "habit")})
     return docs

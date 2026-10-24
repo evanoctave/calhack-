@@ -5,7 +5,7 @@ import pytest
 from nightfall import brief
 from nightfall.engine import Incident
 from nightfall.household import load
-from nightfall.search import parse_hours, is_open
+from nightfall.search import is_open, parse_hours
 
 NOW = datetime(2026, 10, 25, 2, 3)
 

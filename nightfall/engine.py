@@ -4,13 +4,15 @@ Owns the only place that sets incident.state. A dict keyed by (state, event kind
 handler; unknown pairs are no-ops recorded as "ignored". Rejected: nested ifs (not printable, not
 walkable by a test).
 """
+
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Final
+from typing import Any, Final
 
 
 class State(str, Enum):
@@ -119,7 +121,9 @@ def _person_lost(inc: Incident, ev: Event) -> Transition:
     """Camera lost the person: same clock as a door opening (R2)."""
     inc.person_in_frame = False
     tr = _door_open(inc, ev)
-    return Transition(tr.from_state, tr.to_state, tr.actions, tr.rule, "person left the frame" if tr.rule != "ignored" else tr.detail)
+    return Transition(
+        tr.from_state, tr.to_state, tr.actions, tr.rule, "person left the frame" if tr.rule != "ignored" else tr.detail
+    )
 
 
 def _person_back_door(inc: Incident, ev: Event) -> Transition:
@@ -215,8 +219,19 @@ TRANSITIONS: Final[dict[tuple[State, str], Handler]] = {
 }
 
 EVENT_KINDS: Final[frozenset[str]] = frozenset(
-    {"motion", "door_open", "door_close", "person_seen", "reply", "tick", "ack", "close",
-     "person_enter", "person_lost", "person_back"}
+    {
+        "motion",
+        "door_open",
+        "door_close",
+        "person_seen",
+        "reply",
+        "tick",
+        "ack",
+        "close",
+        "person_enter",
+        "person_lost",
+        "person_back",
+    }
 )
 
 

@@ -1,10 +1,12 @@
 """Notifiers. SSE pushes a ring to each member's phone page; Twilio (voice lane) sits behind the same
 interface and falls back to SSE.
 """
+
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from nightfall.household import TreeMember
 
@@ -53,8 +55,13 @@ class SseNotifier:
         for m in members:
             self._hub.publish(
                 f"phone:{m.id}",
-                {"type": "ring", "message": message, "link": self._link(incident_id, m.id),
-                 "incident_id": incident_id, "tier": tier},
+                {
+                    "type": "ring",
+                    "message": message,
+                    "link": self._link(incident_id, m.id),
+                    "incident_id": incident_id,
+                    "tier": tier,
+                },
             )
         self._record({"type": "ring", "tier": tier, "members": [m.name for m in members], "source": "sse"})
 

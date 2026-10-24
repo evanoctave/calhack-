@@ -31,7 +31,11 @@ def test_frame_relay_and_takeover(client: TestClient) -> None:
 
 
 def test_clip_relay(client: TestClient) -> None:
-    r = client.post("/say/clip", data={"member_id": "TM-MIKE"}, files={"clip": ("c.mp4", io.BytesIO(b"\x00\x00\x00\x18ftyp"), "audio/mp4")})
+    r = client.post(
+        "/say/clip",
+        data={"member_id": "TM-MIKE"},
+        files={"clip": ("c.mp4", io.BytesIO(b"\x00\x00\x00\x18ftyp"), "audio/mp4")},
+    )
     url = r.json()["url"]
     assert url.startswith("/clips/clip-") and client.get(url).status_code == 200
     assert client.get("/clips/../x").status_code in (404, 400)
@@ -40,7 +44,13 @@ def test_clip_relay(client: TestClient) -> None:
 def test_exit_frames_route(client: TestClient) -> None:
     client.post("/event", json={"kind": "door_open"})
     inc = client.get("/state").json()["incident"]["id"]
-    r = client.post(f"/frames/{inc}", files={"f0": ("a.jpg", io.BytesIO(b"\xff\xd8a"), "image/jpeg"), "f1": ("b.jpg", io.BytesIO(b"\xff\xd8b"), "image/jpeg")})
+    r = client.post(
+        f"/frames/{inc}",
+        files={
+            "f0": ("a.jpg", io.BytesIO(b"\xff\xd8a"), "image/jpeg"),
+            "f1": ("b.jpg", io.BytesIO(b"\xff\xd8b"), "image/jpeg"),
+        },
+    )
     assert r.json()["frame_ids"] == ["FR-0", "FR-1"]
     big = io.BytesIO(b"x" * (200 * 1024 + 1))
     assert client.post(f"/frames/{inc}", files={"f0": ("c.jpg", big, "image/jpeg")}).status_code == 413

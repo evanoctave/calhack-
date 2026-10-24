@@ -1,4 +1,5 @@
 """OpenStreetMap Overpass query for hazards near a point. No key; needs a User-Agent."""
+
 from __future__ import annotations
 
 from typing import Any, Final
@@ -11,11 +12,13 @@ UA: Final = "nightfall-calhacks/0.1 (hackathon demo)"
 
 def hazards(lat: float, lng: float, radius_m: int) -> list[dict[str, Any]]:
     """Ways tagged water, rail, motorway or construction within radius, with center coordinates."""
-    q = (f'[out:json][timeout:25];(way["waterway"](around:{radius_m},{lat},{lng});'
-         f'way["natural"="water"](around:{radius_m},{lat},{lng});'
-         f'way["railway"="rail"](around:{radius_m},{lat},{lng});'
-         f'way["highway"~"^motorway"](around:{radius_m},{lat},{lng});'
-         f'way["landuse"="construction"](around:{radius_m},{lat},{lng}););out center tags 80;')
+    q = (
+        f'[out:json][timeout:25];(way["waterway"](around:{radius_m},{lat},{lng});'
+        f'way["natural"="water"](around:{radius_m},{lat},{lng});'
+        f'way["railway"="rail"](around:{radius_m},{lat},{lng});'
+        f'way["highway"~"^motorway"](around:{radius_m},{lat},{lng});'
+        f'way["landuse"="construction"](around:{radius_m},{lat},{lng}););out center tags 80;'
+    )
     last: Exception | None = None
     for url in MIRRORS:
         try:

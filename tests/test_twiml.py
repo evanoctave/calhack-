@@ -33,7 +33,9 @@ def test_agent_turn_json(client: TestClient) -> None:
     inc = client.post("/event", json={"kind": "door_close"}).json()["incident_id"]
     o = client.get(f"/agent/opening/{inc}/TM-MIKE").json()
     assert "Mike" in o["say"] and o["audio"]["mode"] == "browser_tts"
-    r = client.post("/agent/turn", json={"incident_id": inc, "member_id": "TM-MIKE", "text": "what is he wearing"}).json()
+    r = client.post(
+        "/agent/turn", json={"incident_id": inc, "member_id": "TM-MIKE", "text": "what is he wearing"}
+    ).json()
     assert r["intent"] == "clothing" and "barefoot" in r["say"]
     assert client.get("/voice/../x.wav").status_code in (404, 400)
 

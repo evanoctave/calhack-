@@ -4,6 +4,7 @@ Runs at setup (scripts/run_actor.py), never during an incident. Dedupes hazards 
 so one creek is one row, not forty way segments. Hours parse the Google "11 AM to 9:30 PM" strings into
 the "HH:MM-HH:MM" spec; "Open 24 hours" becomes "24/7".
 """
+
 from __future__ import annotations
 
 import re
@@ -13,17 +14,23 @@ from typing import Any, Final
 from nightfall.search import haversine_mi
 
 HAZARD_CATS: Final = frozenset({"water", "rail", "motorway", "construction"})
-SEARCHES: Final = ["24 hour gas station", "24 hour convenience store", "24 hour restaurant",
-                   "hospital emergency room", "24 hour pharmacy", "train station"]
+SEARCHES: Final = [
+    "24 hour gas station",
+    "24 hour convenience store",
+    "24 hour restaurant",
+    "hospital emergency room",
+    "24 hour pharmacy",
+    "train station",
+]
 _CAT: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
-    (re.compile(r"gas|fuel|petrol", re.I), "fuel"),
-    (re.compile(r"convenience|grocery|market|7-?eleven", re.I), "convenience"),
-    (re.compile(r"hospital|emergency|urgent|medical|clinic", re.I), "hospital"),
-    (re.compile(r"pharmacy|drug", re.I), "pharmacy"),
-    (re.compile(r"train|transit|bus|metro|station", re.I), "transit"),
-    (re.compile(r"restaurant|diner|cafe|coffee|fast food|donut|taco|burger", re.I), "diner"),
+    (re.compile(r"gas|fuel|petrol", re.IGNORECASE), "fuel"),
+    (re.compile(r"convenience|grocery|market|7-?eleven", re.IGNORECASE), "convenience"),
+    (re.compile(r"hospital|emergency|urgent|medical|clinic", re.IGNORECASE), "hospital"),
+    (re.compile(r"pharmacy|drug", re.IGNORECASE), "pharmacy"),
+    (re.compile(r"train|transit|bus|metro|station", re.IGNORECASE), "transit"),
+    (re.compile(r"restaurant|diner|cafe|coffee|fast food|donut|taco|burger", re.IGNORECASE), "diner"),
 )
-_TIME: Final = re.compile(r"(\d{1,2})(?::(\d{2}))?\s*(AM|PM)", re.I)
+_TIME: Final = re.compile(r"(\d{1,2})(?::(\d{2}))?\s*(AM|PM)", re.IGNORECASE)
 
 
 def _cat(name: str, category: str) -> str:
@@ -44,7 +51,9 @@ def hours_spec(opening_hours: list[dict[str, str]] | None, today: str | None = N
     if not opening_hours:
         return ""
     day = today or datetime.now().strftime("%A")
-    row = next((r for r in opening_hours if str(r.get("day", "")).lower().startswith(day.lower()[:3])), opening_hours[0])
+    row = next(
+        (r for r in opening_hours if str(r.get("day", "")).lower().startswith(day.lower()[:3])), opening_hours[0]
+    )
     txt = str(row.get("hours", ""))
     if "24 hours" in txt.lower():
         return "24/7"
@@ -67,10 +76,19 @@ def from_google(items: list[dict[str, Any]], home: tuple[float, float]) -> list[
             continue
         seen.add(name.lower())
         lat, lng = float(loc["lat"]), float(loc["lng"])
-        out.append({"category": _cat(name, str(it.get("categoryName", ""))), "name": name, "lat": lat, "lng": lng,
-                    "distance_mi": round(haversine_mi(home[0], home[1], lat, lng), 2),
-                    "hours": hours_spec(it.get("openingHours")), "phone": str(it.get("phone") or ""),
-                    "address": str(it.get("address") or ""), "source": "apify"})
+        out.append(
+            {
+                "category": _cat(name, str(it.get("categoryName", ""))),
+                "name": name,
+                "lat": lat,
+                "lng": lng,
+                "distance_mi": round(haversine_mi(home[0], home[1], lat, lng), 2),
+                "hours": hours_spec(it.get("openingHours")),
+                "phone": str(it.get("phone") or ""),
+                "address": str(it.get("address") or ""),
+                "source": "apify",
+            }
+        )
     return out
 
 
@@ -96,7 +114,17 @@ def from_overpass(elements: list[dict[str, Any]], home: tuple[float, float]) -> 
         dup = next((p for p in out if p["name"] == label and haversine_mi(p["lat"], p["lng"], lat, lng) < 0.25), None)
         if dup is not None:
             continue
-        out.append({"category": cat, "name": str(label), "lat": lat, "lng": lng, "hours": "", "phone": "", "source": "apify",
-                    "distance_mi": round(haversine_mi(home[0], home[1], lat, lng), 2)})
+        out.append(
+            {
+                "category": cat,
+                "name": str(label),
+                "lat": lat,
+                "lng": lng,
+                "hours": "",
+                "phone": "",
+                "source": "apify",
+                "distance_mi": round(haversine_mi(home[0], home[1], lat, lng), 2),
+            }
+        )
     out.sort(key=lambda p: p["distance_mi"])
     return out

@@ -3,13 +3,13 @@
 Kept apart from the engine (pure) and the routes (HTTP). The voice lane swaps the speak action for
 Cartesia audio and the ring action for the Twilio call agent without touching engine.py.
 """
+
 from __future__ import annotations
 
 from typing import Any
 
 from nightfall import brief as briefmod
-from nightfall import engine
-from nightfall import llm, voice
+from nightfall import engine, llm, voice
 from nightfall.script import SCRIPT, fill
 from nightfall.store import Store
 
@@ -48,8 +48,16 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
         elif a == "build_brief":
             clothing = llm.describe_clothing(store.frame_bytes.get(inc.id))
             habits = await store.memory.search("where does he go when he leaves at night", 3)
-            store.briefs[inc.id] = briefmod.build(store.hh, inc, clothing, store.places,
-                                                  store.frames.get(inc.id, []), store.now(), habits, store.memory.source)
+            store.briefs[inc.id] = briefmod.build(
+                store.hh,
+                inc,
+                clothing,
+                store.places,
+                store.frames.get(inc.id, []),
+                store.now(),
+                habits,
+                store.memory.source,
+            )
             emit(store, {"type": "brief_ready", "incident_id": inc.id})
         elif a == "start_escalation":
             t = (inc.exited_at or store.now()).strftime("%-I:%M %p")
@@ -64,14 +72,21 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
             store.frames.pop(inc.id, None)
 
 
-
-
 def _speak(store: Store, line: str, source: str) -> None:
     """Resolve audio for a line (Cartesia or browser TTS) and push it to the dashboard."""
     store.history.append(("system", line))
     ref = voice.say(line, store.hh.persona)
-    emit(store, {"type": "speak", "text": line, "mode": ref["mode"], "url": ref["url"],
-                 "voice_source": ref["source"], "line_source": source})
+    emit(
+        store,
+        {
+            "type": "speak",
+            "text": line,
+            "mode": ref["mode"],
+            "url": ref["url"],
+            "voice_source": ref["source"],
+            "line_source": source,
+        },
+    )
 
 
 def tr_payload(tr: engine.Transition, inc: engine.Incident, store: Store) -> dict[str, Any]:

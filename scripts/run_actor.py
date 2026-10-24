@@ -4,6 +4,7 @@ Usage: .venv/bin/python scripts/run_actor.py [--slug fullerton] [--no-google]
 Hazards from Overpass (free); open-at-night places from the Apify Google Maps scraper (APIFY_TOKEN).
 Without a token, hazards still come from Overpass and the call-first rows fall back to the fixture.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -14,9 +15,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from nightfall import places  # noqa: E402
-from nightfall.household import load  # noqa: E402
-from nightfall.integrations import apify, overpass  # noqa: E402
+from nightfall import places
+from nightfall.household import load
+from nightfall.integrations import apify, overpass
 
 
 def main() -> int:

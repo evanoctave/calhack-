@@ -2,6 +2,7 @@
 
 Frozen dataclasses so the engine cannot mutate the tree mid-incident. Loaded from data/household.json.
 """
+
 from __future__ import annotations
 
 import json
@@ -46,7 +47,7 @@ class Household:
         """Look up a member by id."""
         return next((m for m in self.tree if m.id == member_id), None)
 
-    def with_member(self, m: TreeMember) -> "Household":
+    def with_member(self, m: TreeMember) -> Household:
         """Return a copy with one more tree member."""
         return replace(self, tree=self.tree + (m,))
 

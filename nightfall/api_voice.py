@@ -3,6 +3,7 @@
 TwiML flow: Twilio POSTs /twiml/{inc}/{member} -> we speak the opening and <Gather input="speech">;
 the caller's words POST to /twiml/{inc}/{member}/turn -> call_agent.handle -> speak reply, loop or hang up.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -26,13 +27,19 @@ def _store() -> Any:
 
 def _twiml(say: str, gather_url: str | None, hangup: bool) -> Response:
     ref = voice.say(say, "assistant")
-    inner = f"<Play>{escape(PUBLIC_URL + ref['url'])}</Play>" if ref["mode"] == "cartesia" else f"<Say voice=\"Polly.Joanna\">{escape(say)}</Say>"
+    inner = (
+        f"<Play>{escape(PUBLIC_URL + ref['url'])}</Play>"
+        if ref["mode"] == "cartesia"
+        else f'<Say voice="Polly.Joanna">{escape(say)}</Say>'
+    )
     if hangup or gather_url is None:
         body = f"<Response>{inner}<Hangup/></Response>"
     else:
-        body = (f"<Response><Gather input=\"speech\" action=\"{escape(gather_url)}\" method=\"POST\" "
-                f"speechTimeout=\"auto\" timeout=\"6\">{inner}</Gather>"
-                f"<Say>I did not hear anything. The brief is on your phone. Goodbye.</Say></Response>")
+        body = (
+            f'<Response><Gather input="speech" action="{escape(gather_url)}" method="POST" '
+            f'speechTimeout="auto" timeout="6">{inner}</Gather>'
+            f"<Say>I did not hear anything. The brief is on your phone. Goodbye.</Say></Response>"
+        )
     return Response(content='<?xml version="1.0" encoding="UTF-8"?>' + body, media_type="application/xml")
 
 
@@ -48,8 +55,15 @@ def _ctx(incident_id: str, member_id: str) -> tuple[Any, dict[str, Any], str]:
 @router.post("/twiml/{incident_id}/{member_id}")
 async def twiml_open(incident_id: str, member_id: str) -> Response:
     store, b, name = _ctx(incident_id, member_id)
-    store.log.append({"type": "call", "incident_id": incident_id, "member_id": member_id, "intent": "opening",
-                      "ts": store.now().isoformat()})
+    store.log.append(
+        {
+            "type": "call",
+            "incident_id": incident_id,
+            "member_id": member_id,
+            "intent": "opening",
+            "ts": store.now().isoformat(),
+        }
+    )
     return _twiml(call_agent.opening(store.hh, b, name), f"{PUBLIC_URL}/twiml/{incident_id}/{member_id}/turn", False)
 
 
@@ -59,8 +73,16 @@ async def twiml_turn(incident_id: str, member_id: str, request: Request) -> Resp
     form = await request.form()
     text = str(form.get("SpeechResult", ""))
     r = call_agent.handle(store.hh, b, name, text)
-    store.log.append({"type": "call", "incident_id": incident_id, "member_id": member_id, "heard": text,
-                      "intent": r.intent, "ts": store.now().isoformat()})
+    store.log.append(
+        {
+            "type": "call",
+            "incident_id": incident_id,
+            "member_id": member_id,
+            "heard": text,
+            "intent": r.intent,
+            "ts": store.now().isoformat(),
+        }
+    )
     store.hub.publish("dashboard", {"type": "call", "member_id": member_id, "heard": text, "intent": r.intent})
     if r.ack:
         await _ack(store, incident_id, member_id)
@@ -93,7 +115,9 @@ async def agent_turn(body: TurnIn) -> dict[str, Any]:
     """Phone-page agent (browser STT in, TTS out). Same brain as the Twilio call."""
     store, b, name = _ctx(body.incident_id, body.member_id)
     r = call_agent.handle(store.hh, b, name, body.text)
-    store.hub.publish("dashboard", {"type": "call", "member_id": body.member_id, "heard": body.text, "intent": r.intent})
+    store.hub.publish(
+        "dashboard", {"type": "call", "member_id": body.member_id, "heard": body.text, "intent": r.intent}
+    )
     if r.ack:
         await _ack(store, body.incident_id, body.member_id)
     return {"say": r.say, "intent": r.intent, "done": r.done, "ack": r.ack, "audio": voice.say(r.say, "assistant")}

@@ -4,6 +4,7 @@ Real mode: Cartesia Sonic WAV cached by sha1 under out/voice (LRU 64) so the doo
 network; every scripted line is pre-synthesized at boot. Mock mode: the browser speaks the text with
 SpeechSynthesis. Rejected: streaming WebSocket TTS (more moving parts; lines are short and cacheable).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -20,10 +21,10 @@ LRU: Final = 64
 
 
 class AudioRef(TypedDict):
-    mode: str          # "cartesia" | "browser_tts"
+    mode: str  # "cartesia" | "browser_tts"
     text: str
-    url: str           # "/voice/<sha>.wav" when mode == cartesia
-    source: str        # "cartesia" | "mock"
+    url: str  # "/voice/<sha>.wav" when mode == cartesia
+    source: str  # "cartesia" | "mock"
 
 
 def _key(text: str, voice_id: str) -> str:
@@ -46,8 +47,11 @@ def say(text: str, persona: str = "caregiver_clone") -> AudioRef:
     mock: AudioRef = {"mode": "browser_tts", "text": text, "url": "", "source": "mock"}
     if not cartesia.enabled():
         return mock
-    voice_id = os.environ.get("CARTESIA_VOICE_ID", "") if persona == "caregiver_clone" else os.environ.get(
-        "CARTESIA_ASSISTANT_VOICE_ID", os.environ.get("CARTESIA_VOICE_ID", ""))
+    voice_id = (
+        os.environ.get("CARTESIA_VOICE_ID", "")
+        if persona == "caregiver_clone"
+        else os.environ.get("CARTESIA_ASSISTANT_VOICE_ID", os.environ.get("CARTESIA_VOICE_ID", ""))
+    )
     path = cached_path(text, voice_id)
     try:
         if not path.exists():

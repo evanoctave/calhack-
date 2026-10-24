@@ -4,6 +4,7 @@ Geocode + Overpass run inline (a few seconds). The Apify Google Maps run takes o
 costs a few cents, so it runs as a background task and the page polls /setup/status. The result is
 cached to data/places.custom.live.json and becomes the household's place list.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -95,8 +96,20 @@ def _save(rows: list[dict[str, Any]]) -> None:
 @router.get("/setup/status")
 async def setup_status() -> dict[str, Any]:
     store = _store()
-    sections = rank(store.places, (store.hh.home_lat, store.hh.home_lng), store.hh.radius_mi, store.now(),
-                    list(store.hh.familiar_places), list(store.hh.contacts))
-    return {**_status, "home": {"lat": store.hh.home_lat, "lng": store.hh.home_lng, "radius_mi": store.hh.radius_mi},
-            "hazards_ranked": sections.hazards, "call_first": sections.call_first, "familiar": sections.familiar,
-            "places_source": store.places_source(), "total": len(store.places)}
+    sections = rank(
+        store.places,
+        (store.hh.home_lat, store.hh.home_lng),
+        store.hh.radius_mi,
+        store.now(),
+        list(store.hh.familiar_places),
+        list(store.hh.contacts),
+    )
+    return {
+        **_status,
+        "home": {"lat": store.hh.home_lat, "lng": store.hh.home_lng, "radius_mi": store.hh.radius_mi},
+        "hazards_ranked": sections.hazards,
+        "call_first": sections.call_first,
+        "familiar": sections.familiar,
+        "places_source": store.places_source(),
+        "total": len(store.places),
+    }

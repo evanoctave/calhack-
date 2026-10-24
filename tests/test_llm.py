@@ -37,6 +37,10 @@ def test_describe_clothing_mock_and_garbage(monkeypatch) -> None:
     monkeypatch.setattr(llm.anthropic_llm, "complete", lambda *a, **k: "not json at all")
     c = llm.describe_clothing(b"\xff\xd8")
     assert c["top_color"] == "unknown" and c["confidence"] == 0.0
-    monkeypatch.setattr(llm.anthropic_llm, "complete", lambda *a, **k: '{"top_color":"teal","top_type":"hoodie","footwear":"flip","confidence":0.9}')
+    monkeypatch.setattr(
+        llm.anthropic_llm,
+        "complete",
+        lambda *a, **k: '{"top_color":"teal","top_type":"hoodie","footwear":"flip","confidence":0.9}',
+    )
     c = llm.describe_clothing(b"\xff\xd8")
     assert c == {**c, "top_color": "unknown", "top_type": "hoodie", "footwear": "unknown", "source": "anthropic"}

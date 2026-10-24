@@ -20,6 +20,6 @@ case "${1:-serve}" in
     echo "phone:     $PUBLIC_URL/phone.html#TM-SARAH"
     exec $PY -m uvicorn nightfall.api:app --host 0.0.0.0 --port "${PORT:-8000}" ;;
   test) exec $PY -m pytest -q ;;
-  check) $PY -m pytest -q && $PY -c "import nightfall.api" && echo "check: green" ;;
+  check) $PY -m ruff check nightfall scripts tests && $PY -m ruff format --check nightfall scripts tests >/dev/null && $PY -m pytest -q && echo "check: green" ;;
   *) echo "usage: ./run.sh [serve|demo|test|check]"; exit 2 ;;
 esac

@@ -1,4 +1,5 @@
 """Nominatim geocoding (OpenStreetMap). No key; needs a User-Agent; one request per second max."""
+
 from __future__ import annotations
 
 from typing import Final

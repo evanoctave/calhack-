@@ -4,6 +4,7 @@ The dashboard posts a small JPEG every few hundred ms while an incident is open;
 latest one. Takeover: a relative's typed line is synthesized in the caregiver voice and played by the
 dashboard; a recorded clip is relayed as-is. Rejected: WebRTC (too many moving parts for a hotspot demo).
 """
+
 from __future__ import annotations
 
 import base64
@@ -12,9 +13,9 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from starlette.datastructures import UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
+from starlette.datastructures import UploadFile
 
 from nightfall import voice
 
@@ -49,8 +50,11 @@ async def cam_latest() -> Response:
     store = _store()
     if not store.latest_frame or time.time() - store.latest_frame_at > 10:
         raise HTTPException(404, "no live frame")
-    return Response(content=store.latest_frame, media_type="image/jpeg",
-                    headers={"Cache-Control": "no-store", "X-Frame-Age": f"{time.time() - store.latest_frame_at:.1f}"})
+    return Response(
+        content=store.latest_frame,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-store", "X-Frame-Age": f"{time.time() - store.latest_frame_at:.1f}"},
+    )
 
 
 class TakeoverIn(BaseModel):
@@ -93,8 +97,17 @@ async def say(body: SayIn) -> dict[str, Any]:
 
     store.history.append(("system", text))
     ref = voice.say(text, store.hh.persona)
-    emit(store, {"type": "speak", "text": text, "mode": ref["mode"], "url": ref["url"],
-                 "voice_source": ref["source"], "line_source": f"human:{m.name}"})
+    emit(
+        store,
+        {
+            "type": "speak",
+            "text": text,
+            "mode": ref["mode"],
+            "url": ref["url"],
+            "voice_source": ref["source"],
+            "line_source": f"human:{m.name}",
+        },
+    )
     return {"ok": True, "audio": ref}
 
 
@@ -119,8 +132,17 @@ async def say_clip(request: Request) -> dict[str, Any]:
         old.unlink(missing_ok=True)
     from nightfall.actions import emit
 
-    emit(store, {"type": "speak", "text": f"[{m.name}'s voice]", "mode": "clip", "url": f"/clips/{name}",
-                 "voice_source": "human", "line_source": f"human:{m.name}"})
+    emit(
+        store,
+        {
+            "type": "speak",
+            "text": f"[{m.name}'s voice]",
+            "mode": "clip",
+            "url": f"/clips/{name}",
+            "voice_source": "human",
+            "line_source": f"human:{m.name}",
+        },
+    )
     return {"ok": True, "url": f"/clips/{name}"}
 
 
@@ -131,7 +153,9 @@ async def clip_file(name: str) -> Response:
     p = CLIP_DIR / name
     if not p.exists():
         raise HTTPException(404, "no")
-    mt = "audio/mp4" if name.endswith(".mp4") else "audio/webm" if name.endswith(".webm") else "application/octet-stream"
+    mt = (
+        "audio/mp4" if name.endswith(".mp4") else "audio/webm" if name.endswith(".webm") else "application/octet-stream"
+    )
     return Response(content=p.read_bytes(), media_type=mt)
 
 

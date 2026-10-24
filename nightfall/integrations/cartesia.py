@@ -1,4 +1,5 @@
 """Cartesia Sonic (TTS) and Ink (STT) over HTTP. Verified shapes: POST /tts/bytes, POST /stt."""
+
 from __future__ import annotations
 
 import os
@@ -14,8 +15,10 @@ STT_MODEL: Final = "ink-whisper"
 
 def enabled() -> bool:
     """True when a key and a voice id are configured and MOCK is off."""
-    return os.environ.get("MOCK", "1") != "1" and bool(os.environ.get("CARTESIA_API_KEY")) and bool(
-        os.environ.get("CARTESIA_VOICE_ID")
+    return (
+        os.environ.get("MOCK", "1") != "1"
+        and bool(os.environ.get("CARTESIA_API_KEY"))
+        and bool(os.environ.get("CARTESIA_VOICE_ID"))
     )
 
 
@@ -47,8 +50,11 @@ def tts_wav(text: str, voice_id: str | None = None, speed: float = 0.9) -> bytes
 def stt(audio: bytes, filename: str = "reply.wav") -> str:
     """Transcribe a short clip with Ink. Returns the text; raises on error."""
     r = httpx.post(
-        f"{BASE}/stt", headers=_headers(), timeout=10.0,
-        files={"file": (filename, audio, "audio/wav")}, data={"model": STT_MODEL, "language": "en"},
+        f"{BASE}/stt",
+        headers=_headers(),
+        timeout=10.0,
+        files={"file": (filename, audio, "audio/wav")},
+        data={"model": STT_MODEL, "language": "en"},
     )
     r.raise_for_status()
     return str(r.json().get("text", "")).strip()

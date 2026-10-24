@@ -1,4 +1,5 @@
 """Apify Google Maps Scraper (compass~crawler-google-places) run synchronously. Returns raw items."""
+
 from __future__ import annotations
 
 import os
@@ -15,8 +16,9 @@ def enabled() -> bool:
     return bool(os.environ.get("APIFY_TOKEN"))
 
 
-def google_places(lat: float, lng: float, radius_km: float, searches: list[str], per_search: int = 6,
-                  timeout_s: float = 300.0) -> list[dict[str, Any]]:
+def google_places(
+    lat: float, lng: float, radius_km: float, searches: list[str], per_search: int = 6, timeout_s: float = 300.0
+) -> list[dict[str, Any]]:
     """Run the scraper for several search strings around a point. Raises on HTTP errors."""
     body = {
         "searchStringsArray": searches,
@@ -28,9 +30,12 @@ def google_places(lat: float, lng: float, radius_km: float, searches: list[str],
         "maxReviews": 0,
         "maxImages": 0,
     }
-    r = httpx.post(f"{BASE}/acts/{ACTOR}/run-sync-get-dataset-items",
-                   params={"token": os.environ["APIFY_TOKEN"], "timeout": int(timeout_s), "format": "json"},
-                   json=body, timeout=timeout_s + 30)
+    r = httpx.post(
+        f"{BASE}/acts/{ACTOR}/run-sync-get-dataset-items",
+        params={"token": os.environ["APIFY_TOKEN"], "timeout": int(timeout_s), "format": "json"},
+        json=body,
+        timeout=timeout_s + 30,
+    )
     r.raise_for_status()
     data = r.json()
     return list(data) if isinstance(data, list) else []

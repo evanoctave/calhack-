@@ -3,6 +3,7 @@
 Rejected: SQLite tonight; the light demo needs no persistence. docs/DATA-MODEL.md lists the tables
 the core lane adds next.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -43,7 +44,11 @@ class Store:
         self.call_911_sent: bool = False
         self.night_mode: bool = True
         self.hub = Hub()
-        notifier = TwilioNotifier(self.hub, self.link, PUBLIC_URL, self.log) if twilio.enabled() else SseNotifier(self.hub, self.link, self.log)
+        notifier = (
+            TwilioNotifier(self.hub, self.link, PUBLIC_URL, self.log)
+            if twilio.enabled()
+            else SseNotifier(self.hub, self.link, self.log)
+        )
         self.runner = Runner(notifier)
         self.lock = asyncio.Lock()
         self.tick_task: asyncio.Task[None] | None = None
@@ -60,5 +65,3 @@ class Store:
 
     def night(self) -> bool:
         return self.night_mode or in_window(self.now().time(), self.hh.night_start, self.hh.night_end)
-
-

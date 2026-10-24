@@ -1,5 +1,3 @@
-import sys
-
 from nightfall import voice
 from nightfall.household import load
 
