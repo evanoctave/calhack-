@@ -29,7 +29,7 @@ class AudioRef(TypedDict):
 
 def _key(text: str, voice_id: str) -> str:
     speed, emotion = style()
-    return hashlib.sha1(f"{voice_id}|{speed}|{emotion}|{text}".encode()).hexdigest()
+    return hashlib.sha1(f"wav-v2|{voice_id}|{speed}|{emotion}|{text}".encode()).hexdigest()
 
 
 def cached_path(text: str, voice_id: str) -> Path:

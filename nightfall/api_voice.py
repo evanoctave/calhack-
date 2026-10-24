@@ -7,7 +7,7 @@ the caller's words POST to /twiml/{inc}/{member}/turn -> call_agent.handle -> sp
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, Final
 from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, HTTPException, Request
@@ -18,6 +18,8 @@ from nightfall import call_agent, voice
 from nightfall.store import PUBLIC_URL
 
 router = APIRouter()
+CALL_REASONING_TIMEOUT_S: Final = 5.0
+CALL_AUDIO_TIMEOUT_S: Final = 2.0
 
 
 def _store() -> Any:
@@ -78,7 +80,15 @@ async def twiml_turn(incident_id: str, member_id: str, request: Request) -> Resp
     store, b, name = _ctx(incident_id, member_id)
     form = await request.form()
     text = str(form.get("SpeechResult", ""))
-    r = await asyncio.to_thread(call_agent.handle, store.hh, b, name, text)
+    try:
+        r = await asyncio.wait_for(
+            asyncio.to_thread(call_agent.handle, store.hh, b, name, text), timeout=CALL_REASONING_TIMEOUT_S
+        )
+    except TimeoutError:
+        print(f"call reasoning timed out: {incident_id}")
+        r = call_agent.Reply(
+            "I don't have that answer right now. Please open the brief, or ask what he was wearing.", "timeout"
+        )
     store.log.append(
         {
             "type": "call",
@@ -92,7 +102,16 @@ async def twiml_turn(incident_id: str, member_id: str, request: Request) -> Resp
     store.hub.publish("dashboard", {"type": "call", "member_id": member_id, "heard": text, "intent": r.intent})
     if r.ack:
         await _ack(store, incident_id, member_id)
-    return await asyncio.to_thread(_twiml, r.say, f"{PUBLIC_URL}/twiml/{incident_id}/{member_id}/turn", r.done)
+    gather_url = f"{PUBLIC_URL}/twiml/{incident_id}/{member_id}/turn"
+    if r.intent == "timeout":
+        return _twiml(r.say, gather_url, r.done, use_cartesia=False)
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(_twiml, r.say, gather_url, r.done), timeout=CALL_AUDIO_TIMEOUT_S
+        )
+    except TimeoutError:
+        print(f"call synthesis timed out: {incident_id}")
+        return _twiml(r.say, gather_url, r.done, use_cartesia=False)
 
 
 class AnswerIn(BaseModel):
