@@ -3,7 +3,7 @@
 const Cam = {model: null, video: null, canvas: null, ctx: null, overlay: null, octx: null, ring: [], personFrames: [],
              present: false, hits: 0, misses: 0, lastEvent: "", lostMs: 1500, lastSeenAt: 0, relayAt: 0, busy: false, on: false, heights: [], awayAt: 0, face: null, faceMisses: 0, faceTick: 0, facing: "", awaySince: 0, awayLostSent: false, awayHoldMs: 5000, track: []};
 
-function camTele(event, detail) { fetch("/door/telemetry", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({event, detail: String(detail || "")})}).catch(() => {}); }
+function camTele(event, detail, metadata = {}) { fetch("/door/telemetry", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({event, detail: String(detail || ""), ...metadata})}).catch(() => {}); }
 function camStatus(t) { const el = document.getElementById("camstat"); if (el) el.textContent = t; }
 
 async function startCam() {
@@ -155,12 +155,22 @@ async function enroll(label) {
   return enrollNamed(label, name);
 }
 async function enrollNamed(label, name) {
-  if (!Face.ready) { camStatus("face recognition not ready yet"); return; }
-  camStatus("look at the camera…"); const samples = [];
-  for (let i = 0; i < 4 && samples.length < 3; i++) { const d = await descriptorNow(); if (d) samples.push(d); await new Promise(r => setTimeout(r, 350)); }
-  if (!samples.length) { camStatus("no face found; face the camera and try again"); return; }
-  const mean = samples[0].map((_, k) => samples.reduce((a, s) => a + s[k], 0) / samples.length);
-  await post("/enroll", {label, name, descriptor: mean}); await loadEnrolled(); camStatus("enrolled " + name + " as " + label);
+  const report = (event, detail) => { camStatus(detail); camTele(event, detail, {name, label}); };
+  try {
+    if (!Face.ready) throw new Error("Face recognition is not ready yet. Start the camera and try again.");
+    camStatus("look at the camera…"); const samples = [];
+    for (let i = 0; i < 4 && samples.length < 3; i++) { const d = await descriptorNow(); if (d) samples.push(d); await new Promise(r => setTimeout(r, 350)); }
+    if (!samples.length) throw new Error("No face found. Face the camera and try again.");
+    const mean = samples[0].map((_, k) => samples.reduce((a, s) => a + s[k], 0) / samples.length);
+    const response = await fetch("/enroll", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({label, name, descriptor: mean})});
+    if (!response.ok) throw new Error("Registration could not be saved. Try again.");
+    const result = await response.json();
+    if (!result.ok) throw new Error("Registration was not confirmed. Try again.");
+    await loadEnrolled();
+    report("enroll_success", "Enrolled " + name + " as " + label);
+  } catch (error) {
+    report("enroll_error", error instanceof Error ? error.message : "Registration failed. Try again.");
+  }
 }
 // Door zone: which edge of the frame the door is on. Entry = track started at that edge; exit = track ended there.
 const Door = {edge: (() => { try { return localStorage.getItem("nf-door-edge") || "far"; } catch (e) { return "far"; } })(), first: null};

@@ -65,6 +65,7 @@ class Incident:
     checkin: str = "none"
     checkin_who: str = ""
     attire_night: bool = False
+    cause: str = "door"
 
     def features(self) -> Features:
         return Features(self.identity, self.direction, self.checkin, self.attire_night, self.night_mode)
@@ -295,7 +296,8 @@ def _ack(inc: Incident, ev: Event) -> Transition:
 def _tick_escalating(inc: Incident, ev: Event) -> Transition:
     dl = inc.deadline_at
     if dl is not None and ev.ts >= dl:
-        return _t(inc, State.EXHAUSTED, ("banner:call_911",), "R3", "15 minutes since exit")
+        detail = "15 minutes since help request" if inc.cause == "help" else "15 minutes since exit"
+        return _t(inc, State.EXHAUSTED, ("banner:call_911",), "R3", detail)
     return _ignored(inc, ev, "escalating")
 
 
@@ -311,8 +313,9 @@ def _sos(inc: Incident, ev: Event) -> Transition:
     if inc.state in (State.ESCALATING, State.ACKED, State.EXHAUSTED):
         return _ignored(inc, ev, "already escalated")
     inc.opened_at = inc.opened_at or ev.ts
+    inc.cause = "help"
+    # Retain the escalation clock; this timestamp is not evidence of a physical exit.
     inc.exited_at = ev.ts
-    inc.identity = "match"
     return _t(
         inc,
         State.ESCALATING,

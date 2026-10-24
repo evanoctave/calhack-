@@ -33,6 +33,13 @@ Built at Cal Hacks 13.0 (UC Berkeley), October 2026.
 
 Demo knobs: `DOOR_WAIT_S=5 ESCALATION_STEP_S=10 ./run.sh` shortens the waits.
 
+### React caregiver app
+
+The detailed mobile setup and caregiver flow lives in [`frontend/`](frontend/README.md).
+Run `npm ci && npm run dev` there for development, or `npm run build` to serve it from
+the Python backend at `/ui/index.html`. The existing `/app` and door views remain available.
+See the frontend README for a key-free local demo, API integration details, and current limitations.
+
 ## Devices
 
 Life Alert inside a doorbell camera. The laptop at `/` is the door device: camera, speaker, one red HELP button, nothing else to click. The phone at `/app?me=<name>` is the caregiver's dashboard: live feed, alert, brief, search, live voice, door settings and face enrollment. `/dashboard.html` is the admin view.

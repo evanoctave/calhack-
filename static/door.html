@@ -141,7 +141,7 @@ function earStart() {
       const res = ev.results[i], text = res[0].transcript.trim(); if (!text || isEcho(text)) continue;
       const inc = last && last.incident; if (!inc || !["CONVERSATION", "VISITOR", "WATCHING", "DOOR_OPEN"].includes(inc.state)) continue;
       if (Cur.src || Cur.audio) cutAudio("barge-in");
-      if (res.isFinal) { tele("heard", text); post("/event", {kind: "reply", text}); }
+      if (res.isFinal) { tele("heard", text); post("/event", {kind: "reply", payload: {text}}); }
     }
   };
   r.onerror = e => tele("ear_error", e.error);

@@ -10,7 +10,7 @@ import asyncio
 from typing import Any
 
 from nightfall import brief as briefmod
-from nightfall import engine, llm, voice
+from nightfall import engine, history, llm, voice
 from nightfall.script import SCRIPT, fill, pick
 from nightfall.store import Store
 
@@ -18,8 +18,22 @@ from nightfall.store import Store
 def emit(store: Store, obj: dict[str, Any]) -> None:
     """Append to the log and push to the dashboard channel."""
     obj.setdefault("ts", store.now().isoformat())
+    if obj.get("type") == "speak":
+        obj.setdefault("incident_id", store.inc.id if store.inc else None)
+        store.door_speech = {k: obj[k] for k in ("text", "incident_id", "ts") if k in obj}
     store.log.append(obj)
     store.hub.publish("dashboard", obj)
+    # Phone consumers need status/subtitles, never dashboard control commands or audio autoplay.
+    if obj.get("type") in {"speak", "door", "answered", "live"}:
+        public = {
+            k: v
+            for k, v in obj.items()
+            if k in {"type", "text", "incident_id", "ts", "event", "detail", "name", "label", "member_id", "by", "on"}
+        }
+        if obj.get("type") != "door" or obj.get("event") in {"enroll_success", "enroll_error"}:
+            for member in store.hh.tree:
+                if obj.get("type") != "answered" or obj.get("member_id") == member.id:
+                    store.hub.publish(f"phone:{member.id}", public)
 
 
 REGREET_S = 90.0
@@ -111,11 +125,16 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
                 store.now(),
                 habits,
                 store.memory.source,
+                history.summary(history.load()),
             )
             emit(store, {"type": "brief_ready", "incident_id": inc.id})
         elif a == "start_escalation":
             t = (inc.exited_at or store.now()).strftime("%I:%M %p").lstrip("0")
-            msg = f"{store.hh.person_name} has left the house at {t}. Open the brief."
+            msg = (
+                f"Help was requested at the door at {t}. Open the camera and check on {store.hh.person_name}."
+                if inc.cause == "help"
+                else f"{store.hh.person_name} has left the house at {t}. Open the brief."
+            )
             await store.runner.start(inc.id, store.hh, msg)
         elif a == "cancel_escalation":
             await store.runner.cancel(inc.id)
@@ -191,7 +210,7 @@ def start_vision(store: Store, incident_id: str) -> None:
             b = store.briefs.get(incident_id)
             if b is not None:
                 b["clothing"], b["clothing_line"] = c, briefmod.clothing_line(c)
-                b["prose"] = briefmod.prose(store.hh, b["last_seen_hhmm"], b["clothing_line"])
+                b["prose"] = briefmod.prose(store.hh, b["last_seen_hhmm"], b["clothing_line"], b.get("cause", "door"))
                 for m in store.hh.tree:
                     store.hub.publish(f"phone:{m.id}", {"type": "brief_updated", "incident_id": incident_id})
             emit(
@@ -224,5 +243,13 @@ def _record_history(store: Store, inc: engine.Incident, tr: engine.Transition) -
     if inc.exited_at is None and tr.to_state == engine.State.RETURNED:
         return
     hist.record(
-        inc.id, inc.opened_at, inc.exited_at, store.now(), outcome, inc.heading, inc.acked_by, inc.verdict().score
+        inc.id,
+        inc.opened_at,
+        inc.exited_at,
+        store.now(),
+        outcome,
+        inc.heading,
+        inc.acked_by,
+        inc.verdict().score,
+        cause=inc.cause,
     )
