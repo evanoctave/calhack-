@@ -29,7 +29,7 @@ def _store() -> Any:
 def _twiml(say: str, gather_url: str | None, hangup: bool) -> Response:
     ref = voice.say(say, "assistant")
     inner = (
-        f"<Play>{escape(PUBLIC_URL + ref['url'])}</Play>"
+        f"<Play>{escape(PUBLIC_URL + voice.telephone_url(ref['url']))}</Play>"
         if ref["mode"] == "cartesia"
         else f'<Say voice="Polly.Joanna">{escape(say)}</Say>'
     )

@@ -74,3 +74,18 @@ def test_live_talk_pauses_ai_and_resumes_on_hangup(client: TestClient) -> None:
     with client.websocket_connect("/ws/talk/TM-SARAH"):
         pass
     assert api.store.takeover_by == "TM-SARAH", "explicit takeover survives a live session"
+
+
+def test_video_relay_drops_stale_frames_for_a_slow_phone(client: TestClient) -> None:
+    # A phone that has not acked its last two frames gets nothing more until it acks, then only the newest frame
+    with client.websocket_connect("/ws/video-in") as door:
+        door.receive_json()
+        with client.websocket_connect("/ws/video/TM-SARAH") as phone:
+            door.receive_json()
+            for i in range(10):
+                door.send_bytes(b"\xff\xd8" + bytes([i]) * 100)
+            first = phone.receive_bytes()
+            second = phone.receive_bytes()
+            assert first[2] == 0 and second[2] != 0
+            phone.send_text("a")
+            assert phone.receive_bytes()[2] == 9

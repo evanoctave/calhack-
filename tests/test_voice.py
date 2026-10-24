@@ -44,3 +44,17 @@ def test_select_persists_to_env(monkeypatch, tmp_path) -> None:
     assert voice.style() == (0.95, "calm")
     monkeypatch.delenv("VOICE_SPEED", raising=False)
     monkeypatch.delenv("VOICE_EMOTION", raising=False)
+
+
+def test_telephone_copy_is_8khz_mulaw_and_a_sixth_the_size(monkeypatch, tmp_path) -> None:
+    import struct
+
+    monkeypatch.setattr(voice, "OUT", tmp_path)
+    pcm = b"".join(struct.pack("<h", (i * 37) % 20000 - 10000) for i in range(24000))
+    hdr = b"RIFF" + struct.pack("<I", 36 + len(pcm)) + b"WAVEfmt " + struct.pack("<IHHIIHH", 16, 1, 1, 24000, 48000, 2, 16)
+    (tmp_path / "abc.wav").write_bytes(hdr + b"data" + struct.pack("<I", len(pcm)) + pcm)
+    assert voice.telephone_url("/voice/abc.wav") == "/voice/abc.tel.wav"
+    tel = (tmp_path / "abc.tel.wav").read_bytes()
+    assert struct.unpack("<HHI", tel[20:28]) == (7, 1, 8000) and len(tel) - 58 == 8000
+    (tmp_path / "bad.wav").write_bytes(b"RIFFnope")
+    assert voice.telephone_url("/voice/bad.wav") == "/voice/bad.wav"

@@ -76,6 +76,8 @@ function tick() {
 }
 setInterval(tick, 200);
 function showSpeak(who, text) { $("speakwho").textContent = who; $("speaktxt").textContent = text; $("speak").classList.add("on"); clearTimeout(showSpeak.t); showSpeak.t = setTimeout(() => $("speak").classList.remove("on"), 9000); }
+// A hidden or background tab gets its timers throttled to about once a second: camera, detector and feed crawl.
+document.addEventListener("visibilitychange", () => tele(document.hidden ? "door_hidden" : "door_visible", document.hidden ? "tab in background: camera slows to ~1 fps, keep this tab in front" : ""));
 function tele(event, detail) { fetch("/door/telemetry", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({event, detail: String(detail || "")})}).catch(() => {}); }
 const Cur = {audio: null, src: null, live: false};
 const Out = {ctx: null, started: false, line: ""};

@@ -6,7 +6,7 @@ Rejected: WebRTC (needs TURN once the phone is on cellular; the tunnel already c
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, Final
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -174,19 +174,62 @@ async def ws_door(ws: WebSocket) -> None:
 
 
 class VideoHub:
-    """Door camera -> every phone watching. JPEG frames as binary messages; the door streams only while watched."""
+    """Door camera -> every phone watching. JPEG frames as binary messages; the door streams only while watched.
+
+    Each phone gets its own sender holding only the newest frame, and at most two frames unacknowledged: a phone
+    on a slow tunnel skips frames instead of falling seconds behind, and never stalls the door or other phones.
+    """
+
+    INFLIGHT: Final = 2
+    ACK_GRACE_S: Final = 1.5  # a phone that never acks (old page) still gets a frame this often
 
     def __init__(self) -> None:
         self.watchers: dict[WebSocket, str] = {}
         self.door: WebSocket | None = None
         self.frames = 0
+        self._latest: dict[WebSocket, bytes] = {}
+        self._wake: dict[WebSocket, asyncio.Event] = {}
+        self._unacked: dict[WebSocket, int] = {}
+
+    def add(self, ws: WebSocket, member_id: str) -> None:
+        self.watchers[ws] = member_id
+        self._wake[ws], self._unacked[ws] = asyncio.Event(), 0
+
+    def remove(self, ws: WebSocket) -> None:
+        for d in (self.watchers, self._latest, self._wake, self._unacked):
+            d.pop(ws, None)
+
+    def ack(self, ws: WebSocket) -> None:
+        if ws in self._unacked:
+            self._unacked[ws] = max(0, self._unacked[ws] - 1)
+            self._wake[ws].set()
 
     async def broadcast(self, data: bytes) -> None:
         for ws in list(self.watchers):
+            self._latest[ws] = data
+            if ws in self._wake:
+                self._wake[ws].set()
+
+    async def pump(self, ws: WebSocket) -> None:
+        """Send this phone the newest frame whenever it has room; drops everything older."""
+        while ws in self.watchers:
+            ev = self._wake[ws]
+            try:
+                await asyncio.wait_for(ev.wait(), self.ACK_GRACE_S)
+            except TimeoutError:
+                self._unacked[ws] = 0
+            ev.clear()
+            if self._unacked.get(ws, 0) >= self.INFLIGHT:
+                continue
+            data = self._latest.pop(ws, None)
+            if data is None:
+                continue
+            self._unacked[ws] = self._unacked.get(ws, 0) + 1
             try:
                 await ws.send_bytes(data)
             except Exception:  # noqa: BLE001
-                self.watchers.pop(ws, None)
+                self.remove(ws)
+                return
 
     async def tell_door(self) -> None:
         if self.door is not None:
@@ -237,15 +280,19 @@ async def ws_video(ws: WebSocket, member_id: str) -> None:
         await ws.close(code=4403)
         return
     await ws.accept()
-    video.watchers[ws] = member_id
+    video.add(ws, member_id)
     await video.tell_door()
+    sender = asyncio.create_task(video.pump(ws))
     try:
         while True:
             msg = await ws.receive()
             if msg.get("type") == "websocket.disconnect":
                 break
+            if msg.get("text"):
+                video.ack(ws)
     except WebSocketDisconnect:
         pass
     finally:
-        video.watchers.pop(ws, None)
+        video.remove(ws)
+        sender.cancel()
         await video.tell_door()

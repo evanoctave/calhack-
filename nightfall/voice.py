@@ -38,9 +38,53 @@ def cached_path(text: str, voice_id: str) -> Path:
 
 
 def _prune() -> None:
-    files = sorted(OUT.glob("*.wav"), key=lambda p: p.stat().st_mtime)
+    files = sorted((p for p in OUT.glob("*.wav") if not p.name.endswith(".tel.wav")), key=lambda p: p.stat().st_mtime)
     for p in files[:-LRU]:
         p.unlink(missing_ok=True)
+        p.with_suffix(".tel.wav").unlink(missing_ok=True)
+
+
+def _mulaw(s: int) -> int:
+    """One 16-bit PCM sample to G.711 mu-law."""
+    sign = 0x80 if s < 0 else 0
+    s = min(abs(s), 32635) + 0x84
+    exp = s.bit_length() - 8
+    return ~(sign | (exp << 4) | ((s >> (exp + 3)) & 0x0F)) & 0xFF
+
+
+def telephone_url(url: str) -> str:
+    """An 8 kHz mu-law copy of a cached 24 kHz line, for Twilio <Play>.
+
+    The phone line carries 8 kHz anyway; the copy is a sixth the size, so Twilio fetches it fast even when the
+    tunnel runs over a weak hotspot uplink. Falls back to the original URL if the WAV is not what we expect.
+    """
+    src = OUT / url.rsplit("/", 1)[-1]
+    dst = src.with_suffix(".tel.wav")
+    if dst.exists():
+        return url[: -len(".wav")] + ".tel.wav"
+    try:
+        raw = src.read_bytes()
+        rate = int.from_bytes(raw[24:28], "little")
+        bits = int.from_bytes(raw[34:36], "little")
+        i = raw.index(b"data") + 8
+        if rate % 8000 or bits != 16 or raw[22] != 1:
+            return url
+        step = rate // 8000
+        pcm = memoryview(raw[i : i + (len(raw) - i) // 2 * 2]).cast("h")
+        out = bytes(_mulaw(sum(pcm[j : j + step]) // step) for j in range(0, len(pcm) - step + 1, step))
+    except (OSError, ValueError, IndexError):
+        return url
+    n = len(out)
+    hdr = (
+        b"RIFF" + (4 + 26 + 12 + 8 + n).to_bytes(4, "little") + b"WAVE"
+        + b"fmt " + (18).to_bytes(4, "little") + (7).to_bytes(2, "little") + (1).to_bytes(2, "little")
+        + (8000).to_bytes(4, "little") + (8000).to_bytes(4, "little") + (1).to_bytes(2, "little")
+        + (8).to_bytes(2, "little") + (0).to_bytes(2, "little")
+        + b"fact" + (4).to_bytes(4, "little") + n.to_bytes(4, "little")
+        + b"data" + n.to_bytes(4, "little")
+    )
+    dst.write_bytes(hdr + out)
+    return url[: -len(".wav")] + ".tel.wav"
 
 
 def style() -> tuple[float, str]:
