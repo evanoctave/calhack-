@@ -15,7 +15,7 @@ from typing import Any
 from nightfall import brief as briefmod
 from nightfall import engine
 from nightfall.escalation import Runner
-from nightfall.household import Household, in_window, load
+from nightfall.household import Household, load
 from nightfall.integrations import twilio
 from nightfall.memory import Memory
 from nightfall.notify import Hub, SseNotifier, TwilioNotifier
@@ -44,6 +44,7 @@ class Store:
         self.memory = Memory(self.hh)
         self.inc: engine.Incident | None = None
         self.log: list[dict[str, Any]] = []
+        self.door_speech: dict[str, Any] | None = None
         self.frames: dict[str, list[str]] = {}
         self.briefs: dict[str, dict[str, Any]] = {}
         self.history: list[tuple[str, str]] = []
@@ -84,7 +85,7 @@ class Store:
         return f"{PUBLIC_URL}/brief.html#{briefmod.mint(incident_id, member_id, self.now())}"
 
     def night(self) -> bool:
-        return self.night_mode or in_window(self.now().time(), self.hh.night_start, self.hh.night_end)
+        return self.night_mode
 
     def approach_context(self) -> tuple[int, tuple[float, ...]]:
         """Trips to the door in the last 15 minutes (this one included) and the hours of earlier exits."""

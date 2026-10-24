@@ -1,0 +1,180 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: calc(100dvh - 150px);
+}
+.quote {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  margin: 6px 0 14px;
+  letter-spacing: -0.35px;
+}
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 21px;
+  cursor: pointer;
+}
+.consent input {
+  width: 21px;
+  height: 21px;
+  flex-shrink: 0;
+  margin: 2px 0 0;
+  accent-color: var(--accent, #245dd6);
+}
+.wave {
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 10px 2px;
+  margin: 24px 0;
+}
+.wave span {
+  display: block;
+  flex: 1;
+  max-width: 4px;
+  min-width: 2px;
+  border-radius: 4px;
+  background: var(--accent, #245dd6);
+}
+.playRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.recording {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #b52c3d;
+  font-weight: 600;
+}
+.recording span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.sample {
+  padding: 8px 0 12px;
+}
+.sample + .sample {
+  border-top: 1px solid var(--line, #d8dfe9);
+  padding-top: 12px;
+}
+.sample p {
+  font-size: 14px;
+  line-height: 20px;
+  margin: 6px 0;
+}
+.sampleActions {
+  display: flex;
+  gap: 5px;
+}
+.sponsor {
+  color: var(--accent, #245dd6);
+  font-size: 12px;
+  font-weight: 600;
+}
+.selectField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  margin: 14px 0;
+}
+.selectField select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line, #c8d5e4);
+  border-radius: 12px;
+  color: var(--ink, #182335);
+  background: rgba(255, 255, 255, 0.72);
+  font: inherit;
+}
+.preset {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+}
+.preset + .preset {
+  border-top: 1px solid var(--line, #d8dfe9);
+}
+.preset label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  cursor: pointer;
+}
+.preset label span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.preset input {
+  accent-color: var(--accent, #245dd6);
+  height: 20px;
+  width: 20px;
+}
+.segments {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 18px;
+}
+.segments button {
+  flex: 1;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 10px 8px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--muted, #506078);
+  cursor: pointer;
+}
+.segments button[aria-pressed="true"] {
+  background: var(--soft, #e1edfc);
+  color: var(--accent, #245dd6);
+  border-color: #a9c3ea;
+}
+.slider,
+.select {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  margin: 16px 0;
+}
+.slider input {
+  width: 100%;
+  accent-color: var(--accent, #245dd6);
+  height: 32px;
+}
+.select select {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #c8d5e4;
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--ink, #182335);
+  font: inherit;
+}
+.page .sample button,
+.page .preset > button,
+.page .playRow button {
+  width: auto;
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 4px 8px;
+}
+.playRow > span {
+  white-space: nowrap;
+}
