@@ -1,0 +1,18 @@
+{
+  "incident_id": "INC-0001",
+  "profile_id": "HH-DEMO",
+  "timestamp": "2026-10-23T02:14:05Z",
+  "snapshot": "data:image/jpeg;base64,/9j/4AAQSkZJRg==",
+  "clothing": {
+    "description": "navy hoodie, gray sweatpants, barefoot",
+    "top_color": "navy",
+    "top_type": "hoodie",
+    "bottom_color": "gray",
+    "bottom_type": "sweatpants",
+    "footwear": "barefoot",
+    "carried_items": [],
+    "confidence": 0.86,
+    "source": "mock"
+  },
+  "state": "DOOR_OPEN"
+}

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sse_events.schema.json",
+  "title": "SseEvent",
+  "description": "One message on an SSE stream. Dashboard stream: GET /sse/dashboard (state, speak, ring, brief_ready, exit_frames_request, tree, arm, reset). Phone stream: GET /sse/phone/{member_id} (ring, acked, deadline). Messages are flat JSON: type plus its fields. Mirrors nightfall/actions.py, api.py and notify.py.",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": {"enum": ["state", "speak", "ring", "brief_ready", "exit_frames_request", "tree", "arm", "reset", "acked", "deadline"]}
+  },
+  "oneOf": [
+    {
+      "description": "dashboard: engine transition",
+      "required": ["type", "incident_id", "kind", "from", "to", "rule", "actions"],
+      "properties": {
+        "type": {"const": "state"},
+        "incident_id": {"type": "string"},
+        "kind": {"type": "string", "description": "Event kind that caused it: motion door_open door_close person_seen reply tick close"},
+        "from": {"type": "string"},
+        "to": {"type": "string"},
+        "rule": {"type": "string"},
+        "detail": {"type": "string"},
+        "actions": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    {
+      "description": "dashboard: a line to speak",
+      "required": ["type", "text"],
+      "properties": {"type": {"const": "speak"}, "text": {"type": "string"}, "mode": {"type": "string", "examples": ["browser_tts"]}}
+    },
+    {
+      "description": "dashboard: a tier was rung",
+      "required": ["type", "tier", "members"],
+      "properties": {"type": {"const": "ring"}, "tier": {"type": "integer"}, "members": {"type": "array", "items": {"type": "string"}}, "source": {"type": "string"}}
+    },
+    {
+      "description": "phone: ring this member",
+      "required": ["type", "message", "link", "incident_id", "tier"],
+      "properties": {
+        "type": {"const": "ring"},
+        "message": {"type": "string"},
+        "link": {"type": "string"},
+        "incident_id": {"type": "string"},
+        "tier": {"type": "integer"}
+      }
+    },
+    {
+      "required": ["type", "incident_id"],
+      "properties": {"type": {"enum": ["brief_ready", "exit_frames_request", "deadline"]}, "incident_id": {"type": "string"}}
+    },
+    {
+      "description": "dashboard: phone-tree member added",
+      "required": ["type", "member"],
+      "properties": {"type": {"const": "tree"}, "member": {"type": "object"}}
+    },
+    {
+      "required": ["type", "night_mode"],
+      "properties": {"type": {"const": "arm"}, "night_mode": {"type": "boolean"}}
+    },
+    {
+      "required": ["type"],
+      "properties": {"type": {"const": "reset"}}
+    },
+    {
+      "description": "phone: someone acknowledged",
+      "required": ["type", "by", "incident_id"],
+      "properties": {"type": {"const": "acked"}, "by": {"type": "string"}, "incident_id": {"type": "string"}}
+    }
+  ]
+}

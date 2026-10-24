@@ -1,0 +1,24 @@
+{
+  "profile_id": "HH-DEMO",
+  "generated_at": "2026-10-23T02:14:30Z",
+  "home": {"lat": 33.8704, "lng": -117.9242, "radius_mi": 1.5},
+  "open_late": [
+    {"category": "fuel", "name": "Chevron, Harbor and Chapman", "lat": 33.8740, "lng": -117.9270, "distance_mi": 0.3, "phone": "(714) 555-0101", "hours": "24/7", "open_now": true, "source": "fixture"},
+    {"category": "diner", "name": "Denny's, Orangethorpe", "lat": 33.8600, "lng": -117.9150, "distance_mi": 0.8, "phone": "(714) 555-0103", "hours": "24/7", "open_now": true, "source": "fixture"}
+  ],
+  "hazards": [
+    {"category": "water", "name": "Brea Creek channel", "lat": 33.8760, "lng": -117.9250, "distance_mi": 0.4, "source": "fixture"},
+    {"category": "rail", "name": "BNSF rail line", "lat": 33.8800, "lng": -117.9300, "distance_mi": 0.7, "source": "fixture"}
+  ],
+  "route": {
+    "stops": [
+      {"name": "Ralphs on Chapman", "lat": 33.8720, "lng": -117.9110, "eta_min": 6, "distance_mi": 0.7},
+      {"name": "Old house on Malvern Ave", "lat": 33.8745, "lng": -117.9390, "eta_min": 9, "distance_mi": 1.0}
+    ]
+  },
+  "local_contacts": [
+    {"name": "Fullerton PD non-emergency", "phone": "(714) 738-6800"},
+    {"name": "Silver Alert", "phone": "", "note": "California runs Silver Alert; ask the police to issue one."}
+  ],
+  "source": "fixture"
+}

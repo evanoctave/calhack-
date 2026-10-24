@@ -1,0 +1,22 @@
+{
+  "id": "HH-DEMO",
+  "name": "Dad",
+  "age": 78,
+  "photo": "/robert.svg",
+  "height_build": "5ft 9in, slim",
+  "medications": [
+    {"name": "donepezil", "dose": "10 mg", "note": "nightly"},
+    {"name": "metoprolol", "dose": "50 mg", "note": "morning"}
+  ],
+  "familiar_places": [
+    {"name": "Old house on Malvern Ave, lived there 30 years", "lat": 33.8745, "lng": -117.9390},
+    {"name": "Ralphs on Chapman, went every morning", "lat": 33.8720, "lng": -117.9110}
+  ],
+  "contacts": [
+    {"id": "TM-SARAH", "name": "Sarah", "phone": "web", "tier": 1},
+    {"id": "TM-MIKE", "name": "Mike", "phone": "web", "tier": 2},
+    {"id": "TM-LINDA", "name": "Linda (neighbor)", "phone": "web", "tier": 3}
+  ],
+  "voice_id": "cartesia-voice-id-here",
+  "home": {"lat": 33.8704, "lng": -117.9242, "radius_mi": 1.5}
+}

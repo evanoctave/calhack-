@@ -33,7 +33,7 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
                                                   store.frames.get(inc.id, []), store.now())
             emit(store, {"type": "brief_ready", "incident_id": inc.id})
         elif a == "start_escalation":
-            t = (inc.exited_at or store.now()).strftime("%-I:%M %p")
+            t = (inc.exited_at or store.now()).strftime("%I:%M %p").lstrip("0")
             msg = f"{store.hh.person_name} has left the house at {t}. Open the brief."
             await store.runner.start(inc.id, store.hh, msg)
         elif a == "cancel_escalation":
