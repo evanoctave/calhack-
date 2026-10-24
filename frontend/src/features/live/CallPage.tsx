@@ -67,26 +67,75 @@ export function CallPage() {
   >("idle");
   const [error, setError] = useState(""),
     [audioNotice, setAudioNotice] = useState("");
+  const [autoListening, setAutoListening] = useState(false);
+  const [deviceVoice, setDeviceVoice] = useState(false);
   const audio = useRef<HTMLAudioElement | null>(null),
     recognition = useRef<Recognition | null>(null);
+  const utterance = useRef<SpeechSynthesisUtterance | null>(null);
+  const mediaGeneration = useRef(0),
+    automatic = useRef(false);
+  const listenTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const listenNext = useRef<() => void>(() => undefined);
+  const sendRecognized = useRef<(text: string) => void>(() => undefined);
+  const answeredMember = useRef(memberId);
   const alive = useRef(true),
     requestNumber = useRef(0),
     openingFor = useRef("");
   const isBusy = status === "loading";
+  const updateAutomatic = useCallback((on: boolean) => {
+    automatic.current = on;
+    setAutoListening(on);
+  }, []);
+  const stopRecognition = useCallback(() => {
+    clearTimeout(listenTimer.current);
+    listenTimer.current = undefined;
+    if (recognition.current) {
+      const current = recognition.current;
+      recognition.current = null;
+      current.onend = current.onresult = current.onerror = null;
+      current.abort();
+    }
+  }, []);
   const stopMedia = useCallback(() => {
+    mediaGeneration.current++;
+    stopRecognition();
     if (audio.current) {
       audio.current.pause();
       audio.current.onended = audio.current.onerror = null;
       audio.current = null;
     }
-    if (recognition.current) {
-      recognition.current.onend =
-        recognition.current.onresult =
-        recognition.current.onerror =
-          null;
-      recognition.current.abort();
-      recognition.current = null;
+    if (utterance.current) {
+      utterance.current.onend = utterance.current.onerror = null;
+      utterance.current = null;
+      window.speechSynthesis?.cancel();
     }
+  }, [stopRecognition]);
+  const pauseAutomatic = useCallback(() => {
+    updateAutomatic(false);
+    stopRecognition();
+    setStatus((previous) => (previous === "listening" ? "ready" : previous));
+  }, [updateAutomatic, stopRecognition]);
+  const scheduleListening = useCallback((generation: number) => {
+    clearTimeout(listenTimer.current);
+    if (
+      !automatic.current ||
+      !alive.current ||
+      document.hidden ||
+      generation !== mediaGeneration.current
+    )
+      return;
+    listenTimer.current = setTimeout(() => {
+      listenTimer.current = undefined;
+      if (
+        automatic.current &&
+        alive.current &&
+        !document.hidden &&
+        generation === mediaGeneration.current
+      )
+        listenNext.current();
+    }, 350);
   }, []);
   useEffect(() => {
     alive.current = true;
@@ -94,6 +143,7 @@ export function CallPage() {
       alive.current = false;
       requestNumber.current++;
       openingFor.current = "";
+      automatic.current = false;
       stopMedia();
     };
   }, [stopMedia]);
@@ -101,83 +151,151 @@ export function CallPage() {
     // A server reset, a new incident, or a different family member starts a new conversation.
     requestNumber.current++;
     stopMedia();
+    updateAutomatic(false);
     openingFor.current = "";
     setReply(null);
     setQuestion("");
     setError("");
     setAudioNotice("");
+    setDeviceVoice(false);
     setStatus("idle");
-  }, [sessionKey, stopMedia]);
+  }, [sessionKey, stopMedia, updateAutomatic]);
   useEffect(() => {
     if (!callAvailable) {
       requestNumber.current++;
       stopMedia();
+      updateAutomatic(false);
       setReply(null);
       setQuestion("");
       setStatus(incident ? "ended" : "idle");
     } else {
       setStatus((previous) => (previous === "ended" ? "idle" : previous));
     }
-  }, [callAvailable, incident?.id, stopMedia]);
+  }, [callAvailable, incident?.id, stopMedia, updateAutomatic]);
   useEffect(() => {
     const hidden = () => {
       if (document.hidden) {
+        requestNumber.current++;
         stopMedia();
+        updateAutomatic(false);
         setStatus((previous) =>
-          previous === "loading" || previous === "ended" ? previous : "ready",
+          previous === "loading"
+            ? "idle"
+            : previous === "ended" || previous === "idle"
+              ? previous
+              : "ready",
         );
       }
     };
     document.addEventListener("visibilitychange", hidden);
     return () => document.removeEventListener("visibilitychange", hidden);
-  }, [stopMedia]);
+  }, [stopMedia, updateAutomatic]);
 
   const play = useCallback(
     async (response: AgentReply) => {
       stopMedia();
+      const generation = mediaGeneration.current;
       setAudioNotice("");
+      setDeviceVoice(false);
       const finalStatus = response.done ? "ended" : "ready";
-      if (!response.audio?.url || preview || document.hidden) {
+      const valid = () =>
+        alive.current &&
+        generation === mediaGeneration.current &&
+        !document.hidden;
+      const finish = () => {
+        if (!valid()) return;
+        setStatus(finalStatus);
+        if (response.done) updateAutomatic(false);
+        else scheduleListening(generation);
+      };
+      if (preview || document.hidden) {
         setStatus(finalStatus);
         setAudioNotice(
           preview
             ? "Preview transcript. No generated audio is attached."
-            : document.hidden && response.audio?.url
-              ? "Tap Play response when you return to this screen."
-              : "Audio is unavailable. You can read the transcript and keep typing.",
+            : "Call paused. Tap Play response when you return to this screen.",
         );
+        return;
+      }
+      const fallback = () => {
+        if (!valid()) return;
+        if (audio.current) {
+          audio.current.onended = audio.current.onerror = null;
+          audio.current.pause();
+          audio.current = null;
+        }
+        if (
+          !response.say ||
+          !window.speechSynthesis ||
+          !window.SpeechSynthesisUtterance
+        ) {
+          updateAutomatic(false);
+          setStatus(finalStatus);
+          setAudioNotice(
+            "Audio is unavailable. Read the transcript, then tap Speak or type a question.",
+          );
+          return;
+        }
+        setDeviceVoice(true);
+        setAudioNotice(
+          "Device voice · Browser speech, not your family’s cloned voice.",
+        );
+        const speech = new SpeechSynthesisUtterance(response.say);
+        utterance.current = speech;
+        speech.lang = "en-US";
+        speech.rate = 0.95;
+        speech.onend = () => {
+          if (!valid() || utterance.current !== speech) return;
+          utterance.current = null;
+          finish();
+        };
+        const failed = () => {
+          if (!valid() || utterance.current !== speech) return;
+          utterance.current = null;
+          updateAutomatic(false);
+          setStatus(finalStatus);
+          setAudioNotice(
+            "Device voice could not play. Tap Play response to retry, or type a question.",
+          );
+        };
+        speech.onerror = failed;
+        try {
+          setStatus("speaking");
+          window.speechSynthesis.speak(speech);
+        } catch {
+          failed();
+        }
+      };
+      if (!response.audio?.url) {
+        fallback();
         return;
       }
       const element = new Audio(response.audio.url);
       audio.current = element;
       element.onended = () => {
-        if (alive.current && audio.current === element) setStatus(finalStatus);
+        if (valid() && audio.current === element) {
+          audio.current = null;
+          finish();
+        }
       };
       element.onerror = () => {
-        if (alive.current && audio.current === element) {
-          setStatus(finalStatus);
-          setAudioNotice(
-            "Audio could not play. Read the transcript or tap Play response to retry.",
-          );
-        }
+        if (valid() && audio.current === element) fallback();
       };
       try {
         setStatus("speaking");
         await element.play();
       } catch {
-        if (alive.current && audio.current === element) {
-          setStatus(finalStatus);
-          setAudioNotice("Tap Play response to enable audio on this phone.");
-        }
+        if (valid() && audio.current === element) fallback();
       }
     },
-    [preview, stopMedia],
+    [preview, stopMedia, updateAutomatic, scheduleListening],
   );
 
   const open = useCallback(
     async (alreadyAnswered: boolean) => {
       if (!incident || !canShowEmergency(incident)) return;
       const run = ++requestNumber.current;
+      updateAutomatic(!preview);
       setStatus("loading");
       setError("");
       try {
@@ -199,6 +317,7 @@ export function CallPage() {
       } catch (cause) {
         if (!alive.current || run !== requestNumber.current) return;
         setStatus("idle");
+        updateAutomatic(false);
         setError(
           cause instanceof ApiError && cause.status === 404
             ? "This call is no longer available. Return to the current alert."
@@ -218,6 +337,8 @@ export function CallPage() {
       mutate,
       refresh,
       play,
+      updateAutomatic,
+      preview,
     ],
   );
   useEffect(() => {
@@ -242,12 +363,13 @@ export function CallPage() {
       incident &&
       callAvailable &&
       answered === incident.id &&
+      answeredMember.current === memberId &&
       openingFor.current !== incident.id
     ) {
       openingFor.current = incident.id;
       void open(true);
     }
-  }, [incident?.id, location.state, open, callAvailable]);
+  }, [incident?.id, location.state, open, callAvailable, memberId]);
 
   const sendTurn = async (text: string) => {
     if (
@@ -255,7 +377,8 @@ export function CallPage() {
       !canShowEmergency(incident) ||
       !text.trim() ||
       isBusy ||
-      status === "ended"
+      status === "ended" ||
+      reply?.done
     )
       return;
     stopMedia();
@@ -275,6 +398,7 @@ export function CallPage() {
       await play(response);
     } catch (cause) {
       if (!alive.current || run !== requestNumber.current) return;
+      updateAutomatic(false);
       setStatus("ready");
       setQuestion(text);
       setError(
@@ -284,27 +408,32 @@ export function CallPage() {
       );
     }
   };
-  const speak = () => {
-    if (!callAvailable) return;
-    if (status === "listening") {
-      stopMedia();
-      setStatus("ready");
+  const startListening = () => {
+    if (
+      !callAvailable ||
+      !alive.current ||
+      document.hidden ||
+      reply?.done ||
+      status === "ended" ||
+      status === "loading"
+    )
       return;
-    }
-    const Constructor = speechRecognition();
-    if (!Constructor) {
-      setError(
-        "Voice input is not available in this browser. Type your question below.",
-      );
-      return;
-    }
     if (preview) {
       setError(
         "Voice input is available in the connected app. Type a question in this preview.",
       );
       return;
     }
+    const Constructor = speechRecognition();
+    if (!Constructor) {
+      updateAutomatic(false);
+      setError(
+        "Voice input is not available in this browser. Type your question below.",
+      );
+      return;
+    }
     stopMedia();
+    const generation = mediaGeneration.current;
     setError("");
     const recognizer = new Constructor();
     recognition.current = recognizer;
@@ -312,32 +441,70 @@ export function CallPage() {
     recognizer.continuous = false;
     recognizer.interimResults = false;
     recognizer.onresult = (event) => {
-      if (!alive.current || recognition.current !== recognizer) return;
-      void sendTurn(event.results[0]?.[0]?.transcript || "");
+      if (
+        !alive.current ||
+        recognition.current !== recognizer ||
+        generation !== mediaGeneration.current
+      )
+        return;
+      const text = event.results[0]?.[0]?.transcript?.trim();
+      if (text) sendRecognized.current(text);
     };
     recognizer.onend = () => {
-      if (alive.current && recognition.current === recognizer)
-        setStatus((previous) =>
-          previous === "listening" ? "ready" : previous,
-        );
+      if (
+        !alive.current ||
+        recognition.current !== recognizer ||
+        generation !== mediaGeneration.current
+      )
+        return;
+      recognition.current = null;
+      setStatus((previous) => (previous === "listening" ? "ready" : previous));
+      scheduleListening(generation);
     };
     recognizer.onerror = (event) => {
-      if (alive.current && recognition.current === recognizer) {
-        setError(
-          event.error === "not-allowed"
-            ? "Microphone permission is blocked. Type your question instead."
-            : "Could not hear a full question. Try again or type it.",
-        );
-        setStatus("ready");
-      }
+      if (
+        !alive.current ||
+        recognition.current !== recognizer ||
+        generation !== mediaGeneration.current
+      )
+        return;
+      if (event.error === "no-speech") return; // onend restarts the current automatic conversation.
+      pauseAutomatic();
+      setError(
+        ["not-allowed", "service-not-allowed"].includes(event.error)
+          ? "Microphone permission is blocked. Allow it in browser settings, then resume listening, or type your question."
+          : "Voice input stopped. Resume listening to try again, or type your question.",
+      );
+      setStatus("ready");
     };
     try {
       setStatus("listening");
       recognizer.start();
     } catch {
+      pauseAutomatic();
       setStatus("ready");
       setError("Could not start voice input. Type your question instead.");
     }
+  };
+  useEffect(() => {
+    listenNext.current = startListening;
+    sendRecognized.current = (text) => {
+      void sendTurn(text);
+    };
+  });
+  const speak = () => {
+    if (status === "listening") pauseAutomatic();
+    else startListening();
+  };
+  const toggleAutomatic = () => {
+    if (automatic.current) {
+      pauseAutomatic();
+      return;
+    }
+    if (preview || !callAvailable || status === "ended" || reply?.done) return;
+    updateAutomatic(true);
+    setError("");
+    if (status === "ready") startListening();
   };
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -398,13 +565,21 @@ export function CallPage() {
               : `Connect to hear when ${state.household.person_name} left, what they were wearing, and where to start looking.`}
           </p>
         )}
-        {reply?.audio?.url && !preview && callAvailable && (
-          <Button variant="quiet" onClick={() => void play(reply)}>
+        {reply?.say && !preview && callAvailable && (
+          <Button
+            variant="quiet"
+            disabled={isBusy}
+            onClick={() => void play(reply)}
+          >
             Play response
           </Button>
         )}
         {audioNotice && <p className="caption">{audioNotice}</p>}
-        <p className="caption">Voice · Cartesia / Dialogue · Nightfall agent</p>
+        <p className="caption">
+          Voice ·{" "}
+          {deviceVoice ? "Browser device voice" : "Cartesia when available"} /
+          Dialogue · Nightfall agent
+        </p>
       </Card>
       {incident.acked_by && !noLongerActive && (
         <Notice tone="success">
@@ -436,12 +611,31 @@ export function CallPage() {
                     ? "Call ended"
                     : "Ready for your question"}
           </Badge>
-          {status !== "ended" && (
+          {!preview && status !== "ended" && !reply?.done && (
+            <div className="stack gap-sm">
+              <Button
+                variant="quiet"
+                onClick={toggleAutomatic}
+                aria-pressed={autoListening}
+              >
+                {autoListening
+                  ? "Pause automatic listening"
+                  : "Resume automatic listening"}
+              </Button>
+              <p className="caption">
+                {autoListening
+                  ? "After Nightfall speaks, your microphone listens for the next question."
+                  : "Automatic listening is paused. Speak once or type below."}
+              </p>
+            </div>
+          )}
+          {status !== "ended" && !reply?.done && (
             <form onSubmit={submit} className="stack gap-sm">
               <Field
                 label="Ask Nightfall"
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
+                onFocus={pauseAutomatic}
                 placeholder="Where should I look?"
                 maxLength={600}
                 disabled={isBusy}
@@ -482,6 +676,7 @@ export function CallPage() {
         <Button
           variant="quiet"
           onClick={() => {
+            updateAutomatic(false);
             stopMedia();
             navigate(incident.acked_by ? "/incident/respond" : "/incident");
           }}

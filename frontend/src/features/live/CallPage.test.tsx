@@ -50,7 +50,11 @@ beforeEach(() => {
   });
   mutate.mockResolvedValue({ ok: true });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 function changeState(view: ReturnType<typeof render>, next: NightfallState) {
   const context = mockUse.mock.results.at(-1)?.value as NightfallContextValue;
   mockUse.mockReturnValue({ ...context, state: next });
@@ -286,5 +290,298 @@ describe("Nightfall call controls", () => {
       screen.getByRole("button", { name: "Connect to Nightfall" }),
     ).toBeEnabled();
     expect(get).toHaveBeenCalledTimes(1);
+  });
+});
+
+class TestAudio {
+  static all: TestAudio[] = [];
+  static fail = false;
+  pause = vi.fn();
+  play = vi.fn(() =>
+    TestAudio.fail
+      ? Promise.reject(new Error("Playback failed"))
+      : Promise.resolve(),
+  );
+  onended: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  constructor(public url: string) {
+    TestAudio.all.push(this);
+  }
+}
+class TestRecognition {
+  static all: TestRecognition[] = [];
+  start = vi.fn();
+  abort = vi.fn();
+  onresult:
+    | ((event: { results: Array<Array<{ transcript: string }>> }) => void)
+    | null = null;
+  onend: (() => void) | null = null;
+  onerror: ((event: { error: string }) => void) | null = null;
+  constructor() {
+    TestRecognition.all.push(this);
+  }
+}
+class TestUtterance {
+  static all: TestUtterance[] = [];
+  onend: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  constructor(public text: string) {
+    TestUtterance.all.push(this);
+  }
+}
+function mediaHarness({
+  preview = false,
+  withAudio = true,
+  failedAudio = false,
+} = {}) {
+  vi.useFakeTimers();
+  TestAudio.all = [];
+  TestAudio.fail = failedAudio;
+  TestRecognition.all = [];
+  TestUtterance.all = [];
+  const synthesis = { speak: vi.fn(), cancel: vi.fn() };
+  vi.stubGlobal("Audio", TestAudio);
+  vi.stubGlobal("SpeechRecognition", TestRecognition);
+  vi.stubGlobal("SpeechSynthesisUtterance", TestUtterance);
+  vi.stubGlobal("speechSynthesis", synthesis);
+  mockUse.mockReturnValue({ ...mockUse.getMockImplementation()?.(), preview });
+  get.mockResolvedValue({
+    say: "Current call briefing",
+    audio: withAudio ? { url: "/opening.wav" } : {},
+    done: false,
+  });
+  return synthesis;
+}
+async function connectMedia() {
+  const view = renderCall();
+  await act(async () => {
+    fireEvent.click(
+      screen.getByRole("button", { name: "Connect to Nightfall" }),
+    );
+  });
+  return view;
+}
+async function finishAndListen(output: TestUtterance) {
+  act(() => output.onend?.());
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(350);
+  });
+}
+// Audio elements use onended; browser speech uses onend.
+async function finishAudioAndListen(output: TestAudio) {
+  act(() => output.onended?.());
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(350);
+  });
+}
+
+describe("automatic call conversation", () => {
+  it("waits for playback, sends recognized turns, continues after ack, and stops on done", async () => {
+    mediaHarness();
+    await connectMedia();
+    expect(TestRecognition.all).toHaveLength(0);
+    await finishAudioAndListen(TestAudio.all[0]);
+    expect(TestRecognition.all[0].start).toHaveBeenCalledTimes(1);
+    mutate.mockResolvedValueOnce({
+      say: "Other calls stopped. What else?",
+      ack: true,
+      done: false,
+      audio: { url: "/reply.wav" },
+    });
+    await act(async () =>
+      TestRecognition.all[0].onresult?.({
+        results: [[{ transcript: "I'm on my way" }]],
+      }),
+    );
+    expect(mutate).toHaveBeenLastCalledWith("/agent/turn", {
+      incident_id: "INC-1",
+      member_id: "TM-SARAH",
+      text: "I'm on my way",
+    });
+    expect(TestRecognition.all[0].abort).toHaveBeenCalledTimes(1);
+    await finishAudioAndListen(TestAudio.all[1]);
+    expect(TestRecognition.all).toHaveLength(2);
+    mutate.mockResolvedValueOnce({
+      say: "All set. Goodbye.",
+      ack: true,
+      done: true,
+      audio: { url: "/done.wav" },
+    });
+    await act(async () =>
+      TestRecognition.all[1].onresult?.({
+        results: [[{ transcript: "I've got him" }]],
+      }),
+    );
+    expect(screen.queryByLabelText("Ask Nightfall")).not.toBeInTheDocument();
+    await finishAudioAndListen(TestAudio.all[2]);
+    expect(TestRecognition.all).toHaveLength(2);
+    expect(screen.queryByLabelText("Ask Nightfall")).not.toBeInTheDocument();
+  });
+  it("pauses automatic listening and ignores an old end callback, while allowing explicit resume", async () => {
+    mediaHarness();
+    await connectMedia();
+    await finishAudioAndListen(TestAudio.all[0]);
+    const ended = TestRecognition.all[0].onend;
+    fireEvent.click(
+      screen.getByRole("button", { name: "Pause automatic listening" }),
+    );
+    expect(TestRecognition.all[0].abort).toHaveBeenCalledTimes(1);
+    act(() => ended?.());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(TestRecognition.all).toHaveLength(1);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Resume automatic listening" }),
+    );
+    expect(TestRecognition.all).toHaveLength(2);
+    fireEvent.focus(screen.getByLabelText("Ask Nightfall"));
+    expect(TestRecognition.all[1].abort).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole("button", { name: "Resume automatic listening" }),
+    ).toBeVisible();
+    expect(screen.getByLabelText("Ask Nightfall")).toBeEnabled();
+  });
+  it("restarts an ended recognition session without speech but pauses on permission rejection", async () => {
+    mediaHarness();
+    await connectMedia();
+    await finishAudioAndListen(TestAudio.all[0]);
+    act(() => TestRecognition.all[0].onend?.());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(350);
+    });
+    expect(TestRecognition.all).toHaveLength(2);
+    act(() => TestRecognition.all[1].onerror?.({ error: "not-allowed" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(TestRecognition.all).toHaveLength(2);
+    expect(screen.getByText(/Microphone permission is blocked/)).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Resume automatic listening" }),
+    );
+    expect(TestRecognition.all).toHaveLength(3);
+    expect(
+      screen.queryByText(/Microphone permission is blocked/),
+    ).not.toBeInTheDocument();
+  });
+  it.each([false, true])(
+    "uses a labeled browser voice when provider audio is unavailable (failed=%s)",
+    async (failedAudio) => {
+      const synthesis = mediaHarness({ withAudio: failedAudio, failedAudio });
+      await connectMedia();
+      expect(synthesis.speak).toHaveBeenCalledTimes(1);
+      expect(
+        screen.getByText(
+          "Device voice · Browser speech, not your family’s cloned voice.",
+        ),
+      ).toBeVisible();
+      expect(TestRecognition.all).toHaveLength(0);
+      await finishAndListen(TestUtterance.all[0]);
+      expect(TestRecognition.all).toHaveLength(1);
+    },
+  );
+  it("keeps preview isolated even when browser voice and microphone APIs exist", async () => {
+    const synthesis = mediaHarness({ preview: true });
+    await connectMedia();
+    fireEvent.click(screen.getByRole("button", { name: "Speak" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(TestAudio.all).toHaveLength(0);
+    expect(TestRecognition.all).toHaveLength(0);
+    expect(TestUtterance.all).toHaveLength(0);
+    expect(synthesis.speak).not.toHaveBeenCalled();
+  });
+  it("cancels browser speech on reset and ignores its saved end callback", async () => {
+    const synthesis = mediaHarness({ withAudio: false });
+    const view = await connectMedia();
+    const ended = TestUtterance.all[0].onend;
+    changeState(view, { ...state, incident: null });
+    expect(synthesis.cancel).toHaveBeenCalledTimes(1);
+    act(() => ended?.());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(TestRecognition.all).toHaveLength(0);
+  });
+  it("pauses on hide and does not restart listening from a pending old audio callback", async () => {
+    mediaHarness();
+    await connectMedia();
+    const ended = TestAudio.all[0].onended;
+    const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
+    fireEvent(document, new Event("visibilitychange"));
+    expect(TestAudio.all[0].pause).toHaveBeenCalledTimes(1);
+    hidden.mockReturnValue(false);
+    fireEvent(document, new Event("visibilitychange"));
+    act(() => ended?.());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(TestRecognition.all).toHaveLength(0);
+    expect(
+      screen.getByRole("button", { name: "Resume automatic listening" }),
+    ).toBeVisible();
+  });
+  it("clears pending automatic listening when unmounted", async () => {
+    mediaHarness();
+    const view = await connectMedia();
+    act(() => TestAudio.all[0].onended?.());
+    view.unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(TestRecognition.all).toHaveLength(0);
+  });
+  it("does not re-answer or restart the old call when the selected member changes", async () => {
+    mediaHarness();
+    const view = render(
+      <MemoryRouter
+        initialEntries={[
+          { pathname: "/incident/call", state: { answered: "INC-1" } },
+        ]}
+      >
+        <CallPage />
+      </MemoryRouter>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(get).toHaveBeenCalledTimes(1);
+    const ended = TestAudio.all[0].onended;
+    const context = mockUse.mock.results.at(-1)?.value as NightfallContextValue;
+    mockUse.mockReturnValue({ ...context, memberId: "TM-MIKE" });
+    view.rerender(
+      <MemoryRouter
+        initialEntries={[
+          { pathname: "/incident/call", state: { answered: "INC-1" } },
+        ]}
+      >
+        <CallPage />
+      </MemoryRouter>,
+    );
+    act(() => ended?.());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(TestRecognition.all).toHaveLength(0);
+    expect(
+      screen.getByRole("button", { name: "Connect to Nightfall" }),
+    ).toBeEnabled();
+  });
+  it("does not open the microphone if browser speech also fails", async () => {
+    mediaHarness({ withAudio: false });
+    await connectMedia();
+    act(() => TestUtterance.all[0].onerror?.());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(screen.getByText(/Device voice could not play/)).toBeVisible();
+    expect(TestRecognition.all).toHaveLength(0);
+    expect(
+      screen.getByRole("button", { name: "Resume automatic listening" }),
+    ).toBeVisible();
+    expect(screen.getByLabelText("Ask Nightfall")).toBeEnabled();
   });
 });

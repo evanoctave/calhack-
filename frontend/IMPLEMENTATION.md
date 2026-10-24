@@ -68,7 +68,7 @@ Paths below describe the inspected backend plus local contract corrections. Prev
 | Nearby result/status            | `GET /setup/status`                                             | `hazards_ranked`, `call_first`, `familiar`, home coordinates, source, and Apify status. Poll while running.                                      |
 | Existing face registrations     | `GET /enroll`                                                   | Read registered names and labels. A person is marked registered only when the monitored name matches.                                            |
 | Device request                  | `POST /door/command`                                            | `{cmd, member_id, ...}`. `door_edge` adds `edge`; `enroll` adds `label` and `name`. A successful POST means queued, not completed on the device. |
-| Voice upload                    | `POST /voice/samples/<kind>`                                    | Multipart `clip`. Browser recording is reviewed locally before this request.                                                                     |
+| Voice upload                    | `POST /voice/samples/<kind>`                                    | Multipart `clip`. Stop & save uploads the take, then keeps review open; a failed upload retains the take for retry.                              |
 | Voice playback/delete           | `GET /voice/samples/<kind>.wav`, `DELETE /voice/samples/<kind>` | Replay the saved sample or remove it.                                                                                                            |
 | Family voice creation           | `POST /voice/clone`                                             | `{name}` → `{voice_id, source, seconds, ok}`. The backend selects the new voice as part of cloning.                                              |
 | Generated preview               | `POST /voice/preview`                                           | `{situation}` → `{text, line_source, audio}`. Play only a returned audio URL; missing audio remains an honest text-only preview.                 |
@@ -87,7 +87,7 @@ Paths below describe the inspected backend plus local contract corrections. Prev
 | Brief                           | `GET /brief/<token>`                                            | Signed viewer-specific brief data. 404 and 410 render separate invalid/expired states.                                                           |
 | Draft-only unsupported settings | `POST /preview/profile`                                         | Preview interceptor only. Supports local photo, medications, familiar places, and tree changes; it is never sent to a real backend.              |
 
-The UI commits a changed profile address before starting the final `/setup/address` search, then polls that search's status. `/setup/address` saves the address, resolved coordinates, and radius before publishing the new state or launching Apify. A failed save leaves the previous household, places, and search status intact. A combined `/profile` update defers geocoded household persistence until all profile fields can be committed together.
+The nearby setup submits a single `/setup/address` request, then polls that search's status. The endpoint saves the address, resolved coordinates, and radius before publishing the new state or launching Apify. A failed save leaves the previous household, places, and search status intact. A combined `/profile` update defers geocoded household persistence until all profile fields can be committed together.
 
 ## State, media, and preview behavior
 
@@ -101,13 +101,19 @@ Counts and timers derive from server timestamps and settings. The browser does n
 
 Call audio, recognition, pending responses, and transcript state are invalidated when the incident disappears, its ID changes, or the selected family member changes. Late responses from the previous call cannot play over a new incident. `ack: true` with `done: false` still keeps the agent conversation available.
 
+After the user starts or answers a call, successful response playback starts browser speech recognition automatically. Each recognized question uses the existing agent-turn endpoint, then playback and listening repeat. Pause/resume and typed input remain available; typing pauses automatic listening. Missing or failed provider audio falls back to browser SpeechSynthesis with an explicit **Device voice** label, never a cloned-family-voice claim. Unsupported or denied recognition keeps typed input available. Hidden pages, ended calls, and identity changes stop the conversation media. Preview never starts recognition or device speech.
+
+Home and Door both expose independent Talk and Listen controls. They can run together using separate PCM sockets and AudioContexts; stopping or losing one does not tear down the other. Sending an AI phrase or changing takeover stops Talk but preserves Listen. Navigation, member/preview changes, and hiding the page release both channels. The backend binds Talk ownership to the current socket: a replacement closes the old sender, and late old frames/cleanup cannot interfere with the new session. The separate recorded-message control also discards late microphone permissions after an identity change.
+
 The preview is entered explicitly with `?preview=1` before the hash. Its API adapter updates an in-memory session and never sends action requests to the connected backend. Scenario controls cover watching, approach, waiting, leaving, return, response by you/another person, visitor, help, and the emergency recommendation. Changing a scenario retains the preview household and voice choices. Refreshing the browser resets preview-only edits.
 
 Preview voice capture, if the user grants microphone permission, is local to the browser. Saving is intercepted; cloning and generation do not contact Cartesia or Claude. Generated audio is not invented. The library fixture deliberately has no audio files. Recorded sample blobs are held within the mounted voice flow, and reloading an unsaved review correctly asks the user to record again. Do not key/remount `VoicePage` when only its route parameter changes.
 
-Microphone access requires a user action and voice consent. Recordings stop after 60 seconds, reject empty/oversized samples, and are uploaded only after review. Late permission grants after leaving the screen are stopped. Audio playback, microphone tracks, recorders, object URLs, and live sockets are cleaned up when their owning flow ends. Media errors leave the user with a retry or transcript rather than a fake success.
+Family voice recording requires a user action and voice consent. Recordings stop after 60 seconds and reject empty/oversized samples. Stop & save uploads automatically while opening the waveform review; uploading, saved, and failed states are explicit. Failed uploads keep the local take for retry. Saved takes can be played, replaced, or deleted. Late permission grants after leaving the screen are stopped. Audio playback, microphone tracks, recorders, object URLs, and live sockets are cleaned up when their owning flow ends. Media errors leave the user with a retry or transcript rather than a fake success.
 
 Voice preview selects an available recorded sample, including reassurance or everyday speech when no introduction sample exists. Generated speech uses the currently selected backend voice and an actual returned audio URL. Reference-sample playback, generated speech, and prerecorded Natural/Warm library clips are presented as different sources.
+
+Ready-made voice selection preserves the server's current voice and style. When that voice is absent from the library, choosing a replacement is explicit. Speed 0.95 and calm emotion are defaults only when the server has no style. Natural/Warm previews retain their prerecorded sound; editable speed/emotion are sent when selecting the voice, not applied to those preview files.
 
 The family browser must stay open for its current web ringing behavior. The sound button unlocks browser audio; it does not request or implement native iPhone lock-screen push. Existing Twilio call/SMS behavior remains on the backend. The app never automatically dials 911; any available phone action remains an explicit user choice. Preview mode does not place calls.
 
@@ -120,6 +126,7 @@ The family browser must stay open for its current web ringing behavior. The soun
 - The door's recognized reply uses `/event`'s required `payload.text` shape.
 - Subtitle and enrollment telemetry reach phone streams; the latest current-incident subtitle survives an SSE reconnect through `door_speech` in the snapshot.
 - Ring snapshots include `incident_id`; Help cause persists through the brief/history path, and recorded history is included in briefs.
+- Live Talk ownership follows the active socket, preventing a reconnect or superseded family sender from clearing or mixing with the current door audio.
 
 These are local patches on the stated baseline, not a deployment or remote merge confirmation.
 
@@ -150,7 +157,7 @@ npm test
 npm run build
 ```
 
-Focused tests cover preview isolation, response/return distinctions, Help versus exit wording, stale emergency suppression, server-reset/new-incident call cleanup, source-state utilities, microphone cleanup including delayed permission, local voice review before upload, available-sample selection, empty review recovery, family joining, address/search ordering, and live-media lifecycle handling. Backend tests exercise Help semantics, call/brief facts, history filtering, and the existing door flow in isolation. No automated test should place a real family or emergency call.
+Focused tests cover preview isolation, response/return distinctions, Help versus exit wording, stale emergency suppression, continuous call listening and device-voice fallback, server-reset/new-incident call cleanup, microphone cleanup including delayed permission, stop-and-save/retry, preset selection payloads, available-sample selection, empty review recovery, family joining, address/search ordering, simultaneous Talk/Listen with PCM playback, and stale media callbacks. Backend tests exercise Help semantics, call/brief facts, history filtering, the existing door flow, and Talk socket ownership in isolation. No automated test should place a real family or emergency call.
 
 Browser acceptance should inspect 390px first, then 360–430px widths: no horizontal overflow, readable card titles, usable inline actions, modal scrolling, and fixed actions remaining reachable. Walk through setup and both main incident outcomes. Verify two member sessions, state recovery after reconnect, brief invalid/expired routes, voice-service errors, and media permission denial.
 

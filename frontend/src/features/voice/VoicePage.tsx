@@ -76,6 +76,11 @@ export function VoicePage() {
   const [recording, setRecording] = useState<Recording | null>(null);
   const [consent, setConsent] = useState(false);
   const [recordingNow, setRecordingNow] = useState(false);
+  const [preparingSample, setPreparingSample] = useState(false);
+  const [saveState, setSaveState] = useState<
+    "idle" | "uploading" | "saved" | "failed"
+  >("idle");
+  const [uploadError, setUploadError] = useState("");
   const [seconds, setSeconds] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -94,19 +99,29 @@ export function VoicePage() {
   const audio = useRef<HTMLAudioElement | null>(null);
   const started = useRef(0);
   const live = useRef(true);
+  const uploading = useRef(false);
+  const consentRef = useRef(consent);
+  consentRef.current = consent;
   const capTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const owner = state?.household.caregiver_name || "Sarah";
   const dad = state?.household.person_name || "Dad";
   const voice = state?.voice;
   const line = (k: SampleKind) =>
     samples[k].line.replace("Sarah", owner).replaceAll("Dad", dad);
-  const count = voice ? kinds.filter((k) => voice.samples[k]).length : 0;
+  const count = kinds.filter(
+    (k) =>
+      voice?.samples[k] || (recording?.kind === k && saveState === "saved"),
+  ).length;
   const availableSamples = kinds.filter(
     (k) => voice?.samples[k] || recording?.kind === k,
   );
   const referenceKind = availableSamples.includes(selectedKind as SampleKind)
     ? (selectedKind as SampleKind)
     : recording?.kind || availableSamples[0];
+  const reviewKind = recording?.kind || kind;
+  const reviewSaved = recording
+    ? saveState === "saved"
+    : Boolean(voice?.samples[kind]);
   function releaseMic() {
     if (capTimer.current) clearTimeout(capTimer.current);
     capTimer.current = null;
@@ -183,11 +198,17 @@ export function VoicePage() {
         if (event.data.size) chunks.push(event.data);
       };
       current.onerror = () => {
+        current.onstop = null;
+        if (current.state !== "inactive") current.stop();
+        recorder.current = null;
         releaseMic();
         setRecordingNow(false);
+        setBusy(false);
         setError("Recording stopped unexpectedly. Please record again.");
       };
       current.onstop = async () => {
+        setBusy(true);
+        setPreparingSample(true);
         const duration = (Date.now() - started.current) / 1000;
         releaseMic();
         setRecordingNow(false);
@@ -197,29 +218,42 @@ export function VoicePage() {
         });
         if (!live.current || stepRef.current !== "record") return;
         if (blob.size < 1000 || duration < 0.8) {
+          setBusy(false);
+          setPreparingSample(false);
           setError(
             "Nothing clear was recorded. Read the sentence for a few seconds, then stop.",
           );
           return;
         }
         if (blob.size > 8 * 1024 * 1024) {
+          setBusy(false);
+          setPreparingSample(false);
           setError(
             "That sample is too large. Please keep the recording under 60 seconds.",
           );
           return;
         }
         const levels = await waveform(blob);
-        if (!live.current || stepRef.current !== "record") return;
+        if (!live.current || stepRef.current !== "record") {
+          if (live.current) {
+            setBusy(false);
+            setPreparingSample(false);
+          }
+          return;
+        }
         if (pendingUrl.current) URL.revokeObjectURL(pendingUrl.current);
         pendingUrl.current = URL.createObjectURL(blob);
-        setRecording({
+        const take = {
           blob,
           url: pendingUrl.current,
           seconds: duration,
           kind: selected,
           levels,
-        });
+        };
+        setRecording(take);
+        setPreparingSample(false);
         navigate(`/voice/review?kind=${selected}`);
+        void saveSample(take);
       };
       started.current = Date.now();
       setSeconds(0);
@@ -267,25 +301,47 @@ export function VoicePage() {
       setError("Tap Play again to allow sound in this browser.");
     }
   }
-  async function saveSample() {
-    if (!recording) return;
+  async function saveSample(take = recording) {
+    if (!take || uploading.current) return;
+    if (!consentRef.current) {
+      setSaveState("failed");
+      setUploadError(
+        "Allow Nightfall to use your voice before saving this sample.",
+      );
+      setBusy(false);
+      return;
+    }
+    uploading.current = true;
+    setSaveState("uploading");
+    setUploadError("");
     setBusy(true);
     setError("");
     try {
       const data = new FormData();
       data.append(
         "clip",
-        recording.blob,
-        recording.blob.type.includes("mp4") ? "sample.mp4" : "sample.webm",
+        take.blob,
+        take.blob.type.includes("mp4") ? "sample.mp4" : "sample.webm",
       );
-      await api.upload(`/voice/samples/${recording.kind}`, data);
-      await refresh();
-      if (live.current && stepRef.current === "review")
-        navigate("/voice/create");
+      await api.upload(`/voice/samples/${take.kind}`, data);
+      if (!live.current) return;
+      setSaveState("saved");
+      try {
+        await refresh();
+      } catch {
+        if (live.current)
+          setNote(
+            "The sample was saved. The sample list could not refresh yet.",
+          );
+      }
     } catch (e) {
-      setError(fail(e));
+      if (live.current) {
+        setSaveState("failed");
+        setUploadError(fail(e));
+      }
     } finally {
-      setBusy(false);
+      uploading.current = false;
+      if (live.current) setBusy(false);
     }
   }
   async function cloneVoice() {
@@ -332,9 +388,19 @@ export function VoicePage() {
   }
   async function removeSample(k: SampleKind) {
     setBusy(true);
+    setError("");
     try {
       await api.delete(`/voice/samples/${k}`);
+      if (recording?.kind === k) {
+        stopPlayback();
+        if (pendingUrl.current) URL.revokeObjectURL(pendingUrl.current);
+        pendingUrl.current = null;
+        setRecording(null);
+        setSaveState("idle");
+        setUploadError("");
+      }
       await refresh();
+      if (stepRef.current === "review") navigate("/voice/samples");
     } catch (e) {
       setError(fail(e));
     } finally {
@@ -352,6 +418,7 @@ export function VoicePage() {
       <input
         type="checkbox"
         checked={consent}
+        disabled={recordingNow || saveState === "uploading"}
         onChange={(e) => setConsent(e.target.checked)}
       />
       <span>
@@ -387,7 +454,9 @@ export function VoicePage() {
         {permission}
         <p className="caption muted">
           {recordingNow
-            ? "Microphone is on. Tap Stop when you finish."
+            ? preview
+              ? "Microphone is on. Stopping saves this take to the preview only."
+              : "Microphone is on. Tap Stop & save to upload this sample."
             : preview
               ? "Preview mode: recordings stay local to this browser session."
               : "Your microphone turns on only when you tap Record."}
@@ -401,17 +470,19 @@ export function VoicePage() {
         {notices}
         <div className="actions">
           <Button
-            disabled={busy || !consent}
+            disabled={busy || (!recordingNow && !consent)}
             variant={recordingNow ? "danger" : "primary"}
             onClick={
               recordingNow ? finishRecording : () => void startRecording()
             }
           >
-            {busy
-              ? "Opening microphone…"
-              : recordingNow
-                ? "Stop & review"
-                : "Record voice sample"}
+            {preparingSample
+              ? "Preparing sample…"
+              : busy
+                ? "Opening microphone…"
+                : recordingNow
+                  ? "Stop & save"
+                  : "Record voice sample"}
           </Button>
         </div>
       </div>
@@ -424,38 +495,64 @@ export function VoicePage() {
           description={`Sample ${kinds.indexOf(recording?.kind || kind) + 1} · ${owner}’s voice`}
           back="/voice/samples"
         />
-        {recording ? (
+        {recording || voice?.samples[kind] ? (
           <>
             <Card>
-              <p className={styles.quote}>“{line(recording.kind)}”</p>
-              <div
-                className={styles.wave}
-                aria-label="Recorded sample waveform"
-              >
-                {recording.levels.map((level, i) => (
-                  <span
-                    key={i}
-                    style={{ height: `${Math.max(8, level * 100)}%` }}
-                  />
-                ))}
-              </div>
+              <p className={styles.quote}>“{line(reviewKind)}”</p>
+              {recording && (
+                <div
+                  className={styles.wave}
+                  aria-label="Recorded sample waveform"
+                >
+                  {recording.levels.map((level, i) => (
+                    <span
+                      key={i}
+                      style={{ height: `${Math.max(8, level * 100)}%` }}
+                    />
+                  ))}
+                </div>
+              )}
               <div className={styles.playRow}>
                 <Button
                   variant="quiet"
                   onClick={() =>
-                    playing ? stopPlayback() : void play(recording.url)
+                    playing
+                      ? stopPlayback()
+                      : void play(
+                          recording?.url ||
+                            (preview
+                              ? undefined
+                              : `/voice/samples/${kind}.wav`),
+                        )
                   }
                 >
                   {playing ? "Ⅱ Pause sample" : "▷ Play sample"}
                 </Button>
                 <span className="caption muted">
-                  {formatTime(recording.seconds)}
+                  {recording ? formatTime(recording.seconds) : "Saved sample"}
                 </span>
               </div>
             </Card>
-            <p className="caption muted">
-              Listen before saving. The sample has not been uploaded yet.
-            </p>
+            {saveState === "uploading" && (
+              <p role="status" className="caption muted">
+                {preview
+                  ? "Saving sample to this preview…"
+                  : "Uploading your sample…"}
+              </p>
+            )}
+            {reviewSaved && (
+              <Notice tone="success">
+                {preview
+                  ? "Sample saved to this preview only."
+                  : "Sample saved. Listen back or record another take."}
+              </Notice>
+            )}
+            {uploadError && (
+              <Notice tone="danger">
+                {uploadError} Your take is still here. Retry saving or record
+                again.
+              </Notice>
+            )}
             <div>
               <h2>Used as a voice reference</h2>
               <p className="caption muted">
@@ -464,28 +561,56 @@ export function VoicePage() {
               </p>
             </div>
             {notices}
+            {!consent && !reviewSaved && permission}
             <div className="actions">
               <Button
                 variant="secondary"
                 disabled={busy}
-                onClick={() => navigate(`/voice/record?kind=${recording.kind}`)}
+                onClick={() => navigate(`/voice/record?kind=${reviewKind}`)}
               >
                 Record again
               </Button>
-              <Button disabled={busy} onClick={() => void saveSample()}>
-                {busy
-                  ? "Saving sample…"
-                  : preview
-                    ? "Save sample to preview"
-                    : "Save sample"}
+              {reviewSaved ? (
+                <Button
+                  disabled={busy}
+                  onClick={() => navigate("/voice/create")}
+                >
+                  Continue to create voice
+                </Button>
+              ) : (
+                <Button
+                  disabled={busy || !consent}
+                  onClick={() => void saveSample()}
+                >
+                  {saveState === "uploading" ? "Saving sample…" : "Retry save"}
+                </Button>
+              )}
+              <Button
+                variant="quiet"
+                disabled={busy}
+                onClick={() => {
+                  if (reviewSaved) void removeSample(reviewKind);
+                  else {
+                    stopPlayback();
+                    if (pendingUrl.current)
+                      URL.revokeObjectURL(pendingUrl.current);
+                    pendingUrl.current = null;
+                    setRecording(null);
+                    setSaveState("idle");
+                    setUploadError("");
+                    navigate("/voice/samples");
+                  }
+                }}
+              >
+                {reviewSaved ? "Delete sample" : "Discard local take"}
               </Button>
             </div>
           </>
         ) : (
           <>
             <Notice>
-              This unsaved recording is no longer available. Record a new sample
-              to continue.
+              No saved sample was found, and the local recording is no longer
+              available. Record a new sample to continue.
             </Notice>
             <Button onClick={() => navigate(`/voice/record?kind=${kind}`)}>
               Record a sample
@@ -686,6 +811,7 @@ export function VoicePage() {
               <strong>{samples[k].title}</strong>
               <Button
                 variant="quiet"
+                disabled={busy}
                 onClick={() => navigate(`/voice/record?kind=${k}`)}
               >
                 {voice?.samples[k] ? "Redo" : "Record"}
@@ -737,15 +863,21 @@ export function VoicePage() {
         {voice?.voice_id && (
           <Button
             variant="secondary"
+            disabled={busy}
             onClick={() => navigate("/voice/preview")}
           >
             Preview current voice
           </Button>
         )}
-        <Button variant="secondary" onClick={() => navigate("/voice/presets")}>
+        <Button
+          variant="secondary"
+          disabled={busy}
+          onClick={() => navigate("/voice/presets")}
+        >
           Choose a ready-made voice
         </Button>
         <Button
+          disabled={busy}
           onClick={() =>
             navigate(
               count ? "/voice/create" : "/voice/record?kind=introduction",
@@ -771,33 +903,38 @@ function Presets({ onDone }: { onDone: () => void }) {
   });
   const [selected, setSelected] = useState(state?.voice.voice_id || "");
   const [variant, setVariant] = useState("warm");
-  const [speed, setSpeed] = useState(state?.voice.style[0] || 1);
-  const [emotion, setEmotion] = useState(state?.voice.style[1] || "happy");
+  const [speed, setSpeed] = useState(state?.voice.style?.[0] ?? 0.95);
+  const [emotion, setEmotion] = useState(state?.voice.style?.[1] || "calm");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [playing, setPlaying] = useState("");
   const sound = useRef<HTMLAudioElement | null>(null);
+  const active = useRef(true);
   const presets = [
     ...new Map(
       (query.data || []).map((preset) => [preset.id, preset]),
     ).values(),
   ];
-  const current = presets.find((p) => p.id === selected) || presets[0];
-  useEffect(
-    () => () => {
+  const current = presets.find((p) => p.id === selected);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
       sound.current?.pause();
-    },
-    [],
-  );
+      sound.current = null;
+    };
+  }, []);
   async function play(id: string) {
     sound.current?.pause();
+    sound.current = null;
     setError("");
     setNote("");
     if (playing === id) {
       setPlaying("");
       return;
     }
+    setPlaying("");
     const file = query.data?.find(
       (p) => p.id === id && p.variant === variant,
     )?.file;
@@ -807,29 +944,35 @@ function Presets({ onDone }: { onDone: () => void }) {
     }
     const audio = new Audio(file);
     sound.current = audio;
-    audio.onended = () => setPlaying("");
+    audio.onended = () => {
+      if (sound.current === audio) setPlaying("");
+    };
     audio.onerror = () => {
+      if (sound.current !== audio) return;
       setPlaying("");
       setError("This voice sample could not be played.");
     };
     try {
       await audio.play();
-      setPlaying(id);
+      if (sound.current === audio) setPlaying(id);
     } catch {
-      setError("Tap Play again to allow sound.");
+      if (sound.current === audio) setError("Tap Play again to allow sound.");
     }
   }
   async function use() {
-    if (!current) return;
+    if (!current || busy) return;
     setBusy(true);
     setError("");
     try {
       await mutate("/voice/select", { voice_id: current.id, speed, emotion });
+      if (!active.current) return;
+      sound.current?.pause();
+      sound.current = null;
       onDone();
     } catch (e) {
-      setError(fail(e));
+      if (active.current) setError(fail(e));
     } finally {
-      setBusy(false);
+      if (active.current) setBusy(false);
     }
   }
   return (
@@ -849,6 +992,19 @@ function Presets({ onDone }: { onDone: () => void }) {
           </Button>
         </Notice>
       )}
+      {query.isSuccess && !presets.length && (
+        <Notice>
+          No voices are available yet. Try loading the library again.
+        </Notice>
+      )}
+      {query.isSuccess &&
+        state?.voice.voice_id &&
+        !presets.some((preset) => preset.id === state.voice.voice_id) && (
+          <p className="caption muted">
+            Your current voice is not in this library. Pick a voice to replace
+            it.
+          </p>
+        )}
       <Card>
         {presets.map((preset) => (
           <div className={styles.preset} key={preset.id}>
@@ -857,14 +1013,25 @@ function Presets({ onDone }: { onDone: () => void }) {
                 type="radio"
                 name="voice"
                 checked={current?.id === preset.id}
+                disabled={busy}
                 onChange={() => setSelected(preset.id)}
               />
               <span>
                 <strong>{preset.name.replace(" (current)", "")}</strong>
-                <small className="caption muted">English</small>
+                <small className="caption muted">
+                  English
+                  {preset.id === state?.voice.voice_id
+                    ? " · Current voice"
+                    : ""}
+                </small>
               </span>
             </label>
-            <Button variant="quiet" onClick={() => void play(preset.id)}>
+            <Button
+              variant="quiet"
+              disabled={busy}
+              aria-label={`${playing === preset.id ? "Pause" : "Play"} ${preset.name.replace(" (current)", "")}`}
+              onClick={() => void play(preset.id)}
+            >
               {playing === preset.id ? "Pause" : "Play"}
             </Button>
           </div>
@@ -877,9 +1044,11 @@ function Presets({ onDone }: { onDone: () => void }) {
             <button
               key={value}
               aria-pressed={variant === value}
+              disabled={busy}
               onClick={() => {
                 setVariant(value);
                 sound.current?.pause();
+                sound.current = null;
                 setPlaying("");
               }}
             >
@@ -888,19 +1057,24 @@ function Presets({ onDone }: { onDone: () => void }) {
           ))}
         </div>
         <label className={styles.slider}>
-          Speed · {speed.toFixed(1)}×
+          Speed · {Number(speed.toFixed(2))}×
           <input
             type="range"
             min="0.6"
             max="1.5"
-            step="0.1"
+            step="0.05"
+            disabled={busy}
             value={speed}
             onChange={(e) => setSpeed(Number(e.target.value))}
           />
         </label>
         <label className={styles.select}>
           Emotion
-          <select value={emotion} onChange={(e) => setEmotion(e.target.value)}>
+          <select
+            disabled={busy}
+            value={emotion}
+            onChange={(e) => setEmotion(e.target.value)}
+          >
             <option value="neutral">Neutral</option>
             <option value="calm">Calm</option>
             <option value="content">Content</option>

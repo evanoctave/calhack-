@@ -51,9 +51,9 @@ Existing SMS links at `/brief.html#TOKEN` automatically open the React brief whe
 
 ## Implemented flow
 
-- Care setup, family voice sample recording/review, provider clone and generated preview requests, ready-made voices, contact priorities, nearby search, door registration requests, sound activation, and joining.
-- Night watch, conversation/return countdown, incoming web ringing, AI call transcript and typed/speech input, family response, return, visitor/help states, emergency choices.
-- Door video, voice takeover, prepared/custom speech, push-to-talk and listening, including permission/connection cleanup.
+- Care setup, consented family recording with automatic Stop & save, waveform review/retry/delete, provider clone and generated preview requests, ready-made voices with Natural/Warm previews and speed/emotion settings, contact priorities, nearby search, door registration requests, sound activation, and joining.
+- Night watch, conversation/return countdown, incoming web ringing, AI calls with automatic listen-after-reply, pause/resume and typed input, clearly labeled device-voice fallback, family response, return, visitor/help states, emergency choices.
+- Door video, voice takeover, prepared/custom speech, recorded messages, and simultaneous Talk/Listen from Home or Door, including permission/connection cleanup and safe reconnect ownership.
 - Mobile brief with camera evidence, clothing, map, ranked hazards, places to call, familiar places, care details, contacts, dispatcher summary, printing, and invalid/expired-link states.
 
 Missing persistence is not simulated in connected mode: photo, medications, familiar places and contact reorder remain limited until the backend adds those contracts. Unsupported controls explain the limitation; preview allows temporary edits. Address/name/voice and other existing endpoints use real server responses. Phone identity, profile names and age come from the backend and may differ from the Figma sample data.
@@ -67,7 +67,7 @@ npm run check
 npm run format
 ```
 
-`check` runs strict TypeScript, Vitest, and the production build. Before publication: 80 frontend tests and the full 154-test backend suite passed, including actual local sample conversion/concatenation using the bundled FFmpeg binary. The production build passed. A 390px connected browser check covered Help → Mike’s phone → signed brief → acknowledgement → return, and current door subtitles. Earlier implementation checks covered 14 routes at 360, 390 and 430px without horizontal overflow. Local mock backend checks covered return before escalation, family answering, acknowledgement while continuing dialogue, signed SMS-brief compatibility and recipient binding. A synthetic binary payload verified the WebSocket relay. Real device microphone/speaker/camera delivery and external provider calls still need device integration testing.
+`check` runs strict TypeScript, Vitest, and the production build. Before publication: 107 frontend tests and the full 160-test backend suite passed, including actual local sample conversion/concatenation using the bundled FFmpeg binary. The production build passed. A 390px connected browser check covered Help → Mike’s phone → signed brief → acknowledgement → return, and current door subtitles. The latest 390px browser checks used synthetic recording and mocked speech/API responses to verify Stop & save → review, preset controls, and automatic call turns with device-voice fallback and pause. Earlier implementation checks covered 14 routes at 360, 390 and 430px without horizontal overflow. Local mock backend checks covered return before escalation, family answering, acknowledgement while continuing dialogue, signed SMS-brief compatibility and recipient binding. A synthetic binary payload verified the WebSocket relay. Real device microphone/speaker/camera delivery and external provider calls still need device integration testing.
 
 - `src/features/`: setup, voice, home, incident, live door/call, brief.
 - `src/state/NightfallProvider.tsx`: shared snapshot, SSE, member session and sound.

@@ -15,6 +15,7 @@ import type { AudioRef } from "../../data/types";
 import { useNightfall } from "../../state/NightfallProvider";
 import { getMicrophone, supportedRecordingType, userMediaError } from "./media";
 import { useDoorAudio } from "./useDoorAudio";
+import { DoorAudioControls } from "./DoorAudioControls";
 import { useDoorVideo } from "./useDoorVideo";
 import styles from "./Live.module.css";
 
@@ -25,7 +26,6 @@ export function DoorPage() {
     preview,
     mutate,
     refresh,
-    enableSound,
     doorSpeech,
     visitorMessage,
   } = useNightfall();
@@ -47,9 +47,12 @@ export function DoorPage() {
     holdWanted = useRef(false),
     recordTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const startingRecording = useRef(false),
-    recordStarted = useRef(0);
+    recordStarted = useRef(0),
+    clipGeneration = useRef(0);
 
   const cancelClip = () => {
+    clipGeneration.current++;
+    startingRecording.current = false;
     holdWanted.current = false;
     clearTimeout(recordTimer.current);
     if (recorder.current) {
@@ -63,6 +66,10 @@ export function DoorPage() {
   };
   useEffect(() => {
     alive.current = true;
+    setRecording(false);
+    setBusy("");
+    setError("");
+    setMessage("");
     const hidden = () => {
       if (document.hidden) {
         cancelClip();
@@ -75,13 +82,13 @@ export function DoorPage() {
       cancelClip();
       document.removeEventListener("visibilitychange", hidden);
     };
-  }, []);
+  }, [memberId, preview]);
 
   const setTakeover = async (on: boolean) => {
     setBusy("takeover");
     setError("");
     setMessage("");
-    audio.stop();
+    audio.stop("talking");
     cancelClip();
     setRecording(false);
     try {
@@ -104,7 +111,7 @@ export function DoorPage() {
   };
   const say = async (phrase: string) => {
     if (!phrase.trim() || busy) return;
-    audio.stop();
+    audio.stop("talking");
     setBusy("say");
     setError("");
     setMessage("");
@@ -134,13 +141,12 @@ export function DoorPage() {
     setRecording(false);
     setError("");
     setMessage("");
-    if (audio.mode === direction || audio.mode === "connecting") {
-      audio.stop();
+    if (audio.channels[direction] !== "off") {
+      audio.stop(direction);
       await refresh();
       return;
     }
     try {
-      await enableSound();
       await audio.start(direction);
     } catch (cause) {
       setError(userMediaError(cause));
@@ -161,13 +167,15 @@ export function DoorPage() {
     }
     holdWanted.current = true;
     startingRecording.current = true;
+    const run = ++clipGeneration.current;
+    const isCurrent = () => alive.current && run === clipGeneration.current;
     audio.stop();
     setError("");
     setMessage("");
     try {
       const type = supportedRecordingType(),
         stream = await getMicrophone();
-      if (!alive.current || !holdWanted.current) {
+      if (!isCurrent() || !holdWanted.current) {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
@@ -185,7 +193,7 @@ export function DoorPage() {
         stream.getTracks().forEach((track) => track.stop());
         recordStream.current = null;
         recorder.current = null;
-        if (!alive.current) return;
+        if (!isCurrent()) return;
         setRecording(false);
         const blob = new Blob(chunks, {
           type: take.mimeType || type || "audio/webm",
@@ -210,17 +218,17 @@ export function DoorPage() {
         setBusy("clip");
         try {
           await api.upload("/say/clip", body);
-          if (alive.current)
+          if (isCurrent())
             setMessage("Your recorded voice was sent to the door speaker.");
         } catch (cause) {
-          if (alive.current)
+          if (isCurrent())
             setError(
               cause instanceof Error
                 ? cause.message
                 : "Could not send the recording.",
             );
         } finally {
-          if (alive.current) setBusy("");
+          if (isCurrent()) setBusy("");
         }
       };
       take.start(200);
@@ -228,10 +236,12 @@ export function DoorPage() {
       setRecording(true);
       recordTimer.current = setTimeout(finishClip, 20000);
     } catch (cause) {
-      if (alive.current) setError(userMediaError(cause));
-      cancelClip();
+      if (isCurrent()) {
+        setError(userMediaError(cause));
+        cancelClip();
+      }
     } finally {
-      startingRecording.current = false;
+      if (isCurrent()) startingRecording.current = false;
     }
   };
 
@@ -296,47 +306,25 @@ export function DoorPage() {
         </Card>
       )}
       {error && <Notice tone="danger">{error}</Notice>}
-      {audio.error && <Notice tone="warning">{audio.error}</Notice>}
       {message && <Notice tone="info">{message}</Notice>}
-      {audio.mode !== "off" && (
-        <div className={styles.voiceStatus} role="status">
-          <span className={styles.voiceDot} />
-          {audio.mode === "connecting"
-            ? "Connecting audio…"
-            : audio.mode === "talking"
-              ? "Your microphone is live at the door"
-              : "Listening to the door microphone"}
-        </div>
-      )}
       {state.takeover_by && (
         <Notice tone="info">
           {ownTakeover
             ? "You have"
             : `${takingOver || "Another family member"} has`}{" "}
           the door voice.{" "}
-          {ownTakeover && audio.mode !== "talking"
+          {ownTakeover && audio.channels.talking === "off"
             ? "Hand back to Nightfall when you are finished."
             : "Automatic speech is paused."}
         </Notice>
       )}
       <Card>
         <div className="stack gap-sm">
-          <div className="grid-two">
-            <Button
-              variant={audio.mode === "talking" ? "danger" : "secondary"}
-              disabled={Boolean(busy)}
-              onClick={() => void toggleAudio("talking")}
-            >
-              {audio.mode === "talking" ? "Stop talking" : "Talk"}
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={Boolean(busy)}
-              onClick={() => void toggleAudio("listening")}
-            >
-              {audio.mode === "listening" ? "Stop listening" : "Listen"}
-            </Button>
-          </div>
+          <DoorAudioControls
+            audio={audio}
+            disabled={Boolean(busy)}
+            onToggle={(direction) => void toggleAudio(direction)}
+          />
           <Button
             variant="secondary"
             disabled={Boolean(busy)}
@@ -349,8 +337,8 @@ export function DoorPage() {
                 : "Take over the voice"}
           </Button>
           <p className="caption">
-            Talk and Listen work one at a time. Temporary talk pauses the AI
-            while your microphone is live.
+            Talk and Listen can stay on together. Talking pauses the AI while
+            your microphone is live. Use headphones to reduce echo.
           </p>
         </div>
       </Card>

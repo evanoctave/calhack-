@@ -7,7 +7,8 @@ import {
   userMediaError,
 } from "./media";
 
-type Mode = "off" | "connecting" | "talking" | "listening";
+type Direction = "talking" | "listening";
+type ChannelState = "off" | "connecting" | "on";
 type Resources = {
   socket?: WebSocket;
   context?: AudioContext;
@@ -22,54 +23,84 @@ export function useDoorAudio(
   preview: boolean,
   onStopped?: () => void,
 ) {
-  const [mode, setMode] = useState<Mode>("off");
-  const [error, setError] = useState("");
-  const resources = useRef<Resources>({});
-  const generation = useRef(0);
+  const [channels, setChannels] = useState<Record<Direction, ChannelState>>({
+    talking: "off",
+    listening: "off",
+  });
+  const [errors, setErrors] = useState<Record<Direction, string>>({
+    talking: "",
+    listening: "",
+  });
+  const resources = useRef<Record<Direction, Resources>>({
+    talking: {},
+    listening: {},
+  });
+  const generation = useRef({ talking: 0, listening: 0 });
   const alive = useRef(true);
   const stoppedRef = useRef(onStopped);
   stoppedRef.current = onStopped;
-  const stop = useCallback(() => {
-    generation.current++;
-    const current = resources.current;
-    resources.current = {};
+  const stopChannel = useCallback((direction: Direction) => {
+    generation.current[direction]++;
+    const current = resources.current[direction];
+    resources.current[direction] = {};
     if (current.socket) {
+      current.socket.onopen = null;
       current.socket.onclose = null;
       current.socket.onerror = null;
+      current.socket.onmessage = null;
       current.socket.close();
     }
+    if (current.processor) current.processor.onaudioprocess = null;
     current.processor?.disconnect();
     current.source?.disconnect();
     current.gain?.disconnect();
     current.stream?.getTracks().forEach((track) => track.stop());
     if (current.context && current.context.state !== "closed")
-      void current.context.close();
-    if (alive.current) setMode("off");
+      void current.context.close().catch(() => undefined);
+    if (alive.current)
+      setChannels((value) => ({ ...value, [direction]: "off" }));
   }, []);
+  const stop = useCallback(
+    (direction?: Direction) => {
+      if (direction) stopChannel(direction);
+      else {
+        stopChannel("talking");
+        stopChannel("listening");
+      }
+    },
+    [stopChannel],
+  );
 
   const start = useCallback(
-    async (direction: "talking" | "listening") => {
-      stop();
+    async (direction: Direction) => {
+      stop(direction);
+      const setError = (message: string) => {
+        if (alive.current)
+          setErrors((value) => ({ ...value, [direction]: message }));
+      };
       setError("");
       if (preview) {
         setError("Preview only. Connect to Nightfall to use live audio.");
         return;
       }
-      const run = generation.current;
-      setMode("connecting");
+      const run = generation.current[direction];
+      const isCurrent = () =>
+        alive.current && generation.current[direction] === run;
+      setChannels((value) => ({ ...value, [direction]: "connecting" }));
       try {
         const context = audioContext();
-        resources.current.context = context;
+        const owned = resources.current[direction];
+        owned.context = context;
         await context.resume();
-        if (generation.current !== run) return;
+        if (!isCurrent()) return;
         let stream: MediaStream | undefined;
         if (direction === "talking") {
           stream = await getMicrophone();
-          if (generation.current !== run) {
+          if (!isCurrent()) {
             stream.getTracks().forEach((track) => track.stop());
             return;
           }
-          resources.current.stream = stream;
+          owned.stream = stream;
         }
         const socket = new WebSocket(
           socketUrl(
@@ -77,21 +108,27 @@ export function useDoorAudio(
           ),
         );
         socket.binaryType = "arraybuffer";
-        resources.current.socket = socket;
+        owned.socket = socket;
         let nextTime = 0;
         socket.onopen = () => {
-          if (generation.current === run) setMode(direction);
+          if (isCurrent())
+            setChannels((value) => ({ ...value, [direction]: "on" }));
         };
         socket.onerror = () => {
-          if (generation.current === run) {
-            stop();
-            setError("Could not connect the door audio. Try again.");
+          if (isCurrent()) {
+            stop(direction);
+            setError(
+              `Could not connect ${direction === "talking" ? "Talk" : "Listen"}. Try again.`,
+            );
+            stoppedRef.current?.();
           }
         };
         socket.onclose = () => {
-          if (generation.current !== run) return;
-          stop();
-          setError("The door audio connection ended. Tap to reconnect.");
+          if (!isCurrent()) return;
+          stop(direction);
+          setError(
+            `${direction === "talking" ? "Talk" : "Listen"} disconnected. Tap to reconnect.`,
+          );
           stoppedRef.current?.();
         };
         if (stream) {
@@ -100,8 +137,10 @@ export function useDoorAudio(
           const processor = context.createScriptProcessor(2048, 1, 1),
             gain = context.createGain();
           gain.gain.value = 0;
+          Object.assign(owned, { source, processor, gain });
           processor.onaudioprocess = (event) => {
             if (
+              !isCurrent() ||
               socket.readyState !== WebSocket.OPEN ||
               socket.bufferedAmount > 64000
             )
@@ -114,11 +153,12 @@ export function useDoorAudio(
           source.connect(processor);
           processor.connect(gain);
           gain.connect(context.destination);
-          Object.assign(resources.current, { source, processor, gain });
         } else {
           socket.onmessage = (event) => {
             if (
+              !isCurrent() ||
               !(event.data instanceof ArrayBuffer) ||
+              !event.data.byteLength ||
               event.data.byteLength % 2 ||
               context.state === "closed"
             )
@@ -141,8 +181,8 @@ export function useDoorAudio(
           };
         }
       } catch (cause) {
-        if (generation.current === run) {
-          stop();
+        if (isCurrent()) {
+          stop(direction);
           setError(userMediaError(cause));
         }
       }
@@ -151,6 +191,8 @@ export function useDoorAudio(
   );
   useEffect(() => {
     alive.current = true;
+    setChannels({ talking: "off", listening: "off" });
+    setErrors({ talking: "", listening: "" });
     const hidden = () => {
       if (document.hidden) stop();
     };
@@ -160,6 +202,11 @@ export function useDoorAudio(
       stop();
       document.removeEventListener("visibilitychange", hidden);
     };
-  }, [stop]);
-  return { mode, error, stop, start };
+  }, [memberId, preview, stop]);
+  return {
+    channels,
+    error: [errors.talking, errors.listening].filter(Boolean).join(" "),
+    stop,
+    start,
+  };
 }

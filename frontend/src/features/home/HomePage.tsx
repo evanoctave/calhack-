@@ -12,6 +12,8 @@ import { CameraFeed } from "../../components/CameraFeed";
 import { useNightfall } from "../../state/NightfallProvider";
 import { canShowEmergency, isHelpIncident } from "../incident/incidentView";
 import { useDoorVideo } from "../live/useDoorVideo";
+import { useDoorAudio } from "../live/useDoorAudio";
+import { DoorAudioControls } from "../live/DoorAudioControls";
 
 export function HomePage() {
   const {
@@ -22,9 +24,11 @@ export function HomePage() {
     soundEnabled,
     enableSound,
     mutate,
+    refresh,
   } = useNightfall();
   const navigate = useNavigate();
   const video = useDoorVideo(memberId, preview);
+  const audio = useDoorAudio(memberId, preview, () => void refresh());
   const [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
     [clock, setClock] = useState(Date.now());
@@ -159,6 +163,15 @@ export function HomePage() {
           }
         />
       </button>
+      <DoorAudioControls
+        audio={audio}
+        onToggle={(direction) => {
+          if (audio.channels[direction] !== "off") {
+            audio.stop(direction);
+            void refresh();
+          } else void audio.start(direction);
+        }}
+      />
       {inc?.state === "CONVERSATION" && (
         <Card>
           <p className="eyebrow">A familiar voice at the door</p>
