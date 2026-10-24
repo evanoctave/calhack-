@@ -85,17 +85,17 @@ async function runCommand(c) {
 async function sos() { await post("/event", {kind: "sos"}); showSpeak("Nightfall", "Calling the family now."); refresh(); }
 async function startDoor() { $("start").classList.add("hidden"); try { const c = new (window.AudioContext || window.webkitAudioContext)(); c.resume(); } catch (e) {} startCam(); doorConnect(); }
 // Live voice from the phone (PCM over /ws/door)
-const Door = {ws: null, ctx: null, t: 0};
+const Spk = {ws: null, ctx: null, t: 0};
 function doorConnect() {
-  const proto = location.protocol === "https:" ? "wss" : "ws"; const ws = new WebSocket(`${proto}://${location.host}/ws/door`); ws.binaryType = "arraybuffer"; Door.ws = ws;
+  const proto = location.protocol === "https:" ? "wss" : "ws"; const ws = new WebSocket(`${proto}://${location.host}/ws/door`); ws.binaryType = "arraybuffer"; Spk.ws = ws;
   ws.onmessage = ev => {
     if (typeof ev.data === "string") { const m = JSON.parse(ev.data); if (m.type === "live") { $("livepill").classList.toggle("on", !!m.on); if (m.on) $("livepill").textContent = "LIVE · " + m.by + " speaking through the door"; } return; }
-    if (!Door.ctx) { Door.ctx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 16000}); Door.t = 0; }
-    const pcm = new Int16Array(ev.data), buf = Door.ctx.createBuffer(1, pcm.length, 16000), ch = buf.getChannelData(0);
+    if (!Spk.ctx) { Spk.ctx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 16000}); Spk.t = 0; }
+    const pcm = new Int16Array(ev.data), buf = Spk.ctx.createBuffer(1, pcm.length, 16000), ch = buf.getChannelData(0);
     for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
-    const src = Door.ctx.createBufferSource(); src.buffer = buf; src.connect(Door.ctx.destination);
-    const now = Door.ctx.currentTime; if (Door.t < now + 0.05) Door.t = now + 0.12; src.start(Door.t); Door.t += buf.duration;
-    if (Door.ctx.state === "suspended") Door.ctx.resume();
+    const src = Spk.ctx.createBufferSource(); src.buffer = buf; src.connect(Spk.ctx.destination);
+    const now = Spk.ctx.currentTime; if (Spk.t < now + 0.05) Spk.t = now + 0.12; src.start(Spk.t); Spk.t += buf.duration;
+    if (Spk.ctx.state === "suspended") Spk.ctx.resume();
   };
   ws.onclose = () => setTimeout(doorConnect, 2000);
 }

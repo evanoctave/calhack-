@@ -30,7 +30,7 @@ function hhmm(iso) { return iso ? new Date(iso).toLocaleTimeString([], {hour: "n
 function render() {
   const h = S.household, inc = S.incident; incident = inc && inc.state !== "CLOSED" ? inc.id : null;
   if (inc && inc.exited_at && !inc.acked_by && ["ESCALATING", "EXHAUSTED"].includes(inc.state) && S.rings.some(r => r.member_ids.includes(member)) && rungFor !== inc.id) ringNow(inc.id, (h.person_full_name.split(" ")[0] || h.person_name) + " has left the house at " + hhmm(inc.exited_at) + ". Open the brief.");
-  if (inc && (inc.acked_by || inc.state === "RETURNED") && !$("incoming").hidden) { $("incoming").hidden = true; stopRing(); }
+  if (!$("incoming").hidden && (!inc || inc.id !== rungFor || inc.acked_by || ["RETURNED", "CLOSED"].includes(inc.state))) { $("incoming").hidden = true; stopRing(); }
   if (!$("incoming").hidden) fillIncoming();
   $("clock").textContent = hhmm(S.now);
   // home
