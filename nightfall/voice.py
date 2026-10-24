@@ -113,6 +113,12 @@ def hear(audio: bytes | None, typed: str | None = None) -> str:
 
 def pre_synthesize(hh: Household) -> dict[str, Any]:
     """Warm the cache for every scripted line. Returns {line_key: mode}."""
-    return {
+    from nightfall.script import VARIANTS
+
+    out = {
         k: say(fill(v, hh), "assistant" if k.startswith("visitor_") else hh.persona)["mode"] for k, v in SCRIPT.items()
     }
+    for k, lines in VARIANTS.items():
+        for i, v in enumerate(lines[1:], 2):
+            out[f"{k}_{i}"] = say(fill(v, hh), hh.persona)["mode"]
+    return out

@@ -1,0 +1,35 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="390" height="844" viewBox="0 0 390 844" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Material backdrop" clip-path="url(#clip0_0_42)">
+<g id="Moonlit blue fold" filter="url(#filter0_f_0_42)">
+<path d="M390 0C312 86 358 180 218 265C94 341 104 499 0 590V754H390V0Z" fill="url(#paint0_linear_0_42)"/>
+</g>
+<g id="Soft reflected light" filter="url(#filter1_f_0_42)">
+<path d="M0 3.57751C128 -14.4225 197 34.5775 256 171.578C301 278.578 319 394.578 390 435.578V611.578H0V3.57751Z" fill="url(#paint1_linear_0_42)"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_f_0_42" x="-38" y="-38" width="466" height="830" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="19" result="effect1_foregroundBlur_0_42"/>
+</filter>
+<filter id="filter1_f_0_42" x="-48" y="-48" width="486" height="707.578" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="24" result="effect1_foregroundBlur_0_42"/>
+</filter>
+<linearGradient id="paint0_linear_0_42" x1="195" y1="0" x2="195" y2="754" gradientUnits="userSpaceOnUse">
+<stop stop-color="#CBDCEB" stop-opacity="0.04"/>
+<stop offset="0.42" stop-color="#AFC8E0" stop-opacity="0.24"/>
+<stop offset="1" stop-color="#DCE7F1" stop-opacity="0.1"/>
+</linearGradient>
+<linearGradient id="paint1_linear_0_42" x1="195" y1="0" x2="195" y2="611.578" gradientUnits="userSpaceOnUse">
+<stop stop-color="#F5F8FB" stop-opacity="0.03"/>
+<stop offset="0.5" stop-color="#F3F8FB" stop-opacity="0.28"/>
+<stop offset="1" stop-color="#F1F6FA" stop-opacity="0.03"/>
+</linearGradient>
+<clipPath id="clip0_0_42">
+<rect width="390" height="844" fill="white"/>
+</clipPath>
+</defs>
+</svg>

@@ -109,7 +109,9 @@ async def _step(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
             if store.inc is not None and store.inc.state != engine.State.CLOSED:
                 await store.runner.cancel(store.inc.id)
             store.inc = engine.Incident(id=f"INC-{secrets.token_hex(4)}", night_mode=store.night())
+            store.inc.approaches_15m, store.inc.prior_exit_hours = store.approach_context()
             store.takeover_by, store.call_911_sent = None, False
+            store.door_speech = None
         inc = store.inc
         inc.night_mode = store.night()
         if kind == "reply":
@@ -250,16 +252,6 @@ async def ack(body: AckIn) -> dict[str, Any]:
     if store.inc is None:
         raise HTTPException(404, "no such incident")
     if store.inc.id != body.incident_id:
-        # the call belongs to an earlier incident (Dad came back in, then out again): the family's word still
-        # stands for whatever is running now, and the door goes quiet
-        if store.inc.state in (
-            engine.State.CONVERSATION,
-            engine.State.DOOR_OPEN,
-            engine.State.WATCHING,
-            engine.State.ESCALATING,
-        ):
-            await _step("stand_down", {"checkin": "self_other", "who": store.hh.member(body.member_id).name})
-        store.quiet_until = store.now() + timedelta(seconds=QUIET_AFTER_ACK_S)
         raise HTTPException(404, "no such incident")
     first = await store.runner.ack(body.incident_id, body.member_id)
     store.quiet_until = store.now() + timedelta(seconds=QUIET_AFTER_ACK_S)
@@ -327,11 +319,15 @@ async def full_log() -> list[dict[str, Any]]:
 
 @app.post("/reset")
 async def reset() -> dict[str, Any]:
+    previous_members = {member.id for member in store.hh.tree}
     if store.inc is not None:
         await store.runner.cancel(store.inc.id)
     store.inc, store.frames, store.briefs = None, {}, {}
     store.quiet_until = store.last_open_at = None
+    store.said_tonight.clear()
+    store.approaches.clear()
     store.log.clear()
+    store.door_speech = None
     store.history, store.frame_bytes = [], {}
     store.takeover_by, store.call_911_sent, store.latest_frame = None, False, b""
     store.clothing.clear()
@@ -354,6 +350,8 @@ async def reset() -> dict[str, Any]:
         print(f"memory close: {e}")
     store.memory_task = asyncio.create_task(_warm_memory())
     store.hub.publish("dashboard", {"type": "reset"})
+    for member_id in previous_members | {member.id for member in store.hh.tree}:
+        store.hub.publish(f"phone:{member_id}", {"type": "reset"})
     return {"ok": True}
 
 

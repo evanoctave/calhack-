@@ -32,9 +32,19 @@ html, body { height: 100%; } body { padding: 0; background: #06101d; color: #eef
 .start button { margin-top: 18px; padding: 16px 28px; border-radius: 999px; border: 0; background: #7fa7ff; color: #06101d; font: 600 17px var(--font); cursor: pointer; }
 .hidden { display: none !important; } #camstat, #persondot, #persontxt, #idtxt, #enrolled { font-size: 13px; }
 .live { position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%); background: rgba(76,193,122,.9); color: #06101d; border-radius: 999px; padding: 8px 16px; font-weight: 600; display: none; } .live.on { display: block; }
+/* The laptop is the doorbell: the whole screen is the camera feed. Everything else stays in the DOM for the
+   scripts but is not shown; the family sees state on their phones. */
+.top, .bottom, .caption, .speak, .count, .live, #overlay { display: none !important; }
+.device { display: block; background: #000; }
+.stage, .camwrap { position: fixed; inset: 0; width: 100vw !important; height: 100vh; aspect-ratio: auto; border-radius: 0; box-shadow: none; background: #000; }
+#cam { object-fit: cover; }
+.start { background: #000; cursor: pointer; }
+.start .box { color: rgba(255,255,255,.55); font: 500 15px/1.4 var(--font); letter-spacing: .01em; }
+.start .box h1, .start .box p, .start .box button { display: none; }
+.start .box::after { content: "Tap anywhere to start the door camera"; }
 </style></head><body>
 <script>if (/iphone|ipad|android|mobile/i.test(navigator.userAgent)) { location.replace("/app"); }</script>
-<div class="start" id="start"><div class="box"><h1>Nightfall door</h1><p>This screen is the doorbell camera and speaker. It watches the front door, talks in the family's voice, and the red button calls the family. Tap to start.</p><button onclick="startDoor()">Start the door</button></div></div>
+<div class="start" id="start" onclick="startDoor()"><div class="box"><h1>Nightfall door</h1><p>This screen is the doorbell camera and speaker. It watches the front door, talks in the family's voice, and the red button calls the family. Tap to start.</p><button onclick="startDoor()">Start the door</button></div></div>
 <div class="device">
   <div class="top"><div class="brand"><span class="led" id="led"></span>Night<span>fall</span> · <span id="mode">Night watch is on</span></div><div class="status" id="watching">Watching the front door</div></div>
   <div class="stage"><div class="camwrap">
@@ -80,8 +90,8 @@ async function playAtDoor(e) {
   try {
     const r = await fetch(e.url, {cache: "no-store"}); if (!r.ok) throw new Error("audio " + r.status);
     const blob = await r.blob(); cutAudio("new line");
-    if (Out.ctx) {
-      if (Out.ctx.state !== "running") await Out.ctx.resume();
+    if (Out.ctx && Out.ctx.state !== "running") await Promise.race([Out.ctx.resume().catch(() => {}), new Promise(r => setTimeout(r, 300))]);
+    if (Out.ctx && Out.ctx.state === "running") {
       const buf = await Out.ctx.decodeAudioData(await blob.arrayBuffer());
       const src = Out.ctx.createBufferSource(); src.buffer = buf; src.connect(Out.ctx.destination); Cur.src = src;
       src.onended = () => { if (Cur.src === src) Cur.src = null; tele("audio_ended", e.url); };
@@ -131,14 +141,20 @@ function earStart() {
       const res = ev.results[i], text = res[0].transcript.trim(); if (!text || isEcho(text)) continue;
       const inc = last && last.incident; if (!inc || !["CONVERSATION", "VISITOR", "WATCHING", "DOOR_OPEN"].includes(inc.state)) continue;
       if (Cur.src || Cur.audio) cutAudio("barge-in");
-      if (res.isFinal) { tele("heard", text); post("/event", {kind: "reply", text}); }
+      if (res.isFinal) { tele("heard", text); post("/event", {kind: "reply", payload: {text}}); }
     }
   };
   r.onerror = e => tele("ear_error", e.error);
   r.onend = () => { Ear.on = false; if (Out.started) setTimeout(earStart, 300); };  // Chrome ends sessions; keep listening
   try { r.start(); tele("ear_on", ""); } catch (e) { Ear.on = false; }
 }
-async function startDoor() { $("start").classList.add("hidden"); Out.started = true; Cam.armAt = Date.now() + ARM_DELAY_MS; earStart(); try { const c = new (window.AudioContext || window.webkitAudioContext)(); await c.resume(); Out.ctx = c; const a = new Audio("/voice/silence.wav"); a.volume = 0.01; await a.play().catch(() => {}); } catch (e) {} tele("door_started", navigator.userAgent.slice(0, 60)); startCam(); doorConnect(); micConnect(); videoConnect(); }
+async function startDoor() {
+  if (Out.started) return; $("start").classList.add("hidden"); Out.started = true; Cam.armAt = Date.now() + ARM_DELAY_MS;
+  // Unlock audio inside the tap, without awaiting: the tap's permission is single-use, and fullscreen would consume it.
+  try { const c = new (window.AudioContext || window.webkitAudioContext)(); c.resume().catch(() => {}); Out.ctx = c; const a = new Audio("/voice/silence.wav"); a.volume = 0.01; a.play().catch(() => {}); } catch (e) {}
+  tele("door_started", navigator.userAgent.slice(0, 60)); startCam(); doorConnect(); micConnect(); videoConnect(); earStart();
+  // No automatic fullscreen: it hides Chrome's camera and mic prompts. The page already fills the window.
+}
 // Live voice from the phone (PCM over /ws/door)
 const Spk = {ws: null, ctx: null, t: 0};
 function doorConnect() {

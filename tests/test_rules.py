@@ -17,7 +17,8 @@ def test_parse_checkin() -> None:
     assert parse_checkin("this is Sarah, taking the trash out", NAMES, "Dad")[0] == "self_other"
     assert parse_checkin("I'm Dad", NAMES, "Dad")[0] == "confused"
     assert parse_checkin("need some air", NAMES, "Dad") == ("air", "")
-    assert parse_checkin("I have to get to work, they are waiting", NAMES, "Dad")[0] == "confused"
+    assert parse_checkin("I have to get to work, they are waiting", NAMES, "Dad")[0] == "disoriented"
+    assert parse_checkin("I need to pick up the kids from school", NAMES, "Dad")[0] == "disoriented"
     assert parse_checkin("", NAMES, "Dad") == ("silence", "")
     assert parse_checkin("It's Robert", NAMES, "Dad")[0] == "confused", (
         "a name outside the care circle does not stand down"
@@ -32,7 +33,7 @@ def test_wander_score_cases() -> None:
     assert wander_score(Features(checkin="self_other")).action == "ignore"
     assert wander_score(Features(identity="unknown", checkin="air")).action == "speak_only"
     v = wander_score(Features(identity="match", checkin="confused", attire_night=True))
-    assert v.score == 100 and v.action == "escalate" and len(v.reasons) == 4
+    assert v.score >= 95 and v.action == "escalate" and len(v.reasons) == 4 and 0.95 <= v.probability < 1
 
 
 def test_attire() -> None:
@@ -121,3 +122,46 @@ def test_unknown_identity_still_rings() -> None:
     step(inc, Event("person_lost", at(3)))
     tr = step(inc, Event("tick", at(3 + engine.DOOR_WAIT_S)))
     assert "start_escalation" in tr.actions
+
+
+def test_v2_signals_move_the_odds_the_right_way() -> None:
+    base = wander_score(Features(hour=3.0)).probability
+    assert wander_score(Features(hour=13.0, armed=False)).probability < base, "daytime lowers the odds"
+    assert wander_score(Features(hour=13.0, armed=True)).probability == wander_score(Features()).probability, (
+        "armed by hand: the clock never lowers the odds"
+    )
+    assert wander_score(Features(hour=3.0, prior_exit_hours=(2.7, 3.1, 2.9))).probability > base
+    assert wander_score(Features(hour=3.0, prior_exit_hours=(14.0,))).probability == base, "history away from now"
+    assert wander_score(Features(hour=3.0, approaches_15m=3)).probability > base, "pacing"
+    assert wander_score(Features(hour=3.0, direction="exit", lines_unheeded=2)).probability > base
+    weak = wander_score(Features(identity="match", face_conf=0.3)).probability
+    strong = wander_score(Features(identity="match", face_conf=1.0)).probability
+    assert weak < strong
+    assert (
+        wander_score(Features(footwear="barefoot")).probability > wander_score(Features(footwear="shoes")).probability
+    )
+
+
+def test_confabulation_guard() -> None:
+    other = wander_score(Features(identity="unknown", checkin="self_other"))
+    dad = wander_score(Features(identity="match", checkin="self_other"))
+    assert other.action == "ignore" and dad.action == "escalate"
+    assert any("the face is his" in r for r in dad.reasons)
+
+
+def test_reasons_carry_weights_and_factors_sum_to_the_probability() -> None:
+    import math
+
+    v = wander_score(Features(identity="match", footwear="barefoot", hour=2.5, approaches_15m=2))
+    logit = math.log(0.6 / 0.4) + sum(llr for _, llr in v.factors)
+    assert abs(1 / (1 + math.exp(-logit)) - v.probability) < 0.002
+    assert all("odds" in r for r in v.reasons[1:])
+
+
+def test_door_claim_does_not_stand_down_dads_face() -> None:
+    inc = Incident("INC-1")
+    step(inc, Event("person_enter", at(0), {"identity": "match"}))
+    tr = step(inc, Event("stand_down", at(2), {"checkin": "self_other", "who": "Mike"}))
+    assert inc.state == State.CONVERSATION and "staying alert" in tr.detail
+    tr = step(inc, Event("stand_down", at(4), {"checkin": "self_other", "who": "Sarah", "force": True}))
+    assert inc.state == State.RETURNED
