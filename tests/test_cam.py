@@ -36,6 +36,12 @@ def test_clip_relay(client: TestClient) -> None:
         data={"member_id": "TM-MIKE"},
         files={"clip": ("c.mp4", io.BytesIO(b"\x00\x00\x00\x18ftyp"), "audio/mp4")},
     )
+    assert r.status_code == 422, "empty clips are rejected"
+    r = client.post(
+        "/say/clip",
+        data={"member_id": "TM-MIKE"},
+        files={"clip": ("c.mp4", io.BytesIO(b"\x00\x00\x00\x18ftyp" + b"\x00" * 4000), "audio/mp4")},
+    )
     url = r.json()["url"]
     assert url.startswith("/clips/clip-") and client.get(url).status_code == 200
     assert client.get("/clips/../x").status_code in (404, 400)
