@@ -73,9 +73,17 @@ async def setup_address(body: AddressIn) -> dict[str, Any]:
 async def _run_apify(lat: float, lng: float, radius_mi: float) -> None:
     store = _store()
     try:
-        items = await asyncio.to_thread(apify.google_places, lat, lng, radius_mi * 1.609, places.SEARCHES)
-        g = places.from_google(items, (lat, lng))
-        store.places = [p for p in store.places if p["category"] in places.HAZARD_CATS] + g
+        try:
+            rows = places.from_actor(await asyncio.to_thread(apify.night_search_radius, lat, lng, radius_mi))
+        except Exception as e:  # noqa: BLE001
+            print(f"night-search-radius failed ({type(e).__name__}); calling the Google Maps Scraper directly")
+            items = await asyncio.to_thread(apify.google_places, lat, lng, radius_mi * 1.609, places.SEARCHES)
+            rows = places.from_google(items, (lat, lng))
+        g = [p for p in rows if p["category"] not in places.HAZARD_CATS]
+        hz = [p for p in rows if p["category"] in places.HAZARD_CATS] or [
+            p for p in store.places if p["category"] in places.HAZARD_CATS
+        ]
+        store.places = hz + g
         _status.update({"apify": "done", "open": len(g)})
         _save(store.places)
     except asyncio.CancelledError:

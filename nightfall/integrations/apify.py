@@ -1,4 +1,7 @@
-"""Apify Google Maps Scraper (compass~crawler-google-places) run synchronously. Returns raw items."""
+"""Apify at setup: our published Actor night-search-radius first, the Google Maps Scraper directly as fallback.
+
+Both run synchronously and return raw dataset items.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +12,7 @@ import httpx
 
 ACTOR: Final = os.environ.get("APIFY_PLACES_ACTOR", "compass~crawler-google-places")
 BASE: Final = "https://api.apify.com/v2"
+SEARCH_ACTOR: Final = os.environ.get("APIFY_SEARCH_ACTOR", "evanoctave~night-search-radius")
 
 
 def enabled() -> bool:
@@ -35,6 +39,20 @@ def google_places(
         params={"timeout": int(timeout_s), "format": "json"},
         headers={"Authorization": f"Bearer {os.environ['APIFY_TOKEN']}"},
         json=body,
+        timeout=timeout_s + 30,
+    )
+    r.raise_for_status()
+    data = r.json()
+    return list(data) if isinstance(data, list) else []
+
+
+def night_search_radius(lat: float, lng: float, radius_mi: float, timeout_s: float = 300.0) -> list[dict[str, Any]]:
+    """Run our Store Actor: hazards, open-at-night places with phones and hours, nearest first. Raises on HTTP errors."""
+    r = httpx.post(
+        f"{BASE}/acts/{SEARCH_ACTOR}/run-sync-get-dataset-items",
+        params={"timeout": int(timeout_s), "format": "json"},
+        headers={"Authorization": f"Bearer {os.environ['APIFY_TOKEN']}"},
+        json={"lat": lat, "lng": lng, "radius_mi": radius_mi, "google_maps": True},
         timeout=timeout_s + 30,
     )
     r.raise_for_status()

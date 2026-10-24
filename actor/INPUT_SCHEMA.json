@@ -3,51 +3,58 @@
   "type": "object",
   "schemaVersion": 1,
   "properties": {
-    "lat": {
-      "title": "Home latitude",
-      "type": "number",
-      "description": "Latitude of the home.",
-      "editor": "number",
-      "prefill": 37.8
-    },
-    "lng": {
-      "title": "Home longitude",
-      "type": "number",
-      "description": "Longitude of the home.",
-      "editor": "number",
-      "prefill": -122.44
+    "address": {
+      "title": "Home address",
+      "type": "string",
+      "description": "Where the person lives. Street, city and state is enough. Leave empty if you give latitude and longitude instead.",
+      "editor": "textfield",
+      "prefill": "3601 Lyon St, San Francisco, CA"
     },
     "radius_mi": {
       "title": "Search radius (miles)",
       "type": "number",
-      "description": "Most people with dementia are found within 1.5 miles.",
+      "description": "Most people with dementia who wander are found within 1.5 miles of where they went missing.",
       "default": 1.5,
+      "minimum": 0.25,
+      "maximum": 5,
       "editor": "number"
     },
     "familiar_places": {
       "title": "Familiar places",
       "type": "array",
-      "description": "Places the person used to go: [{name, lat, lng}].",
+      "description": "Places from the person's past they may head for: an old job, a church, a childhood street. Each item is {name, lat, lng}.",
       "editor": "json",
+      "prefill": [{"name": "Old office, Chestnut St", "lat": 37.8005, "lng": -122.4382}],
       "default": []
     },
     "google_maps": {
-      "title": "Fetch open-at-night places with the Google Maps Scraper",
+      "title": "Find places open at night (Google Maps Scraper)",
       "type": "boolean",
       "default": true,
       "editor": "checkbox",
-      "description": "Also call Apify's Google Maps Scraper for 24-hour gas stations, stores, diners, ER, pharmacy and transit with phones and hours."
+      "description": "Also call Apify's Google Maps Scraper for 24-hour gas stations, stores, diners, ER, pharmacy and transit, with phone numbers and hours. Adds a few cents per run."
     },
     "max_per_search": {
       "title": "Max places per search term",
       "type": "integer",
       "default": 6,
+      "minimum": 1,
+      "maximum": 30,
       "editor": "number",
-      "description": "Cap per search term to control cost."
+      "description": "Cap per search term (six terms) to control cost."
+    },
+    "lat": {
+      "title": "Home latitude (optional)",
+      "type": "number",
+      "description": "Use instead of the address for an exact point.",
+      "editor": "number",
+      "sectionCaption": "Exact coordinates (optional)"
+    },
+    "lng": {
+      "title": "Home longitude (optional)",
+      "type": "number",
+      "description": "Use instead of the address for an exact point.",
+      "editor": "number"
     }
-  },
-  "required": [
-    "lat",
-    "lng"
-  ]
+  }
 }

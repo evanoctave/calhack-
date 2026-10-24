@@ -67,3 +67,46 @@ def test_from_overpass_dedupes() -> None:
     out = places.from_overpass(els, HOME)
     assert sorted(p["category"] for p in out) == ["motorway", "rail", "water"]
     assert out[0]["name"] == "Brea Creek"
+
+
+def test_from_actor_maps_and_drops_familiar() -> None:
+    rows = [
+        {
+            "section": "check_first",
+            "category": "water",
+            "name": "Shoreline",
+            "lat": 37.805,
+            "lng": -122.447,
+            "distance_mi": 0.08,
+            "phone": "",
+            "hours": "",
+            "source": "overpass",
+            "why": "x",
+            "maps_url": "u",
+        },
+        {
+            "section": "familiar",
+            "category": "familiar",
+            "name": "Old office",
+            "lat": 37.8,
+            "lng": -122.43,
+            "distance_mi": 0.6,
+            "source": "caregiver",
+        },
+        {
+            "section": "call_first",
+            "category": "fuel",
+            "name": "Chevron",
+            "lat": 37.799,
+            "lng": -122.437,
+            "distance_mi": 0.97,
+            "phone": "(415) 922-4922",
+            "hours": "24/7",
+            "address": "Lombard St",
+            "source": "google_maps",
+        },
+    ]
+    out = places.from_actor(rows)
+    assert [p["name"] for p in out] == ["Shoreline", "Chevron"]
+    assert out[0]["source"] == "overpass" and out[1]["source"] == "apify" and out[1]["hours"] == "24/7"
+    assert "why" not in out[0]

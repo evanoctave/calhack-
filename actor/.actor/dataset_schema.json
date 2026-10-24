@@ -3,27 +3,138 @@
   "fields": {
     "type": "object",
     "properties": {
-      "category": {"type": "string", "title": "Category", "description": "water, rail, motorway, construction, fuel, convenience, diner, hospital, pharmacy, transit, familiar", "example": "water"},
-      "name": {"type": "string", "title": "Name", "example": "Palace of Fine Arts lagoon"},
-      "lat": {"type": "number", "title": "Latitude", "example": 37.8022},
-      "lng": {"type": "number", "title": "Longitude", "example": -122.448},
-      "distance_mi": {"type": "number", "title": "Distance (mi)", "example": 0.46},
-      "phone": {"type": "string", "title": "Phone", "example": "(415) 555-0101"},
-      "hours": {"type": "string", "title": "Hours", "description": "24/7 or HH:MM-HH:MM for today, empty if unknown", "example": "24/7"},
-      "open_24h": {"type": "boolean", "title": "Open 24 h", "example": true},
-      "address": {"type": "string", "title": "Address", "example": "Lombard St, San Francisco"},
-      "source": {"type": "string", "title": "Source", "description": "overpass, google_maps or caregiver", "example": "overpass"}
+      "section": {
+        "type": "string",
+        "title": "Section",
+        "description": "check_first (hazards), familiar (places from the person's past) or call_first (open at night)",
+        "example": "check_first"
+      },
+      "category": {
+        "type": "string",
+        "title": "Category",
+        "description": "water, rail, motorway, construction, familiar, fuel, convenience, diner, hospital, pharmacy, transit",
+        "example": "water"
+      },
+      "name": {
+        "type": "string",
+        "title": "Name",
+        "example": "Palace of Fine Arts lagoon"
+      },
+      "distance_mi": {
+        "type": "number",
+        "title": "Distance (mi)",
+        "example": 0.46
+      },
+      "phone": {
+        "type": "string",
+        "title": "Phone",
+        "example": "(415) 555-0101"
+      },
+      "hours": {
+        "type": "string",
+        "title": "Hours",
+        "description": "24/7 or HH:MM-HH:MM for today, empty if unknown",
+        "example": "24/7"
+      },
+      "open_24h": {
+        "type": "boolean",
+        "title": "Open 24 h",
+        "example": true
+      },
+      "address": {
+        "type": "string",
+        "title": "Address",
+        "example": "Lombard St, San Francisco"
+      },
+      "why": {
+        "type": "string",
+        "title": "Why it matters",
+        "example": "Drowning is a leading cause of death in wandering cases; check banks and edges first."
+      },
+      "maps_url": {
+        "type": "string",
+        "title": "Map",
+        "example": "https://www.google.com/maps/search/?api=1&query=37.8022,-122.448"
+      },
+      "lat": {
+        "type": "number",
+        "title": "Latitude",
+        "example": 37.8022
+      },
+      "lng": {
+        "type": "number",
+        "title": "Longitude",
+        "example": -122.448
+      },
+      "source": {
+        "type": "string",
+        "title": "Source",
+        "description": "overpass, google_maps or caregiver",
+        "example": "overpass"
+      }
     },
-    "required": ["category", "name", "lat", "lng", "distance_mi", "source"]
+    "required": [
+      "section",
+      "category",
+      "name",
+      "lat",
+      "lng",
+      "distance_mi",
+      "source"
+    ]
   },
   "views": {
     "overview": {
-      "title": "Where to look and whom to call",
-      "transformation": {"fields": ["category", "name", "distance_mi", "phone", "hours", "source"]},
-      "display": {"component": "table", "properties": {
-        "category": {"label": "Category", "format": "text"}, "name": {"label": "Place", "format": "text"},
-        "distance_mi": {"label": "Miles", "format": "number"}, "phone": {"label": "Phone", "format": "text"},
-        "hours": {"label": "Hours", "format": "text"}, "source": {"label": "Source", "format": "text"}}}
+      "title": "Search plan",
+      "transformation": {
+        "fields": [
+          "section",
+          "category",
+          "name",
+          "distance_mi",
+          "phone",
+          "hours",
+          "why",
+          "maps_url"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "section": {
+            "label": "Section",
+            "format": "text"
+          },
+          "category": {
+            "label": "Category",
+            "format": "text"
+          },
+          "name": {
+            "label": "Place",
+            "format": "text"
+          },
+          "distance_mi": {
+            "label": "Miles",
+            "format": "number"
+          },
+          "phone": {
+            "label": "Phone",
+            "format": "text"
+          },
+          "hours": {
+            "label": "Hours",
+            "format": "text"
+          },
+          "why": {
+            "label": "Why",
+            "format": "text"
+          },
+          "maps_url": {
+            "label": "Map",
+            "format": "link"
+          }
+        }
+      }
     }
   }
 }

@@ -92,6 +92,19 @@ def from_google(items: list[dict[str, Any]], home: tuple[float, float]) -> list[
     return out
 
 
+def from_actor(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Map night-search-radius rows to Place dicts; the caregiver's own familiar places stay in the household file."""
+    keys = ("category", "name", "lat", "lng", "distance_mi", "hours", "phone", "address")
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        if r.get("section") == "familiar" or r.get("lat") is None or not r.get("name"):
+            continue
+        p = {k: r.get(k, "") for k in keys}
+        p["source"] = "overpass" if r.get("source") == "overpass" else "apify"
+        out.append(p)
+    return out
+
+
 def from_overpass(elements: list[dict[str, Any]], home: tuple[float, float]) -> list[dict[str, Any]]:
     """Map Overpass ways to hazard Places, one row per distinct name within 400 m."""
     out: list[dict[str, Any]] = []
