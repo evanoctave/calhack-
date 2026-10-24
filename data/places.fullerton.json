@@ -1,0 +1,18 @@
+[
+  {"category": "water", "name": "Brea Creek channel", "lat": 33.8760, "lng": -117.9250, "hours": "", "phone": "", "source": "fixture"},
+  {"category": "rail", "name": "BNSF rail line", "lat": 33.8800, "lng": -117.9300, "hours": "", "phone": "", "source": "fixture"},
+  {"category": "motorway", "name": "SR-91 on-ramp", "lat": 33.8550, "lng": -117.9200, "hours": "", "phone": "", "source": "fixture"},
+  {"category": "construction", "name": "Construction site, Harbor Blvd", "lat": 33.8520, "lng": -117.9350, "hours": "", "phone": "", "source": "fixture"},
+  {"category": "fuel", "name": "Chevron, Harbor and Chapman", "lat": 33.8740, "lng": -117.9270, "hours": "24/7", "phone": "(714) 555-0101", "source": "fixture"},
+  {"category": "convenience", "name": "7-Eleven, Harbor Blvd", "lat": 33.8770, "lng": -117.9200, "hours": "24/7", "phone": "(714) 555-0102", "source": "fixture"},
+  {"category": "diner", "name": "Denny's, Orangethorpe", "lat": 33.8600, "lng": -117.9150, "hours": "24/7", "phone": "(714) 555-0103", "source": "fixture"},
+  {"category": "hospital", "name": "St. Jude Medical Center ED", "lat": 33.8860, "lng": -117.9120, "hours": "24/7", "phone": "(714) 555-0104", "source": "fixture"},
+  {"category": "transit", "name": "Fullerton Transportation Center", "lat": 33.8690, "lng": -117.9050, "hours": "04:00-01:00", "phone": "(714) 555-0105", "source": "fixture"},
+  {"category": "pharmacy", "name": "CVS, Chapman Ave", "lat": 33.8710, "lng": -117.9140, "hours": "07:00-22:00", "phone": "(714) 555-0106", "source": "fixture"},
+  {"category": "fuel", "name": "Arco, Euclid St", "lat": 33.8650, "lng": -117.9410, "hours": "24/7", "phone": "(714) 555-0107", "source": "fixture"},
+  {"category": "convenience", "name": "AM/PM, Lemon St", "lat": 33.8790, "lng": -117.9170, "hours": "", "phone": "(714) 555-0108", "source": "fixture"},
+  {"category": "fuel", "name": "Shell, Imperial Hwy (far)", "lat": 33.9170, "lng": -117.9242, "hours": "24/7", "phone": "(714) 555-0201", "source": "fixture"},
+  {"category": "water", "name": "Craig Park lake (far)", "lat": 33.9000, "lng": -117.8900, "hours": "", "phone": "", "source": "fixture"},
+  {"category": "diner", "name": "IHOP, Anaheim (far)", "lat": 33.8350, "lng": -117.9242, "hours": "24/7", "phone": "(714) 555-0202", "source": "fixture"},
+  {"category": "hospital", "name": "UCI Medical Center (far)", "lat": 33.7880, "lng": -117.8900, "hours": "24/7", "phone": "(714) 555-0203", "source": "fixture"}
+]

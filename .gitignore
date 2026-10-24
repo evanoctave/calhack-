@@ -147,3 +147,11 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# nightfall
+.env
+.venv/
+out/
+data/*.db*
+__pycache__/
+.pytest_cache/
