@@ -127,7 +127,11 @@
 <div id="arm" style="position:fixed;inset:0;background:linear-gradient(180deg,var(--bg1),var(--bg2));display:flex;align-items:center;justify-content:center;z-index:50;padding:24px">
   <div class="card" style="padding:24px;max-width:360px;text-align:center"><h1 style="font-size:24px">Arm this phone</h1><p class="sub">One tap lets Nightfall ring and speak on this phone tonight.</p><button class="btn primary" onclick="armPhone()">Arm alerts</button></div></div>
 <div id="incoming" hidden style="position:fixed;inset:0;background:rgba(198,40,40,.96);color:#fff;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center">
-  <div style="font-size:14px;opacity:.85;margin-bottom:8px">Nightfall · incoming alert</div><div id="inc-title" style="font-size:30px;font-weight:700;line-height:1.15">Robert left home</div><div id="inc-msg" style="margin:14px 0 28px;opacity:.9"></div>
+  <div style="font-size:14px;opacity:.85;margin-bottom:8px">Nightfall · incoming alert</div><div id="inc-title" style="font-size:30px;font-weight:700;line-height:1.15">Robert left home</div><div id="inc-msg" style="margin:10px 0 18px;opacity:.9"></div>
+  <div style="background:rgba(255,255,255,.12);border-radius:16px;padding:14px 16px;text-align:left;width:100%;max-width:360px;margin-bottom:22px;font-size:15px;line-height:1.5">
+    <div><b>Wearing</b> · <span id="inc-wear">describing…</span></div>
+    <div><b>Headed</b> · <span id="inc-head">—</span></div>
+    <div><b>Emergency services</b> · <span id="inc-911">not called</span></div></div>
   <button class="btn" style="background:#fff;color:#c62828;border:0" onclick="answerFromOverlay()">Answer</button><button class="btn" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.5)" onclick="dismissOverlay()">See the alert</button></div>
 <script src="/app-ui.js"></script><script src="/app-voice.js"></script>
 </body></html>

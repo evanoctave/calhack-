@@ -122,3 +122,13 @@ def test_lost_from_idle_speaks_and_starts_exit_clock() -> None:
     assert inc.state == State.DOOR_OPEN and "speak:open" in tr.actions and "capture_exit_frames" in tr.actions
     step(inc, Event("tick", at(engine.DOOR_WAIT_S)))
     assert inc.state == State.ESCALATING
+
+
+def test_heading_recorded_on_lost() -> None:
+    inc = Incident("INC-1")
+    step(inc, Event("person_enter", at(0)))
+    step(inc, Event("person_lost", at(3), {"heading": "left"}))
+    assert inc.heading == "left"
+    inc2 = Incident("INC-2")
+    step(inc2, Event("person_lost", at(0), {"heading": "sideways"}))
+    assert inc2.heading == "unknown"

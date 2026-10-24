@@ -53,6 +53,7 @@ class Incident:
     seen_inside: bool = False
     last_line_at: datetime | None = None
     person_in_frame: bool = False
+    heading: str = "unknown"
 
     @property
     def deadline_at(self) -> datetime | None:
@@ -117,9 +118,14 @@ def _tick_conversation(inc: Incident, ev: Event) -> Transition:
     return _t(inc, State.CONVERSATION, ("speak:again",), "R1", "auto line")
 
 
+HEADINGS: Final[frozenset[str]] = frozenset({"left", "right", "away", "toward", "unknown"})
+
+
 def _person_lost(inc: Incident, ev: Event) -> Transition:
-    """Camera lost the person: same clock as a door opening (R2)."""
+    """Camera lost the person: same clock as a door opening (R2). Records which way they went."""
     inc.person_in_frame = False
+    h = str(ev.payload.get("heading", "unknown")).lower()
+    inc.heading = h if h in HEADINGS else "unknown"
     tr = _door_open(inc, ev)
     return Transition(
         tr.from_state, tr.to_state, tr.actions, tr.rule, "person left the frame" if tr.rule != "ignored" else tr.detail

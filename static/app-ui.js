@@ -31,6 +31,7 @@ function render() {
   const h = S.household, inc = S.incident; incident = inc && inc.state !== "CLOSED" ? inc.id : null;
   if (inc && inc.exited_at && !inc.acked_by && ["ESCALATING", "EXHAUSTED"].includes(inc.state) && S.rings.some(r => r.member_ids.includes(member)) && rungFor !== inc.id) ringNow(inc.id, (h.person_full_name.split(" ")[0] || h.person_name) + " has left the house at " + hhmm(inc.exited_at) + ". Open the brief.");
   if (inc && (inc.acked_by || inc.state === "RETURNED") && !$("incoming").hidden) { $("incoming").hidden = true; stopRing(); }
+  if (!$("incoming").hidden) fillIncoming();
   $("clock").textContent = hhmm(S.now);
   // home
   $("h-title").textContent = S.night_mode ? "Night watch is on" : "Night watch is off";
@@ -61,6 +62,8 @@ function render() {
     else if (inc.state === "CONVERSATION") ev.push(["At the door", inc.person_in_frame ? "in view" : "", ""]);
     ev.push(["Voice check-in", inc.lines_spoken ? (inc.state === "RETURNED" ? "Returned inside" : inc.lines_spoken + " line" + (inc.lines_spoken > 1 ? "s" : "") + " spoken · no return confirmed") : "Not started", ""]);
     S.rings.forEach((r, i) => { const prev = S.rings[i - 1]; ev.push([(i + 1) + " · Calling " + r.members.join(", "), prev ? `${i} · ${prev.members.join(", ")} did not answer within ${S.ladder_step_s} sec.` : "", "sub"]); });
+    if (inc.exited_at) ev.push(["Headed", headingText(inc.heading), ""]);
+    if (inc.exited_at) ev.push(["Emergency services", inc.emergency && inc.emergency.option_shown ? "Call 911 option shown. Not called." : "Not called. You decide.", inc.emergency && inc.emergency.option_shown ? "danger" : ""]);
     if (inc.acked_by_name) ev.push(["Acknowledged", inc.acked_by_name + " is responding", "ok"]);
     if (inc.state === "RETURNED") ev.push(["Back inside", "Rings cancelled", "ok"]);
   }
@@ -138,7 +141,15 @@ let rungFor = ""; let lastRingMsg = "";
 function showIncoming(msg) { $("inc-title").textContent = ((S && S.household.person_full_name.split(" ")[0]) || "Robert") + " left home"; $("inc-msg").textContent = msg || ""; $("incoming").hidden = false; }
 function answerFromOverlay() { $("incoming").hidden = true; answerCall(); }
 function dismissOverlay() { $("incoming").hidden = true; stopRing(); go("alert"); }
-function ringNow(incId, msg) { if (rungFor === incId) return; rungFor = incId; incident = incId; lastRingMsg = msg; startRing(); speak(msg); showIncoming(msg); }
+function ringNow(incId, msg) { if (rungFor === incId) return; rungFor = incId; incident = incId; lastRingMsg = msg; startRing(); showIncoming(msg); fillIncoming(); }
+function headingText(h) { return {left: "to the left of the door camera", right: "to the right of the door camera", away: "away from the camera, out the door", toward: "toward the camera", unknown: "direction not seen"}[h || "unknown"]; }
+function fillIncoming() {
+  if (!S || !S.incident) return; const inc = S.incident, c = inc.clothing;
+  $("inc-wear").textContent = !c || c.source === "pending" ? "describing from the exit frame…" : (inc.clothing_line === "see photo" ? "see the exit photo" : inc.clothing_line) + " (AI-described, verify)";
+  $("inc-head").textContent = headingText(inc.heading) + (inc.exited_at ? " at " + hhmm(inc.exited_at) : "");
+  $("inc-911").textContent = inc.emergency ? inc.emergency.text : "not called";
+  $("inc-msg").textContent = "Exit at " + hhmm(inc.exited_at) + ". Ringing " + (S.rings.length ? S.rings[S.rings.length - 1].members.join(", ") : "you") + ".";
+}
 function ringDataUrl() { const sr = 8000, len = sr * 3, buf = new Uint8Array(44 + len); const w = (o, s) => [...s].forEach((c, i) => buf[o + i] = c.charCodeAt(0)); w(0, "RIFF"); w(8, "WAVEfmt "); buf[16] = 16; buf[20] = 1; buf[22] = 1; buf[24] = sr & 255; buf[25] = sr >> 8; buf[28] = sr & 255; buf[29] = sr >> 8; buf[32] = 1; buf[34] = 8; w(36, "data"); for (let i = 0; i < len; i++) { const t = i / sr, on = (t % 1) < 0.45; buf[44 + i] = on ? 128 + Math.round(110 * Math.sin(2 * Math.PI * (t < 1.5 ? 880 : 660) * t)) : 128; } return "data:audio/wav;base64," + btoa(String.fromCharCode(...buf)); }
 function startRing() { try { $("ring").play().catch(() => {}); } catch (e) {} if (navigator.vibrate) navigator.vibrate([300, 200, 300]); }
 function stopRing() { try { const a = $("ring"); a.pause(); a.currentTime = 0; } catch (e) {} }

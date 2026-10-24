@@ -88,6 +88,8 @@ async def app_state(member: str = "") -> dict[str, Any]:
             "lines_spoken": inc.lines_spoken,
             "person_in_frame": inc.person_in_frame,
             "door_opened_at": inc.door_opened_at.isoformat() if inc.door_opened_at else None,
+            "heading": inc.heading,
+            "emergency": _emergency(store, inc),
             "brief_link": store.link(inc.id, member) if member and inc.id in store.briefs else "",
             "exit_frame": (store.frames.get(inc.id) or [""])[-1],
             "clothing_line": store.briefs[inc.id]["clothing_line"] if inc.id in store.briefs else "",
@@ -110,6 +112,25 @@ async def app_state(member: str = "") -> dict[str, Any]:
         "memory_source": store.memory.source,
         "places_source": store.places_source(),
         "live_frame": bool(store.latest_frame) and time.time() - store.latest_frame_at < 10,
+    }
+
+
+def _emergency(store: Any, inc: Any) -> dict[str, Any]:
+    """Nightfall never dials. Says plainly whether the 911 option is up and when the 15-minute mark is."""
+    from nightfall.api import CALL_911_S
+    from nightfall.brief import hhmm
+
+    return {
+        "called": False,
+        "option_shown": bool(store.call_911_sent),
+        "option_after_s": CALL_911_S,
+        "deadline_hhmm": hhmm(inc.deadline_at) if inc.deadline_at else "",
+        "text": (
+            "Call 911 option is on your screen. Nightfall has not called."
+            if store.call_911_sent
+            else f"Not called. Nightfall never dials. The Call 911 option appears after {int(CALL_911_S)} s out of view"
+            + (f"; the 15-minute mark is {hhmm(inc.deadline_at)}." if inc.deadline_at else ".")
+        ),
     }
 
 

@@ -1,7 +1,7 @@
 // Person detection in the browser (TensorFlow.js coco-ssd), ring buffer, live relay to phones.
 // Events: person_enter (3 consecutive hits after absence), person_lost (absent LOST_S), person_back.
 const Cam = {model: null, video: null, canvas: null, ctx: null, overlay: null, octx: null, ring: [], personFrames: [],
-             present: false, hits: 0, misses: 0, lastEvent: "", lostMs: 1500, lastSeenAt: 0, relayAt: 0, busy: false, on: false, heights: [], awayAt: 0, face: null, faceMisses: 0, faceTick: 0, facing: "", awaySince: 0, awayLostSent: false, awayHoldMs: 5000};
+             present: false, hits: 0, misses: 0, lastEvent: "", lostMs: 1500, lastSeenAt: 0, relayAt: 0, busy: false, on: false, heights: [], awayAt: 0, face: null, faceMisses: 0, faceTick: 0, facing: "", awaySince: 0, awayLostSent: false, awayHoldMs: 5000, track: []};
 
 function camStatus(t) { const el = document.getElementById("camstat"); if (el) el.textContent = t; }
 
@@ -74,14 +74,24 @@ async function checkFace(present, now) {
   const t = document.getElementById("persontxt"); if (t) t.textContent = "person in frame · " + Cam.facing;
   if (faces.length) { Cam.faceMisses = 0; Cam.awaySince = 0; if (Cam.awayLostSent) { Cam.awayLostSent = false; sendBack("turned back to the camera"); } return; }
   Cam.faceMisses++; if (!Cam.awaySince) Cam.awaySince = now;
-  if (!Cam.awayLostSent && now - Cam.awaySince >= Cam.awayHoldMs) { Cam.awayLostSent = true; camStatus("still heading out after " + Math.round(Cam.awayHoldMs / 1000) + " s: exit clock starts"); post("/event", {kind: "person_lost", payload: {source: "face", reason: "turned away, not responding"}}).then(() => window.refresh && refresh()); }
+  if (!Cam.awayLostSent && now - Cam.awaySince >= Cam.awayHoldMs) { Cam.awayLostSent = true; camStatus("still heading out after " + Math.round(Cam.awayHoldMs / 1000) + " s: exit clock starts"); post("/event", {kind: "person_lost", payload: {source: "face", reason: "turned away, not responding", heading: heading() === "unknown" ? "away" : heading()}}).then(() => window.refresh && refresh()); }
   if (Cam.faceMisses >= 2 && now - Cam.awayAt > 15000) {
     const st = window.lastState && window.lastState.incident ? window.lastState.incident.state : "";
     if (!["CONVERSATION", "DOOR_OPEN", "ESCALATING"].includes(st)) { Cam.awayAt = now; camStatus("turned away from the camera: voice starts"); post("/event", {kind: "person_enter", payload: {source: "face", reason: "turned away"}}).then(() => window.refresh && refresh()); }
   }
 }
 // Moving away from the camera (toward the door): the person's box shrinks by 15% within about a second.
+function heading() {
+  const tr = Cam.track; if (tr.length < 3) return "unknown";
+  const a = tr[0], b = tr[tr.length - 1], dx = b.cx - a.cx, dh = b.h - a.h;
+  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dh)) return dx < 0 ? "left" : "right";
+  if (dh < -20) return "away";
+  if (dh > 20) return "toward";
+  return Math.abs(dx) > 15 ? (dx < 0 ? "left" : "right") : "unknown";
+}
 function trackAway(boxes, now) {
+  const big = boxes.reduce((m, b) => b.bbox[3] > m.bbox[3] ? b : m, boxes[0]);
+  Cam.track.push({t: now, cx: big.bbox[0] + big.bbox[2] / 2, h: big.bbox[3]}); Cam.track = Cam.track.filter(p => now - p.t < 2000);
   const h = Math.max(...boxes.map(b => b.bbox[3])); Cam.heights.push([now, h]); Cam.heights = Cam.heights.filter(([t]) => now - t < 1200);
   if (Cam.heights.length < 4) return; const first = Cam.heights[0][1];
   if (h < first * 0.85 && now - Cam.awayAt > 15000) { Cam.awayAt = now; camStatus("moving away from the camera: voice starts"); const st = window.lastState && window.lastState.incident ? window.lastState.incident.state : ""; if (!["CONVERSATION", "DOOR_OPEN", "ESCALATING"].includes(st)) post("/event", {kind: "person_enter", payload: {source: "coco-ssd", reason: "moving away"}}).then(() => window.refresh && refresh()); }
@@ -93,7 +103,8 @@ async function onEnter() {
   Cam.lastEvent = kind; await post("/event", {kind, payload: {source: "coco-ssd"}}); if (window.refresh) refresh();
 }
 async function onLost() {
-  Cam.lastEvent = "person_lost"; await post("/event", {kind: "person_lost", payload: {source: "coco-ssd"}}); if (window.refresh) refresh();
+  const hd = heading(); Cam.lastEvent = "person_lost"; camStatus("left the frame heading " + hd + ": exit clock starts");
+  await post("/event", {kind: "person_lost", payload: {source: "coco-ssd", heading: hd}}); if (window.refresh) refresh();
 }
 async function postFrames(id) {
   const frames = Cam.personFrames.length ? Cam.personFrames : Cam.ring.slice(-3);
