@@ -10,11 +10,32 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+def load_dotenv(path: Path) -> list[str]:
+    """Read .env the way run.sh does, so this script works the same way the demo does."""
+    loaded: list[str] = []
+    if not path.exists():
+        return loaded
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key, value = key.strip(), value.strip().strip("'\"")
+        if value and key not in os.environ:
+            os.environ[key] = value
+            loaded.append(key)
+    return loaded
+
+
+ROOT = Path(__file__).resolve().parent.parent
+_LOADED = load_dotenv(ROOT / ".env")
 
 from nightfall import vision  # noqa: E402
 from nightfall.brief import clothing_line  # noqa: E402
@@ -30,9 +51,11 @@ def main(argv: list[str]) -> int:
     if not path.exists():
         print(f"no such file: {path}")
         return 2
+    if _LOADED:
+        print(f"loaded  .env ({', '.join(_LOADED)})")
     if not anthropic_vision.configured():
-        print("ANTHROPIC_API_KEY is not set, so this would only exercise the fixture.")
-        print("Set it in .env or inline:  ANTHROPIC_API_KEY=sk-... .venv/bin/python scripts/vision_smoke.py photo.jpg")
+        print("No Anthropic credentials found, so this would only exercise the fixture.")
+        print("Put ANTHROPIC_API_KEY=sk-ant-... in .env (copy .env.example), then rerun.")
         return 2
 
     jpeg = path.read_bytes()
