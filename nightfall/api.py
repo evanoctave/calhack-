@@ -313,6 +313,16 @@ async def index() -> FileResponse:
     return FileResponse(ROOT / "static" / "door.html")
 
 
+@app.middleware("http")
+async def _no_cache_static(request: Request, call_next):  # type: ignore[no-untyped-def]
+    """Phones cache app JS aggressively; during the hackathon every page load must get the newest files."""
+    resp = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith((".js", ".css", ".html")) or path in ("/app", "/door"):
+        resp.headers["Cache-Control"] = "no-store, max-age=0"
+    return resp
+
+
 app.include_router(voice_router)
 app.include_router(cam_router)
 app.include_router(setup_router)
