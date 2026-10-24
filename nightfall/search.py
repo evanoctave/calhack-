@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Any, Final, NamedTuple
 
 HAZARDS: Final = frozenset({"water", "rail", "motorway", "construction"})
+MAX_HAZARDS: Final = 8
 CALL_FIRST: Final = frozenset({"fuel", "convenience", "diner", "hospital", "transit", "pharmacy"})
 
 
@@ -62,7 +63,7 @@ def rank(places: list[dict[str, Any]], home: tuple[float, float], radius_mi: flo
         d = haversine_mi(home[0], home[1], float(p["lat"]), float(p["lng"]))
         if d <= radius_mi:
             inside.append({**p, "distance_mi": round(d, 2)})
-    hazards = sorted((p for p in inside if p["category"] in HAZARDS), key=lambda p: (p["distance_mi"], p["name"]))
+    hazards = sorted((p for p in inside if p["category"] in HAZARDS), key=lambda p: (p["distance_mi"], p["name"]))[:MAX_HAZARDS]
 
     def open_rank(p: dict[str, Any]) -> int:
         o = is_open(parse_hours(str(p.get("hours", ""))), at)

@@ -49,6 +49,7 @@ def next_line(hh: Household, history: Sequence[tuple[str, str]], hits: Sequence[
         out = anthropic_llm.complete(PERSONA_SYSTEM.format(caregiver=hh.caregiver_name, person=hh.person_name),
                                      f"{mem}\nConversation so far:\n{convo}\nNext line:", max_tokens=80)
         line = out.strip().strip('"').splitlines()[0] if out.strip() else ""
+        line = line.replace(" — ", ", ").replace("—", ", ").replace("–", ", ").replace("’", "'")
         ok, why = validate(line)
         if ok:
             return line, "anthropic"

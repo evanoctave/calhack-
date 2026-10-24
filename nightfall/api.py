@@ -39,10 +39,14 @@ store = Store()
 async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
     store.tick_task = asyncio.create_task(_ticker())
     print("voice pre-synthesis:", voice.pre_synthesize(store.hh))
+    store.memory_task = asyncio.create_task(_warm_memory())
     try:
         yield
     finally:
         store.tick_task.cancel()
+        if store.memory_task is not None:
+            store.memory_task.cancel()
+        await store.memory.close()
         if store.inc is not None:
             await store.runner.cancel(store.inc.id)
 
@@ -86,6 +90,12 @@ async def _step(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
                 "rule": tr.rule, "detail": tr.detail, "actions": list(tr.actions)}
 
 
+async def _warm_memory() -> None:
+    n = await store.memory.ensure()
+    print("memory:", store.memory.source, "notes:", n)
+    store.hub.publish("dashboard", {"type": "memory_ready", "source": store.memory.source, "notes": n})
+
+
 async def _ticker() -> None:
     while True:
         await asyncio.sleep(1)
@@ -96,7 +106,8 @@ async def _ticker() -> None:
 @app.get("/health")
 async def health() -> dict[str, Any]:
     return {"ok": True, "mock": {"cartesia": not cartesia.enabled(), "anthropic": not anthropic_llm.enabled(),
-                                 "apify": True, "twilio": not twilio.enabled()},
+                                 "apify": store.places_source() != "apify", "twilio": not twilio.enabled(),
+                                 "moss": store.memory.source != "moss"},
             "now": store.now().isoformat(), "night_mode": store.night()}
 
 
@@ -214,6 +225,9 @@ async def reset() -> dict[str, Any]:
     store.history, store.frame_bytes = [], {}
     store.runner.rings.clear()
     store.hh = load(ROOT / "data" / "household.json")
+    from nightfall.memory import Memory
+
+    store.memory = Memory(store.hh)
     store.hub.publish("dashboard", {"type": "reset"})
     return {"ok": True}
 

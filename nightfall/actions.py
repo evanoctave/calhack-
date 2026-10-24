@@ -30,14 +30,17 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
         elif a == "speak:again":
             reply = str(tr_payload(tr, inc, store).get("text", ""))
             store.history.append(("person", reply))
-            line, source = llm.next_line(store.hh, store.history, llm.memory_hits(store.hh, reply))
+            hits = [h["text"] for h in await store.memory.search(reply, 2)]
+            emit(store, {"type": "memory", "query": reply, "hits": hits, "source": store.memory.source})
+            line, source = llm.next_line(store.hh, store.history, hits)
             _speak(store, line, source)
         elif a == "capture_exit_frames":
             store.hub.publish("dashboard", {"type": "exit_frames_request", "incident_id": inc.id})
         elif a == "build_brief":
             clothing = llm.describe_clothing(store.frame_bytes.get(inc.id))
+            habits = await store.memory.search("where does he go when he leaves at night", 3)
             store.briefs[inc.id] = briefmod.build(store.hh, inc, clothing, store.places,
-                                                  store.frames.get(inc.id, []), store.now())
+                                                  store.frames.get(inc.id, []), store.now(), habits, store.memory.source)
             emit(store, {"type": "brief_ready", "incident_id": inc.id})
         elif a == "start_escalation":
             t = (inc.exited_at or store.now()).strftime("%-I:%M %p")

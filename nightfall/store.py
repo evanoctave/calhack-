@@ -16,6 +16,7 @@ from nightfall import engine
 from nightfall.escalation import Runner
 from nightfall.household import Household, in_window, load
 from nightfall.integrations import twilio
+from nightfall.memory import Memory
 from nightfall.notify import Hub, SseNotifier, TwilioNotifier
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -27,7 +28,8 @@ class Store:
 
     def __init__(self) -> None:
         self.hh: Household = load(ROOT / "data" / "household.json")
-        self.places = briefmod.load_places(ROOT / "data" / "places.fullerton.json")
+        self.places = briefmod.load_places(os.environ.get("PLACES_FILE") or ROOT / "data" / "places.fullerton.json")
+        self.memory = Memory(self.hh)
         self.inc: engine.Incident | None = None
         self.log: list[dict[str, Any]] = []
         self.frames: dict[str, list[str]] = {}
@@ -41,6 +43,10 @@ class Store:
         self.runner = Runner(notifier)
         self.lock = asyncio.Lock()
         self.tick_task: asyncio.Task[None] | None = None
+        self.memory_task: asyncio.Task[None] | None = None
+
+    def places_source(self) -> str:
+        return str(self.places[0].get("source", "fixture")) if self.places else "none"
 
     def now(self) -> datetime:
         return datetime.now().astimezone()

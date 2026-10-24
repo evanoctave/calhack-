@@ -69,7 +69,8 @@ def mock_clothing() -> dict[str, Any]:
 
 
 def build(hh: Household, inc: Incident, clothing: dict[str, Any], places: list[dict[str, Any]],
-          frames: list[str], now: datetime) -> dict[str, Any]:
+          frames: list[str], now: datetime, habits: list[dict[str, Any]] | None = None,
+          memory_source: str = "mock") -> dict[str, Any]:
     """Assemble the brief from structured fields. No model text here."""
     sections = rank(places, (hh.home_lat, hh.home_lng), hh.radius_mi, now,
                     list(hh.familiar_places), list(hh.contacts))
@@ -87,6 +88,7 @@ def build(hh: Household, inc: Incident, clothing: dict[str, Any], places: list[d
         "hazards": sections.hazards, "call_first": sections.call_first,
         "familiar": sections.familiar, "contacts": sections.contacts,
         "prose": prose, "places_source": places[0].get("source", "fixture") if places else "none",
+        "habits": [{"text": h["text"], "kind": h.get("kind", "habit")} for h in (habits or [])], "memory_source": memory_source,
     }
 
 

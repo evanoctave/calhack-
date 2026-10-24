@@ -60,6 +60,7 @@ def facts(hh: Household, brief: dict[str, Any]) -> str:
         "Hazards nearest first: " + "; ".join(f"{p['name']} ({p['distance_mi']} mi)" for p in brief["hazards"]),
         "Open places to call: " + "; ".join(f"{p['name']} {p.get('phone', '')} ({p['distance_mi']} mi)" for p in brief["call_first"][:5]),
         "Familiar places: " + "; ".join(p["name"] for p in brief["familiar"]),
+        "Habits from the caregiver's notes: " + "; ".join(h["text"] for h in brief.get("habits", [])),
         "Contacts: " + "; ".join(f"{c['name']} {c.get('phone', '')} {c.get('note', '')}".strip() for c in brief["contacts"]),
         f"Medications: {meds}.",
         f"Call 911 after 15 minutes of searching, at {brief['deadline_hhmm']}.",
@@ -76,7 +77,9 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
     if REPEAT.search(t):
         return Reply(opening(hh, brief, member_name), "repeat")
     if HAZARDS.search(t):
-        return Reply(f"Check the hazards first: {_names(brief['hazards'], 4)}. Then the familiar places: {_names(brief['familiar'], 3)}.", "hazards")
+        habit = brief.get("habits", [{}])[0].get("text", "") if brief.get("habits") else ""
+        tail = f" The caregiver noted: {habit}." if habit else ""
+        return Reply(f"Check the hazards first: {_names(brief['hazards'], 4)}. Then the familiar places: {_names(brief['familiar'], 3)}.{tail}", "hazards")
     if CLOTHES.search(t):
         return Reply(f"{hh.person_name} was wearing {brief['clothing_line']}. The photo is on the brief.", "clothing")
     if MEDS.search(t):
