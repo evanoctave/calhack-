@@ -193,3 +193,10 @@ input:focus, select:focus { outline: none; border-color: rgba(36, 93, 214, 0.5);
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 }
+/* Medical info */
+.seg.bt { grid-auto-flow: row; grid-template-columns: repeat(4, 1fr); }
+.seg.bt button { font-size: 15px; font-weight: 600; padding: 10px 0; }
+.seg.bt button.wide { grid-column: span 4; font-size: 13px; font-weight: 500; }
+.field select, .field textarea { background: transparent; border: 0; padding: 0; font: 600 16px/22px var(--font); border-radius: 0; box-shadow: none; resize: vertical; }
+.field select:focus, .field textarea:focus { box-shadow: none; }
+.row .x { flex: none; width: 30px; height: 30px; border-radius: 15px; border: 0; background: var(--glass); color: var(--muted); font: 500 18px/1 var(--font); cursor: pointer; }

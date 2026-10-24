@@ -157,3 +157,5 @@ __pycache__/
 .pytest_cache/
 data/faces.json
 data/history.json
+# real health information never goes in the public repo
+data/medical.json

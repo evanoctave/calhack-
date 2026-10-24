@@ -13,6 +13,7 @@
 <section id="s-setup" class="screen">
   <header class="head"><p class="eyebrow">Nightfall</p><h1>Ready for tonight</h1><p class="sub" id="su-sub">Dad's care, in one place.</p></header>
   <div class="card"><div class="row link" onclick="go('profile')"><div><span class="k" id="su-person">Dad (Robert), 78</span><span class="sub2" id="su-person2">Sarah · Daughter · Care details</span></div></div></div>
+  <div class="card"><div class="row link" onclick="go('medical')"><div><span class="k">Medical info</span><span class="sub2" id="su-medical">Blood type, allergies, conditions</span></div></div></div>
   <div class="card"><div class="row link" onclick="go('voice')"><div><span class="k">Family voice</span><span class="sub2" id="su-voice">Record or choose a familiar voice</span></div></div></div>
   <div class="card"><div class="row link" onclick="go('calls')"><div><span class="k">Call order</span><span class="sub2" id="su-calls">1 Sarah → 2 Mike → 3 Linda</span></div></div></div>
   <div class="card"><div class="row link" onclick="go('places')"><div><span class="k">Home &amp; nearby places</span><span class="sub2" id="su-places">San Francisco Marina · 1.5 mi</span></div></div></div>
@@ -35,6 +36,38 @@
     <label class="field"><span class="lbl">Diagnosis, as you'd tell a dispatcher</span><input id="p-diag"></label>
     <div class="grid2"><label class="field"><span class="lbl">Doctor</span><input id="p-docname"></label><label class="field"><span class="lbl">Doctor's phone</span><input id="p-docphone" inputmode="tel"></label></div></div>
   <div class="actions"><button class="btn primary" onclick="saveProfile()">Save care details</button></div>
+</section>
+
+<section id="s-medical" class="screen">
+  <header class="head"><a class="back" onclick="go('setup')">Setup</a><p class="eyebrow">Care settings</p><h1>Medical info</h1><p class="sub" id="md-sub">What paramedics and the ER will ask for.</p></header>
+  <div id="md-sample" class="card pad" hidden><p class="title">Sample details</p><p class="body">This is demo data. Edit anything and save to make it yours.</p></div>
+  <p class="label">Person</p>
+  <div class="card"><label class="field"><span class="lbl">Full name</span><input id="md-name" autocomplete="off"></label>
+    <div class="grid2"><label class="field"><span class="lbl">Called</span><input id="md-short" placeholder="Dad"></label><label class="field"><span class="lbl">Date of birth</span><input id="md-dob" type="date"></label></div></div>
+  <p class="label">Body</p>
+  <div class="card"><div class="grid2"><label class="field"><span class="lbl">Height</span><input id="md-height" placeholder="5 ft 10 in"></label><label class="field"><span class="lbl">Weight</span><input id="md-weight" placeholder="165 lb"></label></div></div>
+  <p class="label">Blood type</p>
+  <div class="seg bt" id="md-blood"></div>
+  <p class="label">Allergies</p>
+  <div class="card" id="md-allergies"></div>
+  <div class="inline"><input id="md-allergy-new" placeholder="Add an allergy" enterkeyhint="done"><button class="btn small" onclick="mdAdd('allergies')">Add</button></div>
+  <p class="label">Conditions</p>
+  <div class="card" id="md-conditions"></div>
+  <div class="inline"><input id="md-condition-new" placeholder="Add a condition" enterkeyhint="done"><button class="btn small" onclick="mdAdd('conditions')">Add</button></div>
+  <p class="label">Medications</p>
+  <div class="card" id="md-meds"></div>
+  <p class="label">Everyday care</p>
+  <div class="card"><label class="field"><span class="lbl">Mobility</span><textarea id="md-mobility" rows="2" placeholder="Walks with a cane"></textarea></label>
+    <label class="field"><span class="lbl">Hearing, vision, language</span><textarea id="md-communication" rows="2" placeholder="Hard of hearing, right ear"></textarea></label>
+    <label class="field"><span class="lbl">Implants or devices</span><input id="md-implants" placeholder="Pacemaker, hearing aid"></label></div>
+  <p class="label">In an emergency</p>
+  <div class="card"><label class="field"><span class="lbl">Resuscitation wishes</span><select id="md-directive"></select></label>
+    <label class="field"><span class="lbl">Preferred hospital</span><input id="md-hospital"></label>
+    <div class="grid2"><label class="field"><span class="lbl">Insurance</span><input id="md-ins"></label><label class="field"><span class="lbl">Member ID</span><input id="md-insid" autocomplete="off"></label></div>
+    <div class="row"><div><span class="k" id="md-doc">Doctor</span><span class="sub2" id="md-docphone"></span></div></div>
+    <label class="field"><span class="lbl">Notes for responders</span><textarea id="md-notes" rows="3"></textarea></label></div>
+  <p class="cap" id="md-stat">Stored on your home server, never in the public repo.</p>
+  <div class="actions"><button class="btn primary" id="md-save" onclick="saveMedical()">Save medical info</button></div>
 </section>
 
 <section id="s-voice" class="screen">
@@ -267,5 +300,5 @@
     <button class="answer" onclick="answerFromOverlay()"><span class="disc"><svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg></span>Answer</button>
   </div>
 </div>
-<script src="/app-ui.js"></script><script src="/app-voice.js"></script>
+<script src="/app-ui.js"></script><script src="/app-voice.js"></script><script src="/app-medical.js"></script>
 </body></html>
