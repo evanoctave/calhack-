@@ -124,3 +124,22 @@ def test_model_id_comes_from_env(monkeypatch, env: dict[str, str], expected: str
     for k, v in env.items():
         monkeypatch.setenv(k, v)
     assert anthropic_vision.model() == expected
+
+
+def test_auth_token_counts_as_configured(monkeypatch, tmp_path) -> None:
+    """The SDK reads ANTHROPIC_AUTH_TOKEN and `ant auth login` profiles too, not just the key."""
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    assert anthropic_vision.configured() is False
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "tok")
+    assert anthropic_vision.configured() is True
+
+
+def test_ant_profile_counts_as_configured(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    assert anthropic_vision.configured() is False
+    (tmp_path / ".config" / "anthropic").mkdir(parents=True)
+    assert anthropic_vision.configured() is True

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Any, Final
 
 DEFAULT_MODEL: Final[str] = "claude-opus-5"
@@ -16,8 +17,15 @@ MAX_TOKENS: Final[int] = 1024
 
 
 def configured() -> bool:
-    """True when an API key is present. No key means the caller goes straight to the fixture."""
-    return bool(os.environ.get("ANTHROPIC_API_KEY"))
+    """True when any credential the SDK can use is present.
+
+    An unset ANTHROPIC_API_KEY does not mean there are no credentials: the SDK also reads
+    ANTHROPIC_AUTH_TOKEN and a profile stored by `ant auth login`. Checking only the key would
+    send a teammate who authenticated that way to the fixture for no reason.
+    """
+    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
+        return True
+    return (Path.home() / ".config" / "anthropic").is_dir()
 
 
 def model() -> str:
