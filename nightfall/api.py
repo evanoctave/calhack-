@@ -175,11 +175,13 @@ async def state() -> dict[str, Any]:
         "now": store.now().isoformat(),
         "night_mode": store.night(),
         "ladder": LADDER,
+        "door_wait_s": engine.DOOR_WAIT_S,
         "incident": None
         if inc is None
         else {
             "id": inc.id,
             "state": inc.state.value,
+            "door_opened_at": inc.door_opened_at.isoformat() if inc.door_opened_at else None,
             "exited_at": inc.exited_at.isoformat() if inc.exited_at else None,
             "deadline_at": inc.deadline_at.isoformat() if inc.deadline_at else None,
             "acked_by": inc.acked_by,
