@@ -178,6 +178,11 @@ def start_vision(store: Store, incident_id: str) -> None:
 
             if store.inc is not None and store.inc.id == incident_id:
                 store.inc.attire_night = attire_is_night(c)
+                store.inc.footwear, store.inc.top_type, store.inc.bottom_type = (
+                    str(c.get("footwear", "")),
+                    str(c.get("top_type", "")),
+                    str(c.get("bottom_type", "")),
+                )
                 emit(
                     store,
                     {

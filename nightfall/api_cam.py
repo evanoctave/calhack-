@@ -125,7 +125,7 @@ async def door_telemetry(body: TelemetryIn) -> dict[str, Any]:
             engine.State.DOOR_OPEN,
             engine.State.WATCHING,
         ):
-            await _step("stand_down", {"checkin": "self_other", "who": "door restarted"})
+            await _step("stand_down", {"checkin": "self_other", "who": "door restarted", "force": True})
     return {"ok": True}
 
 

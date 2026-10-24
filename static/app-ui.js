@@ -238,6 +238,9 @@ function renderFigma() {
     const st = inc && inc.acked_by === m.id ? ["Responding", "ok"] : ringing ? ["Ringing now", "blue"] : done ? ["No answer", ""] : [i === tree.length - 1 && i > 0 ? "Then " + m.name + " + family" : "Next if no answer", ""];
     return `<div class="row"><div class="lead"><span class="badge ${ringing ? "on" : ""}">${i + 1}</span><span class="k">${esc(m.name)}</span></div><span class="v ${st[1]}">${esc(st[0])}</span></div>`; }).join("");
   $("a-ladder").textContent = `No answer? The next person is called after ${S.ladder_step_s} seconds.`;
+  const w = inc && inc.wander; $("a-why-card").hidden = !w;
+  if (w) { $("a-why-p").textContent = Math.round((w.probability || w.score / 100) * 100) + "% likely";
+    $("a-why").innerHTML = w.reasons.slice(1).map(r => { const m = r.match(/^(.*) \((odds [x\/][\d.]+)\)$/); return `<div class="row"><span style="font-size:14px">${esc(m ? m[1] : r)}</span><span class="v ${m && m[2].includes("x") ? "danger" : "ok"}">${m ? esc(m[2].replace("odds ", "").replace("x", "×").replace("/", "÷")) : ""}</span></div>`; }).join(""); }
   // brief + search
   $("b-name").textContent = p + " left home"; $("b-seen").textContent = "Last seen " + (inc && inc.exited_at ? hhmm(inc.exited_at) : "—") + " · Front entrance";
   $("b-radius").textContent = "Within " + h.radius_mi + " mi of home"; $("sr-radius").textContent = h.radius_mi + " mi around home";

@@ -103,6 +103,8 @@ async def app_state(member: str = "") -> dict[str, Any]:
                 "score": inc.verdict().score,
                 "action": inc.verdict().action,
                 "reasons": list(inc.verdict().reasons),
+                "probability": inc.verdict().probability,
+                "factors": [{"signal": k, "llr": v} for k, v in inc.verdict().factors],
             },
             "emergency": _emergency(store, inc),
             "brief_link": store.link(inc.id, member) if member and hh.member(member) and inc.id in store.briefs else "",

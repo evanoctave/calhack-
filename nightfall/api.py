@@ -109,6 +109,7 @@ async def _step(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
             if store.inc is not None and store.inc.state != engine.State.CLOSED:
                 await store.runner.cancel(store.inc.id)
             store.inc = engine.Incident(id=f"INC-{secrets.token_hex(4)}", night_mode=store.night())
+            store.inc.approaches_15m, store.inc.prior_exit_hours = store.approach_context()
             store.takeover_by, store.call_911_sent = None, False
         inc = store.inc
         inc.night_mode = store.night()
@@ -258,7 +259,9 @@ async def ack(body: AckIn) -> dict[str, Any]:
             engine.State.WATCHING,
             engine.State.ESCALATING,
         ):
-            await _step("stand_down", {"checkin": "self_other", "who": store.hh.member(body.member_id).name})
+            await _step(
+                "stand_down", {"checkin": "self_other", "who": store.hh.member(body.member_id).name, "force": True}
+            )
         store.quiet_until = store.now() + timedelta(seconds=QUIET_AFTER_ACK_S)
         raise HTTPException(404, "no such incident")
     first = await store.runner.ack(body.incident_id, body.member_id)
@@ -332,6 +335,7 @@ async def reset() -> dict[str, Any]:
     store.inc, store.frames, store.briefs = None, {}, {}
     store.quiet_until = store.last_open_at = None
     store.said_tonight.clear()
+    store.approaches.clear()
     store.log.clear()
     store.history, store.frame_bytes = [], {}
     store.takeover_by, store.call_911_sent, store.latest_frame = None, False, b""

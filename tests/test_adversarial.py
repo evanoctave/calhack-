@@ -70,7 +70,7 @@ def test_arrival_then_real_approach_is_not_poisoned(client: TestClient) -> None:
     r = client.post("/event", json={"kind": "person_enter"}).json()
     assert r["to"] == "CONVERSATION"
     r = client.post("/event", json={"kind": "features", "payload": {"identity": "other", "attire_night": True}}).json()
-    assert "score 30" in r["detail"]
+    assert "(speak_only)" in r["detail"]
     client.post("/event", json={"kind": "person_lost", "payload": {"direction": "exit"}})
     client.post("/event", json={"kind": "door_close"})
     s = client.get("/app/state").json()
@@ -83,7 +83,7 @@ def test_identity_match_rings_with_reason(client: TestClient) -> None:
     client.post("/event", json={"kind": "door_close"})
     s = client.get("/app/state").json()
     w = s["incident"]["wander"]
-    assert w["score"] == 80 and w["action"] == "escalate" and any("monitored person" in r for r in w["reasons"])
+    assert w["score"] >= 80 and w["action"] == "escalate" and any("monitored person" in r for r in w["reasons"])
     assert s["rings"]
 
 

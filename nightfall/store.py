@@ -59,6 +59,7 @@ class Store:
         self.voice_source: str = "clone" if os.environ.get("VOICE_IS_CLONE") == "1" else "stock"
         self.voice_name: str = os.environ.get("VOICE_NAME", "")
         self.night_mode: bool = True
+        self.approaches: list[Any] = []  # times the person came to the door, for the pacing signal
         self.said_tonight: set[str] = set()  # door lines spoken since reset, so scripted lines vary
         self.last_open_at: Any = None  # when the door last said its opening line
         self.quiet_until: Any = None  # after a family member says he's safe, re-entries don't restart the door
@@ -84,3 +85,20 @@ class Store:
 
     def night(self) -> bool:
         return self.night_mode or in_window(self.now().time(), self.hh.night_start, self.hh.night_end)
+
+    def approach_context(self) -> tuple[int, tuple[float, ...]]:
+        """Trips to the door in the last 15 minutes (this one included) and the hours of earlier exits."""
+        from datetime import datetime, timedelta
+
+        from nightfall import history
+
+        now = self.now()
+        self.approaches = [t for t in self.approaches if now - t < timedelta(minutes=15)] + [now]
+        hours: list[float] = []
+        for r in history.load()[-60:]:
+            try:
+                t = datetime.fromisoformat(r["exited_at"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            hours.append(t.hour + t.minute / 60)
+        return len(self.approaches), tuple(hours)

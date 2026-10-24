@@ -65,9 +65,31 @@ class Incident:
     checkin: str = "none"
     checkin_who: str = ""
     attire_night: bool = False
+    face_conf: float = 1.0
+    footwear: str = ""
+    top_type: str = ""
+    bottom_type: str = ""
+    approaches_15m: int = 1  # set by the API from recent door approaches
+    prior_exit_hours: tuple[float, ...] = ()  # set by the API from the wander history
 
     def features(self) -> Features:
-        return Features(self.identity, self.direction, self.checkin, self.attire_night, self.night_mode)
+        t = self.opened_at
+        return Features(
+            identity=self.identity,
+            direction=self.direction,
+            checkin=self.checkin,
+            attire_night=self.attire_night,
+            in_window=self.night_mode,
+            hour=(t.hour + t.minute / 60) if t else None,
+            armed=self.night_mode,
+            face_conf=self.face_conf,
+            footwear=self.footwear,
+            top_type=self.top_type,
+            bottom_type=self.bottom_type,
+            prior_exit_hours=self.prior_exit_hours,
+            approaches_15m=self.approaches_15m,
+            lines_unheeded=max(0, self.lines_spoken - 1) if self.direction == "exit" else 0,
+        )
 
     def verdict(self) -> RuleVerdict:
         return wander_score(self.features())
@@ -142,13 +164,20 @@ def _absorb(inc: Incident, ev: Event) -> None:
         inc.checkin_who = str(p.get("who", ""))
     if "attire_night" in p:
         inc.attire_night = bool(p["attire_night"])
+    if isinstance(p.get("face_conf"), (int, float)):
+        inc.face_conf = float(p["face_conf"])
+    for k in ("footwear", "top_type", "bottom_type"):
+        if isinstance(p.get(k), str):
+            setattr(inc, k, p[k])
 
 
 def _stand_down(inc: Incident, ev: Event) -> Transition:
     """A care-circle member identified themselves, or the face is a known other: no wander."""
     _absorb(inc, ev)
     v = inc.verdict()
-    if v.action != "ignore" and inc.checkin != "self_other":
+    # "force" is a family member's word from the phone or a door restart; a name said at the door only stands
+    # down when the evidence agrees (the confabulation guard keeps "it's Mike" from Dad's own face ringing on)
+    if not ev.payload.get("force") and v.action != "ignore":
         return _ignored(inc, ev, f"R11 score {v.score}, staying alert")
     who = inc.checkin_who or ("another person" if inc.identity == "other" else "")
     actions: tuple[str, ...] = (

@@ -22,4 +22,8 @@ for key in (
 ):
     os.environ.pop(key, None)
 os.environ["PUBLIC_URL"] = "http://127.0.0.1:8000"
+# tests never touch the real wander history (it feeds the score's history signal)
+import tempfile
+
+os.environ["HISTORY_FILE"] = os.path.join(tempfile.mkdtemp(prefix="nf-hist-"), "history.json")
 os.environ["PLACES_FILE"] = str(ROOT / "data" / "places.marina.json")
