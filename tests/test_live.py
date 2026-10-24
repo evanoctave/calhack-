@@ -1,9 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
-
-from nightfall import api, escalation
 from starlette.websockets import WebSocketDisconnect
 
+from nightfall import api, escalation
 from nightfall.api_live import live
 
 
