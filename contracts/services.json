@@ -1,0 +1,24 @@
+{
+  "orchestrator": {
+    "base_url": "http://127.0.0.1:8000",
+    "sse": ["/sse/dashboard", "/sse/phone/{member_id}"],
+    "owner": "Nam",
+    "endpoints": ["POST /exit-event", "POST /event", "GET /state", "POST /ack", "GET /brief/{token}"],
+    "note": "Single FastAPI app today (nightfall.api). Full route list: docs/API.md."
+  },
+  "voice": {
+    "base_url": "http://127.0.0.1:8001",
+    "owner": "Evan",
+    "endpoints": ["POST /voice/start", "POST /voice/stop", "POST /calls/tree"]
+  },
+  "geo": {
+    "base_url": "http://127.0.0.1:8002",
+    "owner": "Ethan",
+    "endpoints": ["POST /geo/build-plan", "GET /geo/plan/{profile_id}"]
+  },
+  "frontend": {
+    "base_url": "http://127.0.0.1:8000",
+    "owner": "Jun",
+    "note": "Static pages served by the orchestrator: /dashboard.html /phone.html /brief.html"
+  }
+}

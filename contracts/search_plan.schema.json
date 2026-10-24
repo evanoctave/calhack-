@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "search_plan.schema.json",
+  "title": "SearchPlan",
+  "description": "Where to look, built by the geo service. GET /geo/plan/{profile_id}.",
+  "type": "object",
+  "required": ["profile_id", "home", "open_late", "hazards", "route", "local_contacts", "source"],
+  "$defs": {
+    "place": {
+      "type": "object",
+      "required": ["category", "name", "lat", "lng", "distance_mi", "source"],
+      "properties": {
+        "category": {"enum": ["fuel", "convenience", "diner", "hospital", "transit", "pharmacy", "water", "rail", "motorway", "construction"]},
+        "name": {"type": "string"},
+        "lat": {"type": "number"},
+        "lng": {"type": "number"},
+        "distance_mi": {"type": "number"},
+        "phone": {"type": "string"},
+        "hours": {"type": "string"},
+        "open_now": {"type": ["boolean", "null"]},
+        "source": {"enum": ["fixture", "apify", "osm"]}
+      }
+    }
+  },
+  "properties": {
+    "profile_id": {"type": "string"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "home": {
+      "type": "object",
+      "required": ["lat", "lng", "radius_mi"],
+      "properties": {"lat": {"type": "number"}, "lng": {"type": "number"}, "radius_mi": {"type": "number"}}
+    },
+    "open_late": {"type": "array", "description": "Open-at-night places, ranked: check these first", "items": {"$ref": "#/$defs/place"}},
+    "hazards": {"type": "array", "description": "water, rail, motorway, construction", "items": {"$ref": "#/$defs/place"}},
+    "route": {
+      "type": "object",
+      "description": "Home to familiar places, in the order a wanderer most likely goes",
+      "required": ["stops"],
+      "properties": {
+        "stops": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "lat", "lng"],
+            "properties": {
+              "name": {"type": "string"},
+              "lat": {"type": "number"},
+              "lng": {"type": "number"},
+              "eta_min": {"type": "number"},
+              "distance_mi": {"type": "number"}
+            }
+          }
+        },
+        "polyline": {"type": "string", "description": "Encoded polyline, optional"}
+      }
+    },
+    "local_contacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "phone"],
+        "properties": {"name": {"type": "string"}, "phone": {"type": "string"}, "note": {"type": "string"}}
+      }
+    },
+    "source": {"enum": ["fixture", "apify"]}
+  }
+}

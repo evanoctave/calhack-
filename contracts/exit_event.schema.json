@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "exit_event.schema.json",
+  "title": "ExitEvent",
+  "description": "Emitted once when the person leaves through the door zone. POST /exit-event on the orchestrator.",
+  "type": "object",
+  "required": ["incident_id", "profile_id", "timestamp", "snapshot", "clothing", "state"],
+  "properties": {
+    "incident_id": {"type": "string"},
+    "profile_id": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "snapshot": {"type": "string", "description": "Best frame as the person left: data:image/jpeg;base64,... or a URL"},
+    "clothing": {
+      "type": "object",
+      "required": ["description"],
+      "properties": {
+        "description": {"type": "string", "description": "Police-report style, e.g. navy hoodie, gray sweatpants, barefoot"},
+        "top_color": {"type": "string"},
+        "top_type": {"type": "string"},
+        "bottom_color": {"type": "string"},
+        "bottom_type": {"type": "string"},
+        "footwear": {"type": "string"},
+        "carried_items": {"type": "array", "items": {"type": "string"}},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "source": {"enum": ["mock", "vision"]}
+      }
+    },
+    "state": {
+      "enum": ["ARMED_OFF", "ARMED_IDLE", "CONVERSATION", "DOOR_OPEN", "ESCALATING", "ACKED", "RETURNED", "EXHAUSTED", "CLOSED"],
+      "description": "Incident state when the event was emitted. Same enum as State in nightfall/engine.py."
+    }
+  }
+}
