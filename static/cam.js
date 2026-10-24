@@ -1,7 +1,7 @@
 // Person detection in the browser (TensorFlow.js coco-ssd), ring buffer, live relay to phones.
 // Events: person_enter (3 consecutive hits after absence), person_lost (absent LOST_S), person_back.
 const Cam = {model: null, video: null, canvas: null, ctx: null, overlay: null, octx: null, ring: [], personFrames: [],
-             present: false, hits: 0, misses: 0, lastEvent: "", lostMs: 1500, lastSeenAt: 0, relayAt: 0, busy: false, on: false, heights: [], awayAt: 0};
+             present: false, hits: 0, misses: 0, lastEvent: "", lostMs: 1500, lastSeenAt: 0, relayAt: 0, busy: false, on: false, heights: [], awayAt: 0, face: null, faceMisses: 0, faceTick: 0, facing: ""};
 
 function camStatus(t) { const el = document.getElementById("camstat"); if (el) el.textContent = t; }
 
@@ -16,6 +16,7 @@ async function startCam() {
   Cam.on = true; camStatus("loading detector...");
   try { Cam.model = await cocoSsd.load({base: "lite_mobilenet_v2"}); camStatus("detector ready. walk into frame = approach; out of frame 1.5 s = exit timer."); }
   catch (e) { camStatus("detector failed to load (offline?); falling back to motion"); }
+  loadFace();
   setInterval(camTick, 250);
 }
 
@@ -35,7 +36,7 @@ async function camTick() {
     drawBoxes(boxes, present);
     if (present && blob) { Cam.personFrames.push(blob); if (Cam.personFrames.length > 3) Cam.personFrames.shift(); }
     const now = Date.now();
-    if (present) { Cam.hits++; Cam.lastSeenAt = now; trackAway(boxes, now); } else { Cam.hits = 0; Cam.heights = []; }
+    if (present) { Cam.hits++; Cam.lastSeenAt = now; trackAway(boxes, now); await checkFace(true, now); } else { Cam.hits = 0; Cam.heights = []; Cam.faceMisses = 0; }
     if (!Cam.present && Cam.hits >= 2) { Cam.present = true; await onEnter(); }
     if (Cam.present && now - Cam.lastSeenAt >= Cam.lostMs) { Cam.present = false; await onLost(); }
     if (blob && now - Cam.relayAt > 400 && window.lastState && window.lastState.incident && !["CLOSED"].includes(window.lastState.incident.state)) {
@@ -56,9 +57,28 @@ function drawBoxes(boxes, present) {
   c.strokeStyle = present ? "#4cc17a" : "#ff6b6b"; c.lineWidth = 2; c.font = "12px system-ui"; c.fillStyle = c.strokeStyle;
   boxes.forEach(b => { const [x, y, w, h] = b.bbox; c.strokeRect(x, y, w, h); c.fillText("person " + Math.round(b.score * 100) + "%", x + 4, y + 14); });
   const el = document.getElementById("persondot"); if (el) el.className = "dot " + (present ? "ok" : "");
-  const t = document.getElementById("persontxt"); if (t) t.textContent = present ? "person in frame" : "no person";
+  const t = document.getElementById("persontxt"); if (t && !(present && Cam.face)) t.textContent = present ? "person in frame" : "no person";
 }
 
+// Face detector (MediaPipe via TF.js). No face while a person is in frame for ~1 s = turned away from the door camera.
+async function loadFace() {
+  try {
+    const det = await faceDetection.createDetector(faceDetection.SupportedModels.MediaPipeFaceDetector, {runtime: "mediapipe", solutionPath: "https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4.1646425229", modelType: "short"});
+    Cam.face = det; camStatus("detectors ready: person + face. turning away or moving away starts the voice.");
+  } catch (e) { console.warn("face detector unavailable", e); }
+}
+async function checkFace(present, now) {
+  if (!Cam.face || !present || (Cam.faceTick++ % 2)) return;
+  let faces = []; try { faces = await Cam.face.estimateFaces(Cam.canvas, {flipHorizontal: false}); } catch (e) { return; }
+  Cam.facing = faces.length ? "facing camera" : "turned away";
+  const t = document.getElementById("persontxt"); if (t) t.textContent = "person in frame · " + Cam.facing;
+  if (faces.length) { Cam.faceMisses = 0; return; }
+  Cam.faceMisses++;
+  if (Cam.faceMisses >= 2 && now - Cam.awayAt > 15000) {
+    const st = window.lastState && window.lastState.incident ? window.lastState.incident.state : "";
+    if (!["CONVERSATION", "DOOR_OPEN", "ESCALATING"].includes(st)) { Cam.awayAt = now; camStatus("turned away from the camera: voice starts"); post("/event", {kind: "person_enter", payload: {source: "face", reason: "turned away"}}).then(() => window.refresh && refresh()); }
+  }
+}
 // Moving away from the camera (toward the door): the person's box shrinks by 15% within about a second.
 function trackAway(boxes, now) {
   const h = Math.max(...boxes.map(b => b.bbox[3])); Cam.heights.push([now, h]); Cam.heights = Cam.heights.filter(([t]) => now - t < 1200);
