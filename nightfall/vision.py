@@ -48,8 +48,9 @@ SCHEMA: Final[dict[str, Any]] = {
         "top_pattern": _enum(PATTERNS), "bottom_pattern": _enum(PATTERNS),
         "outerwear": _enum(OUTERWEAR), "headwear": _enum(HEADWEAR), "eyewear": _enum(EYEWEAR),
         "build": _enum(BUILD),
-        "carried_items": {"type": "array", "items": _enum(CARRIED), "maxItems": 4},
-        "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+        # No maxItems: structured outputs rejects it. coerce_rich caps the list instead.
+        "carried_items": {"type": "array", "items": _enum(CARRIED)},
+        "confidence": {"type": "number"},
     },
     "required": ["top_color", "top_type", "bottom_color", "bottom_type", "footwear", "top_pattern",
                  "bottom_pattern", "outerwear", "headwear", "eyewear", "build", "carried_items",

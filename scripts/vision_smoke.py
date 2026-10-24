@@ -43,7 +43,7 @@ ROOT = Path(__file__).resolve().parent.parent
 _LOADED = load_dotenv(ROOT / ".env")
 
 from nightfall import vision  # noqa: E402
-from nightfall.brief import clothing_line  # noqa: E402
+from nightfall.brief import clothing_line, coerce_clothing  # noqa: E402
 from nightfall.integrations import anthropic_vision  # noqa: E402
 
 
@@ -78,10 +78,17 @@ def main(argv: list[str]) -> int:
         return 1
     elapsed = time.monotonic() - started
 
-    report = vision.describe_clothing(jpeg)
+    # Build both shapes from the one response. Calling describe_clothing here would
+    # issue a second request and print two different answers for the same image.
+    report = vision.ClothingReport(
+        brief=coerce_clothing({**raw, "source": "anthropic"}), full=vision.coerce_rich(raw)
+    )
     print(f"\nOK in {elapsed:.1f}s\n")
     print("raw model output")
     print(json.dumps(raw, indent=2))
+    lux = vision.mean_luminance(jpeg)
+    if lux is not None:
+        print(f"\nluminance       {lux:.0f}/255 (floor {vision.min_luminance():g})")
     print("\nbrief fields (the six in docs/API.md)")
     print(json.dumps(report.brief, indent=2))
     print(f"\nclothing_line   {clothing_line(report.brief)!r}")

@@ -143,3 +143,13 @@ def test_ant_profile_counts_as_configured(monkeypatch, tmp_path) -> None:
     assert anthropic_vision.configured() is False
     (tmp_path / ".config" / "anthropic").mkdir(parents=True)
     assert anthropic_vision.configured() is True
+
+
+def test_schema_avoids_keywords_structured_outputs_rejects() -> None:
+    """A live call returned 400 on maxItems. Keep the schema to what the API accepts."""
+    import json
+
+    rejected = {"maxItems", "minItems", "minimum", "maximum", "maxLength", "minLength", "pattern"}
+    blob = json.dumps(vision.SCHEMA)
+    found = sorted(k for k in rejected if f'"{k}"' in blob)
+    assert not found, f"structured outputs rejects these schema keywords: {found}"
