@@ -22,8 +22,9 @@ let es = null;
 function connect() { if (es) es.close(); es = sse("/sse/phone/" + member, onEvent); }
 async function refresh() {
   S = await (await fetch("/app/state?member=" + encodeURIComponent(member))).json();
+  serverOffset = new Date(S.now).getTime() - Date.now();
   if (!S.household.tree.some(m => m.id === member)) { const old = member; await resolveMember(); if (member !== old) { connect(); S = await (await fetch("/app/state?member=" + encodeURIComponent(member))).json(); } }
-  render();
+  render(); tickCountdown();
 }
 function hhmm(iso) { return iso ? new Date(iso).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"}) : "—"; }
 function render() {
@@ -86,6 +87,14 @@ function render() {
   $("r-tostat").textContent = S.takeover_by ? "You are speaking." : "AI is speaking for you.";
   if (incident && inc.brief_link) loadBrief(inc.brief_link);
 }
+let serverOffset = 0;
+function tickCountdown() {
+  if (!S) return; const inc = S.incident; const show = inc && inc.state === "DOOR_OPEN" && inc.door_opened_at;
+  ["h", "a"].forEach(k => { const el = $(k + "-cd"); if (!el) return; el.hidden = !show; if (!show) return;
+    const left = Math.max(0, (new Date(inc.door_opened_at).getTime() + S.door_wait_s * 1000 - (Date.now() + serverOffset)) / 1000);
+    $(k + "-cdt").textContent = "Out of view · this phone rings in " + left.toFixed(1) + " s"; $(k + "-cds").textContent = "Back in frame cancels it."; });
+}
+setInterval(tickCountdown, 200);
 function cap(s) { s = s.replace(/unknown ?/g, "").trim(); return s ? s[0].toUpperCase() + s.slice(1) : "See photo"; }
 function setHero(id, inc) { const el = $(id); const f = inc && inc.exit_frame; el.innerHTML = f ? `<img src="${esc(f)}" alt="exit frame">` : '<div class="door"></div><div class="line"></div>'; }
 let briefLoaded = "";

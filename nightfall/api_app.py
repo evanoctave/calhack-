@@ -111,6 +111,12 @@ async def app_state(member: str = "") -> dict[str, Any]:
     }
 
 
+def _door_wait() -> float:
+    from nightfall import engine
+
+    return float(engine.DOOR_WAIT_S)
+
+
 def _live_by() -> str | None:
     from nightfall.api_live import live
 

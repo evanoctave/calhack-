@@ -38,6 +38,7 @@ input { padding: 10px 14px; font-size: 15px; } .tabs { display: none; }
     <div class="rowb" style="margin-bottom:8px"><span id="sdot" class="dot"></span><span class="state" id="state">none</span><span id="inc" class="mono"></span></div>
     <div id="detail" class="muted small">Press Simulate approach, or walk into the camera zone.</div>
     <div id="deadline" class="small muted"></div>
+    <div id="countdown" class="card mt" style="padding:14px 18px;display:none"><span class="small muted" id="cdlabel">Exit clock</span><div style="font-size:40px;font-weight:700;line-height:1" id="cdnum">3</div><div class="small muted" id="cdsub"></div></div>
     <div class="rowb" style="margin-top:12px">
       <button class="btn small primary" onclick="ev('person_enter')">Simulate approach</button>
       <button class="btn small" onclick="ev('person_lost')">Leaves frame</button>
@@ -78,9 +79,27 @@ function render(s) {
   document.getElementById("state").textContent = st; document.getElementById("inc").textContent = inc ? inc.id : "";
   document.getElementById("sdot").className = "dot " + ({ESCALATING:"danger",EXHAUSTED:"danger",DOOR_OPEN:"warn",CONVERSATION:"accent",ACKED:"ok",RETURNED:"ok"}[st] || "");
   document.getElementById("deadline").textContent = inc && inc.deadline_at ? "Call 911 at " + fmtTime(inc.deadline_at) + " if not found (15-minute rule)." : "";
+  const nameOf = id => (s.household.tree.find(m => m.id === id) || {name: id}).name; s.rings = (s.rings || []).map(r => ({...r, members: r.members.map(nameOf)}));
   const tree = document.getElementById("tree"); tree.innerHTML = s.household.tree.map(m => `<li>Tier ${m.tier}: ${esc(m.name)} <a class="small" href="/phone.html#${esc(m.id)}" target="_blank">phone page</a></li>`).join("");
   const log = document.getElementById("log"); log.innerHTML = s.log.slice().reverse().map(line).join("");
 }
+let serverOffset = 0;
+function tickCountdown() {
+  const box = document.getElementById("countdown"); if (!last) return; const inc = last.incident;
+  if (!inc || !["DOOR_OPEN", "ESCALATING"].includes(inc.state)) { box.style.display = "none"; return; }
+  box.style.display = "block"; const now = Date.now() + serverOffset;
+  if (inc.state === "DOOR_OPEN" && inc.door_opened_at) {
+    const left = Math.max(0, (new Date(inc.door_opened_at).getTime() + last.door_wait_s * 1000 - now) / 1000);
+    document.getElementById("cdlabel").textContent = "Out of view · calling family in"; document.getElementById("cdnum").textContent = left.toFixed(1) + " s"; document.getElementById("cdnum").style.color = "var(--warn)";
+    document.getElementById("cdsub").textContent = "Back in frame cancels this.";
+  } else {
+    const since = inc.exited_at ? (now - new Date(inc.exited_at).getTime()) / 1000 : 0; const tiers = last.rings.map(r => r.tier); const nextTier = Math.min(3, (tiers.length ? tiers[tiers.length - 1] : 0) + 1);
+    const step = last.ladder[0] ? last.ladder[0][1] : 60; const nextIn = Math.max(0, tiers.length * step - since);
+    document.getElementById("cdlabel").textContent = "Ringing tier " + (tiers[tiers.length - 1] || 1) + " · " + (last.rings.length ? last.rings[last.rings.length - 1].members.join(", ") : ""); document.getElementById("cdnum").textContent = inc.acked_by ? "answered" : Math.floor(since) + " s"; document.getElementById("cdnum").style.color = inc.acked_by ? "var(--ok)" : "var(--danger)";
+    document.getElementById("cdsub").textContent = inc.acked_by ? "Acknowledged by " + inc.acked_by : (tiers.length < 3 ? "Tier " + nextTier + " in " + nextIn.toFixed(0) + " s if nobody answers" : "Everyone called");
+  }
+}
+setInterval(tickCountdown, 200);
 function line(e) {
   let body = "";
   if (e.type === "state") body = `<span class="pill">${esc(e.rule)}</span> ${esc(e.from)} to <strong>${esc(e.to)}</strong> on ${esc(e.kind)}. ${esc(e.detail)}`;
@@ -106,7 +125,7 @@ function playAtDoor(e) {
   else { nowPlaying("door speaker (browser voice): " + label); speak(e.text); }
 }
 document.addEventListener("click", () => { if (pending) { const e = pending; pending = null; playAtDoor(e); } else if (!audioOk) { try { const c = new (window.AudioContext || window.webkitAudioContext)(); c.resume(); audioOk = true; } catch (err) {} } }, true);
-async function refresh() { last = await (await fetch("/state")).json(); window.lastState = last; render(last); }
+async function refresh() { last = await (await fetch("/state")).json(); window.lastState = last; serverOffset = new Date(last.now).getTime() - Date.now(); render(last); tickCountdown(); }
 async function ev(kind, payload) { await post("/event", {kind, payload: payload || {}}); refresh(); }
 async function reply() { const t = document.getElementById("replytext").value.trim(); if (t) await ev("reply", {text: t}); }
 async function reset() { await post("/reset"); refresh(); }
