@@ -15,7 +15,8 @@ from nightfall import brief as briefmod
 from nightfall import engine
 from nightfall.escalation import Runner
 from nightfall.household import Household, in_window, load
-from nightfall.notify import Hub, SseNotifier
+from nightfall.integrations import twilio
+from nightfall.notify import Hub, SseNotifier, TwilioNotifier
 
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "http://127.0.0.1:8000")
@@ -31,9 +32,13 @@ class Store:
         self.log: list[dict[str, Any]] = []
         self.frames: dict[str, list[str]] = {}
         self.briefs: dict[str, dict[str, Any]] = {}
+        self.history: list[tuple[str, str]] = []
+        self.last_payload: dict[str, Any] = {}
+        self.frame_bytes: dict[str, bytes] = {}
         self.night_mode: bool = True
         self.hub = Hub()
-        self.runner = Runner(SseNotifier(self.hub, self.link))
+        notifier = TwilioNotifier(self.hub, self.link, PUBLIC_URL) if twilio.enabled() else SseNotifier(self.hub, self.link)
+        self.runner = Runner(notifier)
         self.lock = asyncio.Lock()
         self.tick_task: asyncio.Task[None] | None = None
 

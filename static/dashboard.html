@@ -53,8 +53,9 @@ function render(s) {
 function line(e) {
   let body = "";
   if (e.type === "state") body = `<span class="pill">${esc(e.rule)}</span> ${esc(e.from)} to <strong>${esc(e.to)}</strong> on ${esc(e.kind)}. ${esc(e.detail)}`;
-  else if (e.type === "speak") body = `<span class="pill ok">voice</span> "${esc(e.text)}"`;
-  else if (e.type === "ring") body = `<span class="pill danger">ring tier ${esc(e.tier)}</span> ${esc((e.members||[]).join(", "))}`;
+  else if (e.type === "speak") body = `<span class="pill ok">voice ${esc(e.voice_source || "")}</span> "${esc(e.text)}" <span class="muted small">line: ${esc(e.line_source || "script")}</span>`;
+  else if (e.type === "call") body = `<span class="pill">call agent</span> ${esc(e.member_id)} heard "${esc(e.heard || "")}" -> ${esc(e.intent)}`;
+  else if (e.type === "ring") body = `<span class="pill danger">ring tier ${esc(e.tier)}</span> ${esc((e.members||[]).join(", "))} <span class="muted small">${esc(e.source || "")} ${esc(e.result || "")}</span>`;
   else if (e.type === "brief_ready") body = `<span class="pill">brief</span> built for ${esc(e.incident_id)}`;
   else if (e.type === "tree") body = `<span class="pill">tree</span> added ${esc(e.member.name)} at tier ${esc(e.member.tier)}`;
   else body = `<span class="pill">${esc(e.type)}</span>`;
@@ -71,7 +72,7 @@ async function addJudge() {
   refresh();
 }
 sse("/sse/dashboard", async e => {
-  if (e.type === "speak") speak(e.text);
+  if (e.type === "speak") { if (e.url) { new Audio(e.url).play().catch(() => speak(e.text)); } else speak(e.text); }
   if (e.type === "exit_frames_request") postFrames(e.incident_id);
   refresh();
 });

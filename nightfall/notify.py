@@ -59,3 +59,29 @@ class SseNotifier:
             "dashboard",
             {"type": "ring", "tier": tier, "members": [m.name for m in members], "source": "sse"},
         )
+
+
+class TwilioNotifier:
+    """Calls members with an E.164 phone through the TwiML agent and texts the link; SSE always runs too."""
+
+    def __init__(self, hub: Hub, link: LinkFn, public_url: str) -> None:
+        self._sse = SseNotifier(hub, link)
+        self._hub = hub
+        self._link = link
+        self._public = public_url
+
+    async def ring(self, members: list[TreeMember], message: str, incident_id: str, tier: int) -> None:
+        await self._sse.ring(members, message, incident_id, tier)
+        from nightfall.integrations import twilio
+
+        for m in members:
+            if not m.phone.startswith("+"):
+                continue
+            result = "called"
+            try:
+                await asyncio.to_thread(twilio.create_call, m.phone, f"{self._public}/twiml/{incident_id}/{m.id}")
+                await asyncio.to_thread(twilio.send_sms, m.phone, f"{message} {self._link(incident_id, m.id)}")
+            except Exception as e:  # noqa: BLE001
+                print(f"twilio fallback: {e}")
+                result = f"sse only: {e}"
+            self._hub.publish("dashboard", {"type": "ring", "tier": tier, "members": [m.name], "source": "twilio", "result": result})

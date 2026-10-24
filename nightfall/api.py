@@ -19,11 +19,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from nightfall import brief as briefmod
-from nightfall import engine
+from nightfall import engine, voice
 from nightfall.actions import emit as _emit
 from nightfall.actions import run_actions as _run_actions
 from nightfall.escalation import LADDER
 from nightfall.household import TreeMember, load
+from nightfall.integrations import anthropic_llm, cartesia, twilio
+from nightfall.api_voice import router as voice_router
 from nightfall.store import ROOT, Store
 
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "http://127.0.0.1:8000")
@@ -36,6 +38,7 @@ store = Store()
 @asynccontextmanager
 async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
     store.tick_task = asyncio.create_task(_ticker())
+    print("voice pre-synthesis:", voice.pre_synthesize(store.hh))
     try:
         yield
     finally:
@@ -73,6 +76,7 @@ async def _step(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
             store.inc = engine.Incident(id=f"INC-{secrets.token_hex(4)}", night_mode=store.night())
         inc = store.inc
         inc.night_mode = store.night()
+        store.last_payload = payload
         tr = engine.step(inc, engine.Event(kind, store.now(), payload))
         if kind != "tick" or tr.from_state != tr.to_state:
             _emit(store, {"type": "state", "incident_id": inc.id, "kind": kind, "from": tr.from_state.value,
@@ -91,7 +95,8 @@ async def _ticker() -> None:
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
-    return {"ok": True, "mock": {"cartesia": True, "anthropic": True, "apify": True, "twilio": True},
+    return {"ok": True, "mock": {"cartesia": not cartesia.enabled(), "anthropic": not anthropic_llm.enabled(),
+                                 "apify": True, "twilio": not twilio.enabled()},
             "now": store.now().isoformat(), "night_mode": store.night()}
 
 
@@ -158,6 +163,7 @@ async def frames(incident_id: str, request: Request) -> dict[str, Any]:
             if len(data) > MAX_FRAME:
                 raise HTTPException(413, "frame over 200 KB")
             out.append("data:image/jpeg;base64," + base64.b64encode(data).decode())
+            store.frame_bytes[incident_id] = data
     store.frames[incident_id] = (store.frames.get(incident_id, []) + out)[-3:]
     if incident_id in store.briefs:
         store.briefs[incident_id]["exit_frames"] = store.frames[incident_id]
@@ -205,6 +211,7 @@ async def reset() -> dict[str, Any]:
     if store.inc is not None:
         await store.runner.cancel(store.inc.id)
     store.inc, store.log, store.frames, store.briefs = None, [], {}, {}
+    store.history, store.frame_bytes = [], {}
     store.runner.rings.clear()
     store.hh = load(ROOT / "data" / "household.json")
     store.hub.publish("dashboard", {"type": "reset"})
@@ -216,4 +223,5 @@ async def index() -> FileResponse:
     return FileResponse(ROOT / "static" / "dashboard.html")
 
 
+app.include_router(voice_router)
 app.mount("/", StaticFiles(directory=str(ROOT / "static")), name="static")

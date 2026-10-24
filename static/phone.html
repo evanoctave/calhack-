@@ -14,6 +14,12 @@
   </div>
   <div id="deadline" class="banner" hidden>15 minutes since exit. Call 911 now.</div>
 </section>
+<section id="agent" class="card" hidden style="margin-top:16px">
+  <h2>Nightfall agent (the call, in the browser)</h2>
+  <p id="agentsay" class="muted"></p>
+  <div class="row"><button class="primary" onclick="listen()" id="listenbtn">Hold to ask (tap, then speak)</button><input id="agenttext" placeholder="or type: where should I look?" style="flex:1"><button onclick="askTyped()">Ask</button></div>
+  <p id="heard" class="small muted"></p>
+</section>
 <script>
 const member = location.hash.slice(1) || "TM-SARAH"; document.getElementById("who").textContent = "caregiver phone: " + member;
 let ctxA = null, osc = null, incident = null, soundOn = false;
@@ -30,9 +36,32 @@ sse("/sse/phone/" + member, e => {
     set("Ringing: tier " + e.tier, "danger", e.message);
     document.getElementById("actions").hidden = false; document.getElementById("brief").href = e.link;
     ringTone(true); if (navigator.vibrate) navigator.vibrate([300, 200, 300]); speak(e.message);
+    document.getElementById("agent").hidden = false; setTimeout(openingLine, 2500);
   }
   if (e.type === "acked") { ringTone(false); document.getElementById("card").classList.remove("ringing"); set("Acknowledged by " + e.by, "ok", "No further rings."); }
   if (e.type === "deadline") document.getElementById("deadline").hidden = false;
 });
+function playRef(audio, text) { if (audio && audio.url) { new Audio(audio.url).play().catch(() => speak(text)); } else speak(text); }
+async function openingLine() {
+  const r = await (await fetch("/agent/opening/" + incident + "/" + member)).json();
+  document.getElementById("agentsay").textContent = r.say; ringTone(false); playRef(r.audio, r.say);
+}
+async function sendTurn(text) {
+  document.getElementById("heard").textContent = 'You: "' + text + '"';
+  const r = await post("/agent/turn", {incident_id: incident, member_id: member, text});
+  document.getElementById("agentsay").textContent = r.say; playRef(r.audio, r.say);
+  if (r.ack) { ringTone(false); set("You acknowledged by voice", "ok", "Other phones stop ringing."); }
+}
+function listen() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { document.getElementById("heard").textContent = "Speech recognition not available here; type instead."; return; }
+  const rec = new SR(); rec.lang = "en-US"; rec.interimResults = false;
+  document.getElementById("listenbtn").textContent = "Listening...";
+  rec.onresult = ev => sendTurn(ev.results[0][0].transcript);
+  rec.onend = () => { document.getElementById("listenbtn").textContent = "Hold to ask (tap, then speak)"; };
+  rec.onerror = () => { document.getElementById("heard").textContent = "Did not catch that."; };
+  rec.start();
+}
+async function askTyped() { const t = document.getElementById("agenttext").value.trim(); if (t) { document.getElementById("agenttext").value = ""; sendTurn(t); } }
 async function ack() { if (!incident) return; const r = await post("/ack", {incident_id: incident, member_id: member}); ringTone(false); set("You acknowledged", "ok", r.first ? "Other phones stop ringing." : "Already acknowledged by " + r.acked_by); }
 </script></body></html>

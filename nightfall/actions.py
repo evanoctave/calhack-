@@ -9,6 +9,7 @@ from typing import Any
 
 from nightfall import brief as briefmod
 from nightfall import engine
+from nightfall import llm, voice
 from nightfall.script import SCRIPT, fill
 from nightfall.store import Store
 
@@ -23,13 +24,19 @@ def emit(store: Store, obj: dict[str, Any]) -> None:
 async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident) -> None:
     """Execute every action named by a transition, in order."""
     for a in tr.actions:
-        if a.startswith("speak:"):
-            line = fill(SCRIPT[a.split(":")[1]], store.hh)
-            emit(store, {"type": "speak", "text": line, "mode": "browser_tts"})
+        if a == "speak:open":
+            store.history = []
+            _speak(store, fill(SCRIPT["open"], store.hh), "script")
+        elif a == "speak:again":
+            reply = str(tr_payload(tr, inc, store).get("text", ""))
+            store.history.append(("person", reply))
+            line, source = llm.next_line(store.hh, store.history, llm.memory_hits(store.hh, reply))
+            _speak(store, line, source)
         elif a == "capture_exit_frames":
             store.hub.publish("dashboard", {"type": "exit_frames_request", "incident_id": inc.id})
         elif a == "build_brief":
-            store.briefs[inc.id] = briefmod.build(store.hh, inc, briefmod.mock_clothing(), store.places,
+            clothing = llm.describe_clothing(store.frame_bytes.get(inc.id))
+            store.briefs[inc.id] = briefmod.build(store.hh, inc, clothing, store.places,
                                                   store.frames.get(inc.id, []), store.now())
             emit(store, {"type": "brief_ready", "incident_id": inc.id})
         elif a == "start_escalation":
@@ -45,3 +52,16 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
             store.frames.pop(inc.id, None)
 
 
+
+
+def _speak(store: Store, line: str, source: str) -> None:
+    """Resolve audio for a line (Cartesia or browser TTS) and push it to the dashboard."""
+    store.history.append(("system", line))
+    ref = voice.say(line, store.hh.persona)
+    emit(store, {"type": "speak", "text": line, "mode": ref["mode"], "url": ref["url"],
+                 "voice_source": ref["source"], "line_source": source})
+
+
+def tr_payload(tr: engine.Transition, inc: engine.Incident, store: Store) -> dict[str, Any]:
+    """The payload of the event that caused this transition (kept on the store by the API layer)."""
+    return store.last_payload

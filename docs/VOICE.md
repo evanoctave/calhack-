@@ -1,0 +1,62 @@
+# Voice agent lane (`voice-agent-feature`)
+
+Three voice jobs, all behind mocks, all validated by code. The model never sets state, tiers, timers or medications.
+
+## 1. Door redirect
+
+- `voice.say(line, persona)` -> `AudioRef {mode, text, url, source}`. Real: Cartesia Sonic `POST /tts/bytes`
+  (`Authorization: Bearer`, `Cartesia-Version: 2026-08-14`, `model_id: sonic-3`, WAV 24 kHz) cached by sha1
+  in `out/voice/` (LRU 64), served at `/voice/<sha>.wav`. Mock: the dashboard speaks with SpeechSynthesis.
+- `voice.pre_synthesize(hh)` runs at boot so the first line at the door never waits on the network.
+- `voice.hear(audio, typed)` -> text. Real: Cartesia Ink `POST /stt` (`model=ink-whisper`). Mock: the typed reply.
+- `llm.next_line(hh, history, memory_hits)` -> `(line, source)`. Real: Claude (`claude-opus-5`, override with
+  `ANTHROPIC_MODEL`) writes one line inside the persona template; `script.validate` enforces R6 (under 140 chars,
+  no banned phrase, no digits except a time, terminal punctuation). Any failure -> scripted fallback
+  (`closed_place` when the reply mentions a store or work, `again`, then `comfort`).
+- Persona: `household.persona` is `caregiver_clone` (consented clone id in `CARTESIA_VOICE_ID`) or `assistant`.
+  The family-call agent always uses the assistant voice (`CARTESIA_ASSISTANT_VOICE_ID`), never the clone.
+
+## 2. Family call agent
+
+`call_agent.opening(hh, brief, member_name)` composes the first line from brief fields only: time, clothing,
+radius, two nearest hazards, two open places, how to ack. `call_agent.handle(hh, brief, name, text)` -> `Reply`.
+Deterministic intents run first: ack ("I've got him", "he's with me"), repeat, hazards / where to look, clothing,
+medications (from the caregiver table), who to call, goodbye. Anything else goes to Claude with a fact sheet and
+the rule "only these facts"; banned phrases or empty output fall to a safe default.
+
+Transports, same brain:
+- Twilio: `TwilioNotifier` calls every member with an E.164 phone. Twilio fetches `POST /twiml/{inc}/{member}`
+  (opening + `<Gather input="speech" speechTimeout="auto">`), posts `SpeechResult` to `/twiml/.../turn`, loops
+  until ack or goodbye (`<Hangup/>`). The link also goes by SMS. Any Twilio error -> SSE only, logged on the dashboard.
+- Phone page (mock and fallback): `GET /agent/opening/{inc}/{member}`, `POST /agent/turn` with browser speech
+  recognition in and TTS or Cartesia audio out. A spoken ack calls `/ack` exactly like the button.
+
+## 3. Brief prose
+
+`llm.brief_prose(fields)` -> two sentences from fields; template is the mock and the fallback.
+
+## Env
+
+```
+MOCK=0
+CARTESIA_API_KEY=  CARTESIA_VOICE_ID=  CARTESIA_ASSISTANT_VOICE_ID=
+ANTHROPIC_API_KEY= ANTHROPIC_MODEL=claude-opus-5
+TWILIO_ACCOUNT_SID= TWILIO_AUTH_TOKEN= TWILIO_FROM=
+PUBLIC_URL=https://<tunnel>   # Twilio must reach /twiml and /voice
+```
+
+## Consent and limits
+
+The clone is made only from the caregiver's own recording with on-screen consent in the Cartesia console.
+The redirect lines state orientation and reassurance, never facts the system does not have. Twilio trial accounts
+can only call verified numbers; the phone page is the primary ring in the demo. Browser speech recognition needs
+Chrome or Safari over HTTPS or localhost.
+
+## Where Claude could go wrong, and the guard
+
+| Failure | Guard |
+|---|---|
+| Invents clothing | enumerated fields, `unknown` for anything else, confidence under 0.4 shows "see photo", frame always attached |
+| Argues or escalates tone | length cap, banned-phrase list, scripted fallback, 4-line budget (R1) |
+| Hallucinates a medication or a place on the call | medications and places come from the caregiver table and the brief; the QA prompt gets a fact sheet and nothing else; code intents answer the common questions before the model sees them |
+| Takes the ack decision | ack is a regex on the caller's words plus the `/ack` endpoint; the model's text never changes state |

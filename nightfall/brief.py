@@ -82,6 +82,7 @@ def build(hh: Household, inc: Incident, clothing: dict[str, Any], places: list[d
         "exit_frames": frames[:3], "clothing": clothing, "clothing_line": line,
         "medications": list(hh.medications) if hh.meds_opt_in else [],
         "last_seen_at": exited.isoformat(), "deadline_at": (inc.deadline_at or exited).isoformat(),
+        "last_seen_hhmm": exited.strftime("%-I:%M %p"), "deadline_hhmm": (inc.deadline_at or exited).strftime("%-I:%M %p"),
         "home": {"lat": hh.home_lat, "lng": hh.home_lng, "radius_mi": hh.radius_mi},
         "hazards": sections.hazards, "call_first": sections.call_first,
         "familiar": sections.familiar, "contacts": sections.contacts,
