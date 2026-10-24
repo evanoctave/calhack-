@@ -29,7 +29,8 @@ class Store:
 
     def __init__(self) -> None:
         self.hh: Household = load(ROOT / "data" / "household.json")
-        self.places = briefmod.load_places(os.environ.get("PLACES_FILE") or ROOT / "data" / "places.marina.json")
+        live, fixture = ROOT / "data" / "places.marina.live.json", ROOT / "data" / "places.marina.json"
+        self.places = briefmod.load_places(os.environ.get("PLACES_FILE") or (live if live.exists() else fixture))
         self.memory = Memory(self.hh)
         self.inc: engine.Incident | None = None
         self.log: list[dict[str, Any]] = []
