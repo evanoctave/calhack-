@@ -16,7 +16,12 @@ Cal Hacks 13.0. See `NIGHTFALL-MASTER-PROMPT.md` for the full spec and team lane
 ./run.sh check    # gate before every commit
 ```
 
-Demo knobs: `DOOR_WAIT_S=5 ESCALATION_STEP_S=10 ./run.sh` shortens the waits.
+`run.sh` creates `.env` from `.env.example` on first run and installs dependencies whenever
+`requirements.txt` changes. `.env` is gitignored; fill in the keys you have and leave the rest
+blank to stay on the mocks.
+
+Demo knobs: `DOOR_WAIT_S=5 ESCALATION_STEP_S=10 ./run.sh` shortens the waits. An inline value
+wins over `.env`.
 
 ## The moment (mock)
 

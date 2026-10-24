@@ -4,9 +4,40 @@
 # ./run.sh check  tests + import smoke; the gate before every commit
 set -euo pipefail
 cd "$(dirname "$0")"
-if [ ! -d .venv ]; then python3 -m venv .venv && .venv/bin/pip install -q -r requirements.txt; fi
+
+# One file to put keys in. Created from the template on first run.
+if [ ! -f .env ]; then
+  cp .env.example .env
+  echo "created .env from .env.example - add your keys there"
+fi
+
+# Virtualenv, then dependencies whenever requirements.txt changes. The old guard
+# only installed when .venv was missing, so a new dependency was never picked up
+# and the feature needing it failed silently.
+[ -d .venv ] || python3 -m venv .venv
+if [ requirements.txt -nt .venv/.installed ]; then
+  echo "installing dependencies..."
+  .venv/bin/pip install -q -r requirements.txt
+  touch .venv/.installed
+fi
 PY=.venv/bin/python
-[ -f .env ] && set -a && . ./.env && set +a
+
+# Load .env line by line, skipping comments, blanks and blank values. An exported
+# empty ANTHROPIC_API_KEY would shadow a real credential from `ant auth login`.
+# Read in a loop rather than sourcing: process substitution is not available on
+# every shell this has to run on, and it fails silently when it is not.
+while IFS= read -r line || [ -n "$line" ]; do
+  case "$line" in
+    ''|'#'*|' '*'#'*) continue ;;
+  esac
+  key=${line%%=*}
+  value=${line#*=}
+  # An inline value wins, so `DOOR_WAIT_S=5 ./run.sh` still shortens the demo.
+  if [ "$key" != "$line" ] && [ -n "$value" ] && [ -z "${!key:-}" ]; then
+    export "$key=$value"
+  fi
+done < .env
+
 export MOCK="${MOCK:-1}"
 case "${1:-serve}" in
   serve) exec $PY -m uvicorn nightfall.api:app --host 127.0.0.1 --port "${PORT:-8000}" ;;
