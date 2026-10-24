@@ -225,6 +225,7 @@ def _persist_household(hh: Any) -> None:
                 "description": dict(hh.description),
                 "diagnosis": hh.diagnosis,
                 "doctor": dict(hh.doctor),
+                "radius_mi": hh.radius_mi,
                 "home_lat": hh.home_lat,
                 "home_lng": hh.home_lng,
                 "tree": [

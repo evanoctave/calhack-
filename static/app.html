@@ -16,7 +16,7 @@
   <div class="card"><div class="row link" onclick="go('medical')"><div><span class="k">Medical info</span><span class="sub2" id="su-medical">Blood type, allergies, conditions</span></div></div></div>
   <div class="card"><div class="row link" onclick="go('voice')"><div><span class="k">Family voice</span><span class="sub2" id="su-voice">Record or choose a familiar voice</span></div></div></div>
   <div class="card"><div class="row link" onclick="go('calls')"><div><span class="k">Call order</span><span class="sub2" id="su-calls">1 Sarah → 2 Mike → 3 Linda</span></div></div></div>
-  <div class="card"><div class="row link" onclick="go('places')"><div><span class="k">Home &amp; nearby places</span><span class="sub2" id="su-places">San Francisco Marina · 1.5 mi</span></div></div></div>
+  <div class="card"><div class="row link" onclick="go('places')"><div><span class="k">Home &amp; danger zones</span><span class="sub2" id="su-places">San Francisco Marina · 1.5 mi</span></div></div></div>
   <div class="pair"><button class="btn" onclick="go('camera')">Door camera</button><button class="btn" onclick="showArm()">Phone alerts</button></div>
   <div class="actions"><button class="btn primary" onclick="go('home')">Start night watch</button></div>
 </section>
@@ -96,19 +96,25 @@
 </section>
 
 <section id="s-places" class="screen">
-  <header class="head"><a class="back" onclick="go('setup')">Setup</a><h1>Home &amp; familiar places</h1><p class="sub">Help your family know where to look.</p></header>
-  <div class="card"><label class="field"><span class="lbl">Home address</span><input id="p-addr" placeholder="San Francisco Marina"></label></div>
+  <header class="head"><a class="back" onclick="go('setup')">Setup</a><p class="eyebrow">Care settings</p><h1>Home &amp; danger zones</h1><p class="sub">Where Dad lives, and what nearby could hurt him at night.</p></header>
+  <div class="card"><label class="field"><span class="lbl">Home address</span><input id="p-addr" placeholder="3245 Fillmore St, San Francisco, CA" autocomplete="street-address" enterkeyhint="search"></label></div>
+  <p class="label">How far could he walk?</p>
+  <div class="seg" id="pl-rad"></div>
+  <div class="card pad"><span class="cap blue" id="pl-radius">1.5 mi around home</span><p class="cap mt">We map water, rail lines, highways and construction inside this circle right away. Apify then finds places open late where someone could have seen him.</p></div>
   <div class="card"><div class="row"><span class="k">Familiar places</span></div><div id="p-places"></div></div>
-  <div class="card pad"><span class="cap blue" id="pl-radius">1.5 mi around home</span><p class="cap mt">Nearby water, roads and places open at night are included in the search brief.</p></div>
-  <p class="cap">You can edit these details later in Care.</p>
-  <div class="actions"><button class="btn primary" onclick="findPlaces()">Find nearby places</button></div>
+  <p class="cap">Each search uses a little Apify credit.</p>
+  <div class="actions"><button class="btn primary" onclick="findPlaces()">Find dangerous places nearby</button></div>
 </section>
 
 <section id="s-area" class="screen">
   <header class="head"><a class="back" onclick="go('places')">Home and places</a><h1>Know the area first</h1><p class="sub" id="ar-sub">San Francisco Marina · 1.5 mi around home</p></header>
   <div id="area-map"></div>
-  <div class="card"><div class="row"><div><span class="k">Places to check first</span><span class="sub2">Waterfront and nearby hazards</span></div><span class="v blue" id="ar-haz">0</span></div>
+  <div class="card"><div class="row"><div><span class="k">Places to check first</span><span class="sub2">Water, rail, highways, construction</span></div><span class="v blue" id="ar-haz">0</span></div>
     <div class="row"><div><span class="k">Places to call</span><span class="sub2">Open late or open now</span></div><span class="v blue" id="ar-call">0</span></div></div>
+  <p class="label">Dangerous places, nearest first</p>
+  <div class="card" id="ar-hazlist"><div class="row"><span class="muted">Searching…</span></div></div>
+  <p class="label">Open late nearby</p>
+  <div class="card" id="ar-calllist"><div class="row"><span class="muted">Searching…</span></div></div>
   <p class="cap">Familiar places stay separate from nearby risks. This map is a search reference.</p>
   <p class="cap blue" id="ar-status"></p>
   <div class="actions"><button class="btn primary" onclick="go('setup')">Use these nearby places</button></div>

@@ -219,7 +219,7 @@ function renderFigma() {
   $("su-voice").textContent = S.voice.source === "clone" ? (S.voice.name || h.caregiver_name) + "'s cloned voice" : "Record or choose a familiar voice";
   $("su-calls").textContent = tree.map((m, i) => (i + 1) + " " + m.name).join(" → ");
   $("su-places").textContent = (h.address || "Home") + " · " + h.radius_mi + " mi";
-  $("pl-radius").textContent = h.radius_mi + " mi around home"; $("ar-sub").textContent = (h.address || "Home") + " · " + h.radius_mi + " mi around home";
+  const rad = pickRadius ?? h.radius_mi; $("pl-radius").textContent = rad + " mi around home"; renderRadius(rad); $("ar-sub").textContent = (h.address || "Home") + " · " + h.radius_mi + " mi around home";
   $("cam-person").textContent = `${p} (${first})`; $("arm-who").textContent = me + " · " + (tree[0] && tree[0].id === member ? "First contact" : "Care circle");
   $("pf-avatar").innerHTML = h.person_photo ? `<img src="${esc(h.person_photo)}" alt="">` : esc(first[0] || "?");
   $("pf-meds").innerHTML = h.medications.map(m => `<div class="row"><span>${esc(m.name)}</span><span class="v">${esc((m.dose + " · " + (m.note || "")).replace(/ · $/, ""))}</span></div>`).join("") || '<div class="row"><span class="muted">None added</span></div>';
@@ -271,23 +271,34 @@ function autoRoute() {
 }
 function syncEdge() { const v = $("h-edge").value || "far"; document.querySelectorAll("#cam-edge button").forEach(b => b.classList.toggle("on", b.dataset.e === v)); }
 function endCall() { try { speechSynthesis.cancel(); } catch (e) {} go(S && S.incident && S.incident.acked_by === member ? "responding" : "alert"); }
-let areaMap = null, areaLayer = null, areaPoll = null;
+let areaMap = null, areaLayer = null, areaPoll = null, pickRadius = null;
+const RADII = [0.5, 1, 1.5, 2, 3], HAZ_LABEL = {water: "Water", rail: "Rail line", motorway: "Highway", construction: "Construction"};
+function renderRadius(cur) {
+  const el = $("pl-rad"); if (el.dataset.cur === String(cur)) return; el.dataset.cur = String(cur);
+  el.innerHTML = RADII.map(r => `<button type="button" class="${r === cur ? "on" : ""}" onclick="pickRadius = ${r}; render()">${r} mi</button>`).join("");
+}
+function placeRows(list, empty, label) {
+  return list.map(x => `<div class="row"><div><span class="k">${esc(x.name)}</span><span class="sub2">${esc(label(x))}</span></div><span class="v">${x.distance_mi} mi</span></div>`).join("") || `<div class="row"><span class="muted">${empty}</span></div>`;
+}
 async function findPlaces() {
   const address = $("p-addr").value.trim(); go("area"); $("ar-status").textContent = "Finding nearby places…";
   if (address && address !== S.household.address) { await post("/profile", {address}); }
-  const r = await post("/setup/address", {address: address || S.household.address || "San Francisco Marina", radius_mi: S.household.radius_mi, google: true});
-  if (r.detail) { $("ar-status").textContent = "Preview search unavailable: " + r.detail; return; }
+  const r = await post("/setup/address", {address: address || S.household.address || "San Francisco Marina", radius_mi: pickRadius ?? S.household.radius_mi, google: true});
+  if (r.detail) { $("ar-status").textContent = "Search unavailable: " + r.detail; return; }
+  await post("/profile", {}); pickRadius = null; await refresh();  // keeps the new radius across restarts
   clearInterval(areaPoll); areaPoll = setInterval(async () => { const st = await (await fetch("/setup/status")).json(); renderArea(st);
     if (["done", "failed", "skipped", "no token", "cancelled"].includes(st.apify)) { clearInterval(areaPoll); $("ar-status").textContent = st.apify === "done" ? "" : "Open-late places unavailable (" + st.apify + "). Hazards are ready."; } }, 2000);
 }
 async function renderArea(st) {
   if (!window.L) return; st = st || await (await fetch("/setup/status")).json(); const home = st.home || S.household.home;
   if (!areaMap) { areaMap = L.map("area-map", {zoomControl: false, attributionControl: false}); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(areaMap); }
-  if (areaLayer) areaLayer.remove(); areaLayer = L.layerGroup().addTo(areaMap); areaMap.setView([home.lat, home.lng], 14);
-  L.circle([home.lat, home.lng], {radius: home.radius_mi * 1609.34, color: "#245dd6", weight: 1, dashArray: "4 4", fillOpacity: .04}).addTo(areaLayer);
-  const hz = st.hazards_ranked || [], open = (st.places || []).filter(x => !["water", "rail", "motorway", "construction"].includes(x.category));
+  if (areaLayer) areaLayer.remove(); areaLayer = L.layerGroup().addTo(areaMap); const ring = L.circle([home.lat, home.lng], {radius: home.radius_mi * 1609.34, color: "#245dd6", weight: 1, dashArray: "4 4", fillOpacity: .04}).addTo(areaLayer);
+  areaMap.setView([home.lat, home.lng], 14); areaMap.fitBounds(ring.getBounds(), {padding: [8, 8]});
+  const hz = st.hazards_ranked || [], open = st.call_first || [];
   hz.slice(0, 6).forEach((x, i) => L.marker([x.lat, x.lng], {icon: L.divIcon({className: "", html: `<div class="pin" style="background:#b52b38">${i + 1}</div>`, iconSize: [22, 22]})}).addTo(areaLayer));
   open.slice(0, 10).forEach(x => L.circleMarker([x.lat, x.lng], {radius: 6, color: "#fff", weight: 2, fillColor: "#23764a", fillOpacity: 1}).addTo(areaLayer));
+  $("ar-hazlist").innerHTML = placeRows(hz.slice(0, 8), st.apify === "running" ? "Still searching with Apify…" : "No water, rail, highways or construction found in this radius", x => HAZ_LABEL[x.category] || x.category);
+  $("ar-calllist").innerHTML = placeRows(open.slice(0, 6), st.apify === "running" ? "Still searching with Apify…" : "No late-night places found yet", x => cap(x.category) + (x.hours ? " · " + x.hours : "") + (x.phone ? " · " + x.phone : ""));
   $("ar-haz").textContent = hz.length; $("ar-call").textContent = st.open || open.length; setTimeout(() => areaMap.invalidateSize(), 100);
 }
 let voiceList = [], voicePick = null, voiceAudio = null;

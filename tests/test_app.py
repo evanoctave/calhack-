@@ -134,3 +134,15 @@ def test_reentry_soon_after_greeting_does_not_regreet(client: TestClient) -> Non
     client.post("/event", json={"kind": "person_enter"})
     lines = [e["text"] for e in api.store.log if e.get("type") == "speak"]
     assert lines[0].startswith("Hi ") and not lines[-1].startswith("Hi ") and "still dark" in lines[-1]
+
+
+def test_profile_save_keeps_the_search_radius(tmp_path, monkeypatch) -> None:
+    import json
+    from dataclasses import replace
+
+    monkeypatch.setattr(api_app, "ROOT", tmp_path)
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "household.json").write_text(json.dumps({"radius_mi": 1.5}))
+    api_app._persist_household(replace(api.store.hh, radius_mi=3.0))
+    saved = json.loads((tmp_path / "data" / "household.json").read_text())
+    assert saved["radius_mi"] == 3.0 and "description" in saved and "doctor" in saved
