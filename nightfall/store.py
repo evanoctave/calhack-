@@ -30,6 +30,7 @@ class Store:
         self.inc: engine.Incident | None = None
         self.log: list[dict[str, Any]] = []
         self.frames: dict[str, list[str]] = {}
+        self.snapshots: dict[str, list[str]] = {}
         self.briefs: dict[str, dict[str, Any]] = {}
         self.night_mode: bool = True
         self.hub = Hub()

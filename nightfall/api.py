@@ -13,13 +13,17 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, AsyncIterator
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+# request.form() yields starlette's UploadFile; fastapi's subclasses it, so the fastapi
+# class never matches isinstance against what the parser actually produces.
+from starlette.datastructures import UploadFile
 
 from nightfall import brief as briefmod
 from nightfall import engine
+from nightfall import snapshot
 from nightfall.actions import emit as _emit
 from nightfall.actions import run_actions as _run_actions
 from nightfall.escalation import LADDER
@@ -152,13 +156,18 @@ async def tree(body: TreeIn) -> dict[str, Any]:
 async def frames(incident_id: str, request: Request) -> dict[str, Any]:
     form = await request.form()
     out: list[str] = []
+    raw: list[bytes] = []
     for f in form.values():
         if isinstance(f, UploadFile):
             data = await f.read()
             if len(data) > MAX_FRAME:
                 raise HTTPException(413, "frame over 200 KB")
+            raw.append(data)
             out.append("data:image/jpeg;base64," + base64.b64encode(data).decode())
     store.frames[incident_id] = (store.frames.get(incident_id, []) + out)[-3:]
+    saved = snapshot.save_all(incident_id, raw, store.now())
+    if saved:
+        store.snapshots[incident_id] = store.snapshots.get(incident_id, []) + saved
     if incident_id in store.briefs:
         store.briefs[incident_id]["exit_frames"] = store.frames[incident_id]
     return {"frame_ids": [f"FR-{i}" for i in range(len(store.frames[incident_id]))]}
@@ -205,6 +214,7 @@ async def reset() -> dict[str, Any]:
     if store.inc is not None:
         await store.runner.cancel(store.inc.id)
     store.inc, store.log, store.frames, store.briefs = None, [], {}, {}
+    store.snapshots.clear()
     store.runner.rings.clear()
     store.hh = load(ROOT / "data" / "household.json")
     store.hub.publish("dashboard", {"type": "reset"})
