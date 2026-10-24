@@ -1,50 +1,83 @@
-# Nightfall API contract (all lanes build against this)
+# Nightfall API contract
 
-Base `http://127.0.0.1:8000`. JSON. Errors `{"detail": ...}`.
+Base `http://127.0.0.1:8000` (laptop) or the tunnel URL (phones). JSON. Errors `{"detail": ...}`.
+Pages and scripts are served with `Cache-Control: no-store`. Anything arriving through the tunnel is a phone: `/` and `/door` redirect it to `/app`, and `/cam/frame` and `/ws/video-in` refuse it.
 
-| Method | Path | Request | Response | Codes |
-|---|---|---|---|---|
-| GET | `/health` | | `{ok, mock:{cartesia, anthropic, apify, twilio}, now, night_mode}` | 200 |
-| GET | `/state` | | `{household, now, night_mode, ladder, incident, log[], rings[]}` | 200 |
-| POST | `/arm` | `{on: bool}` | `{night_mode}` | 200 |
-| POST | `/event` | `{kind, payload?}` kinds: `motion door_open door_close person_seen{inside} reply{text} tick close` | `{incident_id, from, to, rule, detail, actions}` | 200, 422 |
-| POST | `/frames/{incident_id}` | multipart, up to 3 JPEG, 200 KB each | `{frame_ids}` | 200, 413 |
-| POST | `/ack` | `{incident_id, member_id}` | `{ok, acked_by, first}` | 200, 403, 404 |
-| POST | `/tree` | `{name, phone: "web" or E.164, tier: 1..3}` | `{member_id, phone_url}` | 200, 422 |
-| GET | `/brief/{token}` | | Brief JSON (below) | 200, 404, 410 |
-| GET | `/sse/dashboard` | | events: `state speak ring brief_ready exit_frames_request tree arm reset` | 200 |
-| GET | `/sse/phone/{member_id}` | | events: `ring{message, link, tier} acked{by} deadline` | 200 |
-| POST | `/reset` | | `{ok}` | 200 |
+## Core (api.py)
+
+| Method | Path | Request | Response |
+|---|---|---|---|
+| GET | `/health` | | `{ok, mock:{cartesia, anthropic, apify, twilio, moss}, now, night_mode}` |
+| GET | `/state` | | `{household, now, night_mode, ladder, door_wait_s, incident{id,state,door_opened_at,exited_at,deadline_at,acked_by}, log[], rings[]}` |
+| POST | `/arm` | `{on}` | `{night_mode}` |
+| POST | `/event` | `{kind, payload?}` kinds: `person_enter person_lost person_back features stand_down reply{text} motion door_open door_close person_seen{inside} tick close sos` | `{incident_id, from, to, rule, detail, actions}` |
+| POST | `/ack` | `{incident_id, member_id}` | `{ok, acked_by, first}` (403 non-member, 404) |
+| POST | `/tree` | `{name, phone:"web"|E.164, tier}` | `{member_id, phone_url, existing?}` idempotent by name |
+| GET | `/brief/{token}` | | Brief JSON (404 bad, 410 expired) |
+| GET | `/sse/dashboard` | | `state speak ring brief_ready exit_frames_request tree arm reset memory features stand_down watch_only call takeover live answered clothing voice command door visitor* home sos call_911_option returned` |
+| GET | `/sse/phone/{member_id}` | | `ring{message,link,tier} acked returned brief_updated deadline call_911_option takeover stand_down watch_only visitor visitor_said visitor_left home sos` |
+| POST | `/reset` | | `{ok}` reseeds household, keeps faces |
+
+Event payload fields the detector may send: `identity` (match/other/unknown), `direction` (exit/entry/unknown), `heading` (left/right/away/toward/unknown), `attire_night`, `checkin`/`who` (set by the server from a reply), `source`, `reason`.
+
+## Phone app (api_app.py)
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/app` | the app page |
+| GET | `/app/state?member=TM-…` | everything the app renders: household, incident (state, heading, identity, direction, checkin, wander{score,action,reasons}, emergency{text,option_shown,deadline_hhmm}, clothing, exit_frame, brief_link, visitor), rings, door_wait_s, ladder_step_s, takeover_by, live_by, call_911, voice{voice_id,source,name,mock,samples,style}, memory_source, places_source, live_frame |
+| POST | `/profile` | `{person_full_name?, person_name?, person_age?, caregiver_name?, address?}`; address geocodes and fetches hazards; persisted to `data/household.json` |
+| POST | `/voice/samples/{introduction|reassurance|everyday}` | multipart `clip` (any browser format) → 16 kHz WAV |
+| GET/DELETE | `/voice/samples/{kind}.wav`, `/voice/samples/{kind}` | |
+| POST | `/voice/clone` | `{name}` stitches samples, clones at Cartesia, switches the door voice; mock without keys |
+| POST | `/voice/preview` | `{situation}` → `{text, line_source, audio}` a fresh Claude line in the current voice |
+
+## Door device (api_cam.py)
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/door` | door page (laptop only) |
+| POST | `/cam/frame` | multipart `f` JPEG ≤ 200 KB, laptop only |
+| GET | `/cam/latest.jpg` | polling fallback, 404 if older than 10 s |
+| POST | `/frames/{incident_id}` | up to 3 exit JPEGs; starts clothing vision in the background |
+| POST | `/takeover` | `{member_id, on}` pauses the AI lines (explicit, survives live sessions) |
+| POST | `/say` | `{member_id, text}` spoken at the door in the caregiver voice |
+| POST | `/say/clip` | multipart `member_id`, `clip` ≥ 1.5 KB, relayed as-is |
+| POST | `/door/command` | `{cmd: enroll{label,name} | door_edge{edge} | start | say_test}` relayed to the door over SSE |
+| POST | `/door/telemetry` | `{event, detail}` from the door page (detector, audio) into the log |
+
+## Live audio and video (api_live.py, WebSockets)
+
+| Path | Direction | Payload |
+|---|---|---|
+| `/ws/talk/{member_id}` | phone → server → door | 16 kHz mono Int16 PCM frames. Opening it sets takeover; closing clears it unless `/takeover` was explicit. Door cuts any playing AI line. |
+| `/ws/door` | server → door | PCM from the talker + JSON `{type:"live", on, by}` |
+| `/ws/door-mic` | door → server → phones | PCM; door receives `{type:"listeners", count}` and streams only while count > 0 and nobody is talking |
+| `/ws/listen/{member_id}` | server → phone | PCM from the door microphone |
+| `/ws/video-in` | door → server (laptop only) | JPEG frames ~20 fps; door receives `{type:"watchers", count}` |
+| `/ws/video/{member_id}` | server → phone | JPEG frames |
+
+## Voice agent (api_voice.py)
+
+`POST /twiml/{inc}/{member}` and `…/turn` (Twilio), `GET /agent/opening/{inc}/{member}`, `POST /agent/turn {incident_id, member_id, text}`, `POST /answer`, `POST /voice/select {voice_id, speed, emotion}`, `GET /voice/current`, `GET /voice/{sha}.wav`.
+
+## Setup and enrollment
+
+`POST /setup/address {address, radius_mi, google}` (hazards now, Apify in the background), `GET /setup/status`.
+`GET /enroll`, `POST /enroll {label: person|other, name, descriptor[128]}`, `DELETE /enroll/{name}`.
 
 ## Brief JSON
 
 ```json
-{
-  "incident_id": "INC-...", "person_name": "Dad", "photo": "/robert.svg",
-  "exit_frames": ["data:image/jpeg;base64,..."],
-  "clothing": {"top_color": "navy", "top_type": "hoodie", "bottom_color": "gray", "bottom_type": "sweatpants",
-               "footwear": "barefoot", "confidence": 0.86, "source": "mock"},
-  "clothing_line": "navy hoodie, gray sweatpants, barefoot",
-  "medications": [{"name": "donepezil", "dose": "10 mg", "note": "nightly"}],
-  "last_seen_at": "ISO", "deadline_at": "ISO",
-  "home": {"lat": 33.8704, "lng": -117.9242, "radius_mi": 1.5},
-  "hazards": [Place], "call_first": [Place], "familiar": [Place], "contacts": [{"name", "phone", "note"}],
-  "prose": "two sentences from fields", "places_source": "fixture | apify", "viewer": "TM-..."
-}
+{"incident_id","person_name","photo","exit_frames":[...],"clothing":{top_color,top_type,bottom_color,bottom_type,footwear,confidence,source},
+ "clothing_line","medications":[...],"last_seen_at","deadline_at","last_seen_hhmm","deadline_hhmm","home":{lat,lng,radius_mi},
+ "hazards":[Place],"call_first":[Place],"familiar":[Place],"contacts":[...],"habits":[{text,kind}],"memory_source","prose","places_source","viewer"}
 ```
-
 `Place = {category, name, lat, lng, distance_mi, phone, hours, open_now?, source}`.
-Categories: hazards `water rail motorway construction`; call-first `fuel convenience diner hospital transit pharmacy`.
 
-## State machine (engine.py)
+## State machine
 
-`ARMED_IDLE -motion-> CONVERSATION -door_open-> DOOR_OPEN -(20 s or door_close, nobody inside)-> ESCALATING -ack-> ACKED -close-> CLOSED`
-`DOOR_OPEN -person_seen inside-> RETURNED`. `ESCALATING -(exit + 15 min)-> EXHAUSTED`.
-Env knobs for demos: `DOOR_WAIT_S` (default 20), `ESCALATION_STEP_S` (default 60).
-
-## Lane hooks
-
-- Voice lane: replace the `speak:*` action handler in `nightfall/actions.py` and add a `Notifier` in `nightfall/notify.py`.
-- Vision lane: POST frames to `/frames/{incident_id}`; replace `brief.mock_clothing()` in `actions.py` with `vision.describe_clothing`.
-- Apify lane: write `data/places.<slug>.json` in the Place shape; set `source: "apify"`.
-- Frontend lane: `static/*.html` consume only the endpoints above.
+`ARMED_IDLE -person_enter-> CONVERSATION -person_lost-> DOOR_OPEN -(DOOR_WAIT_S)-> ESCALATING -ack-> ACKED -close-> CLOSED`
+`ARMED_IDLE -person_lost-> DOOR_OPEN` (speaks and starts the clock in one step). `DOOR_OPEN|ESCALATING -person_back-> RETURNED`.
+`* -stand_down-> RETURNED` (care-circle member identified). `ARMED_IDLE -person_enter{direction:entry}-> VISITOR` (or `home` notice when recognized) `-person_lost-> CLOSED`.
+`* -sos-> ESCALATING` (HELP). `ESCALATING -(exit + 15 min)-> EXHAUSTED`. A fresh approach supersedes RETURNED/ACKED/EXHAUSTED and watch-only incidents.

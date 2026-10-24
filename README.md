@@ -6,7 +6,7 @@ the frame of what they were wearing, the family phone tree rings in order, and e
 missing-person brief: photo, clothing, medications, a 1.5-mile map with hazards and open-all-night
 places to call first, and the local non-emergency number.
 
-Cal Hacks 13.0. See `NIGHTFALL-MASTER-PROMPT.md` for the full spec and team lanes.
+Cal Hacks 13.0. Docs: `docs/ARCHITECTURE.md` (devices, modules, services), `docs/API.md` (every route and WebSocket), `docs/RUNBOOK.md` (demo day), `docs/VOICE.md`, `docs/TRACKS.md`, `docs/DECISIONS.md`. Spec: `NIGHTFALL-MASTER-PROMPT.md`.
 
 ## Run
 
