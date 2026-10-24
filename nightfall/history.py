@@ -31,16 +31,14 @@ def record(
     heading: str,
     acked_by: str | None,
     score: int,
-    cause: str = "door",
 ) -> dict[str, Any]:
     """Append one closed incident. Outcome: returned | acked | exhausted | stand_down | watch_only | visitor | sos."""
     row = {
         "incident_id": incident_id,
-        "cause": cause,
         "opened_at": opened_at.isoformat() if opened_at else None,
         "exited_at": exited_at.isoformat() if exited_at else None,
         "closed_at": closed_at.isoformat(),
-        "minutes_out": round((closed_at - exited_at).total_seconds() / 60, 1) if exited_at and cause != "help" else 0,
+        "minutes_out": round((closed_at - exited_at).total_seconds() / 60, 1) if exited_at else 0,
         "outcome": outcome,
         "heading": heading,
         "acked_by": acked_by,
@@ -58,13 +56,7 @@ def record(
 
 def summary(rows: list[dict[str, Any]], limit: int = 5) -> dict[str, Any]:
     """What police ask: has it happened before, how often, how long, which way."""
-    exits = [
-        r
-        for r in rows
-        if r.get("cause", "door") != "help"
-        and r.get("exited_at")
-        and r.get("outcome") in ("returned", "acked", "exhausted")
-    ]
+    exits = [r for r in rows if r.get("exited_at") and r.get("outcome") in ("returned", "acked", "exhausted", "sos")]
     return {
         "count": len(exits),
         "last": exits[-limit:][::-1],

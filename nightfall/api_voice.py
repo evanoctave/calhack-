@@ -161,14 +161,7 @@ async def voice_select(body: VoiceSelectIn) -> dict[str, Any]:
     store = _store()
     if not 0.6 <= body.speed <= 1.5 or len(body.voice_id) < 8:
         raise HTTPException(422, "bad voice settings")
-    voice.select(
-        body.voice_id,
-        body.speed,
-        body.emotion,
-        os.environ.get("ENV_FILE", ".env"),
-        {"VOICE_IS_CLONE": "0", "VOICE_NAME": ""},
-    )
-    store.voice_source, store.voice_name = "stock", ""
+    voice.select(body.voice_id, body.speed, body.emotion, os.environ.get("ENV_FILE", ".env"))
     asyncio.get_running_loop().run_in_executor(None, voice.pre_synthesize, store.hh)
     from nightfall.actions import emit
 

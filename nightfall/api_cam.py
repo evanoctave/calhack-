@@ -103,8 +103,6 @@ async def door_command(body: CommandIn) -> dict[str, Any]:
 class TelemetryIn(BaseModel):
     event: str
     detail: str = ""
-    name: str = ""
-    label: str = ""
 
 
 @router.post("/door/telemetry")
@@ -113,16 +111,7 @@ async def door_telemetry(body: TelemetryIn) -> dict[str, Any]:
     store = _store()
     from nightfall.actions import emit
 
-    emit(
-        store,
-        {
-            "type": "door",
-            "event": body.event[:40],
-            "detail": body.detail[:200],
-            "name": body.name[:100],
-            "label": body.label[:20],
-        },
-    )
+    emit(store, {"type": "door", "event": body.event[:40], "detail": body.detail[:200]})
     print(f"door: {body.event} {body.detail[:120]}")
     if body.event == "door_started":
         # a restarted door is a fresh session: end a conversation still running from before the reload,
@@ -136,7 +125,7 @@ async def door_telemetry(body: TelemetryIn) -> dict[str, Any]:
             engine.State.DOOR_OPEN,
             engine.State.WATCHING,
         ):
-            await _step("stand_down", {"checkin": "self_other", "who": "door restarted", "force": True})
+            await _step("stand_down", {"checkin": "self_other", "who": "door restarted"})
     return {"ok": True}
 
 

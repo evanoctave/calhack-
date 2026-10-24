@@ -7,9 +7,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import shutil
 import subprocess
-import tempfile
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -55,12 +53,8 @@ async def app_state(member: str = "") -> dict[str, Any]:
     rings = []
     for r in store.runner.rings:
         names = [m.name for m in hh.tree if m.id in r["members"]]
-        rings.append({"incident_id": r["incident_id"], "tier": r["tier"], "members": names, "member_ids": r["members"]})
+        rings.append({"tier": r["tier"], "members": names, "member_ids": r["members"]})
     exited = inc.exited_at if inc is not None else None
-    emergency = _emergency(store, inc) if inc is not None else None
-    door_speech = getattr(store, "door_speech", None)
-    if inc is None or not isinstance(door_speech, dict) or door_speech.get("incident_id") != inc.id:
-        door_speech = None
     samples = {k: (SAMPLES / f"{k}.wav").exists() for k in KINDS}
     vid = os.environ.get("CARTESIA_VOICE_ID", "")
     return {
@@ -88,7 +82,6 @@ async def app_state(member: str = "") -> dict[str, Any]:
         if inc is None
         else {
             "id": inc.id,
-            "cause": getattr(inc, "cause", "door"),
             "state": inc.state.value,
             "opened_at": inc.opened_at.isoformat() if inc.opened_at else None,
             "exited_at": exited.isoformat() if exited else None,
@@ -97,7 +90,6 @@ async def app_state(member: str = "") -> dict[str, Any]:
             "acked_by": inc.acked_by,
             "acked_by_name": next((m.name for m in hh.tree if m.id == inc.acked_by), None),
             "lines_spoken": inc.lines_spoken,
-            "last_line": next((t for who, t in reversed(store.history) if who == "system"), ""),
             "person_in_frame": inc.person_in_frame,
             "door_opened_at": inc.door_opened_at.isoformat() if inc.door_opened_at else None,
             "heading": inc.heading,
@@ -110,10 +102,8 @@ async def app_state(member: str = "") -> dict[str, Any]:
                 "score": inc.verdict().score,
                 "action": inc.verdict().action,
                 "reasons": list(inc.verdict().reasons),
-                "probability": inc.verdict().probability,
-                "factors": [{"signal": k, "llr": v} for k, v in inc.verdict().factors],
             },
-            "emergency": emergency,
+            "emergency": _emergency(store, inc),
             "brief_link": store.link(inc.id, member) if member and hh.member(member) and inc.id in store.briefs else "",
             "exit_frame": (store.frames.get(inc.id) or [""])[-1],
             "clothing_line": store.briefs[inc.id]["clothing_line"] if inc.id in store.briefs else "",
@@ -126,8 +116,7 @@ async def app_state(member: str = "") -> dict[str, Any]:
         "door_wait_s": _door_wait(),
         "takeover_by": store.takeover_by,
         "live_by": _live_by(),
-        "call_911": bool(emergency and emergency["option_shown"]),
-        "door_speech": door_speech,
+        "call_911": store.call_911_sent,
         "voice": {
             "voice_id": vid,
             "source": store.voice_source,
@@ -147,29 +136,17 @@ def _emergency(store: Any, inc: Any) -> dict[str, Any]:
     from nightfall.api import CALL_911_S
     from nightfall.brief import hhmm
 
-    active = inc.state.value in ("ESCALATING", "EXHAUSTED", "ACKED") and inc.checkin != "self_other"
-    shown = active and bool(store.call_911_sent)
-    help_requested = getattr(inc, "cause", "door") == "help"
-    if not active:
-        text = "No active emergency recommendation for this check-in. Nightfall has not called."
-    elif shown:
-        text = "Call 911 option is on your screen. Nightfall has not called."
-    elif help_requested:
-        text = (
-            f"Help was requested at the door. Nightfall never dials. The Call 911 option appears after {int(CALL_911_S)} s"
-            " if the request remains unresolved."
-        )
-    else:
-        text = (
-            f"Not called. Nightfall never dials. The Call 911 option appears after {int(CALL_911_S)} s out of view"
-            + (f"; the 15-minute mark is {hhmm(inc.deadline_at)}." if inc.deadline_at else ".")
-        )
     return {
         "called": False,
-        "option_shown": shown,
+        "option_shown": bool(store.call_911_sent),
         "option_after_s": CALL_911_S,
-        "deadline_hhmm": hhmm(inc.deadline_at) if active and not help_requested and inc.deadline_at else "",
-        "text": text,
+        "deadline_hhmm": hhmm(inc.deadline_at) if inc.deadline_at else "",
+        "text": (
+            "Call 911 option is on your screen. Nightfall has not called."
+            if store.call_911_sent
+            else f"Not called. Nightfall never dials. The Call 911 option appears after {int(CALL_911_S)} s out of view"
+            + (f"; the 15-minute mark is {hhmm(inc.deadline_at)}." if inc.deadline_at else ".")
+        ),
     }
 
 
@@ -209,36 +186,19 @@ async def profile(body: ProfileIn) -> dict[str, Any]:
     changes = {k: v for k, v in body.model_dump().items() if v is not None and k != "address"}
     if "person_age" in changes and not 0 <= changes["person_age"] <= 120:
         raise HTTPException(422, "age out of range")
-    previous = store.hh
-    previous_places = store.places
-    from nightfall import api_setup
-
-    previous_setup_status = dict(api_setup._status)
-    old_name = previous.caregiver_name
+    old_name = store.hh.caregiver_name
+    store.hh = replace(store.hh, **changes)
+    if changes.get("caregiver_name") and changes["caregiver_name"] != old_name:
+        # the caregiver is also a care-circle member; keep the ring and the call agent on the new name
+        tree = [replace(m, name=changes["caregiver_name"]) if m.name == old_name else m for m in store.hh.tree]
+        store.hh = replace(store.hh, tree=tuple(tree))
     geo: dict[str, Any] = {}
-    try:
-        if body.address and body.address.strip() and body.address.strip() != previous.address:
-            from nightfall.api_setup import AddressIn, _setup_address
+    if body.address and body.address.strip() and body.address.strip() != store.hh.address:
+        from nightfall.api_setup import AddressIn, setup_address
 
-            geo = await _setup_address(
-                AddressIn(address=body.address.strip(), radius_mi=previous.radius_mi, google=False),
-                persist_household=False,
-            )
-            store.hh = replace(store.hh, address=body.address.strip())
-        store.hh = replace(store.hh, **changes)
-        if changes.get("caregiver_name") and changes["caregiver_name"] != old_name:
-            # The caregiver is also a care-circle member; keep the ring and call agent on the new name.
-            tree = [replace(m, name=changes["caregiver_name"]) if m.name == old_name else m for m in store.hh.tree]
-            store.hh = replace(store.hh, tree=tuple(tree))
-        _persist_household(store.hh)
-        if geo:
-            api_setup._save(store.places)
-    except Exception:
-        store.hh = previous
-        store.places = previous_places
-        api_setup._status.clear()
-        api_setup._status.update(previous_setup_status)
-        raise
+        geo = await setup_address(AddressIn(address=body.address.strip(), radius_mi=store.hh.radius_mi, google=False))
+        store.hh = replace(store.hh, address=body.address.strip())
+    _persist_household(store.hh)
     return {
         "ok": True,
         "household": {
@@ -253,11 +213,8 @@ async def profile(body: ProfileIn) -> dict[str, Any]:
 
 def _persist_household(hh: Any) -> None:
     path = ROOT / "data" / "household.json"
-    temporary: Path | None = None
     try:
         d = json.loads(path.read_text())
-        if not isinstance(d, dict):
-            raise TypeError("household file must contain an object")
         d.update(
             {
                 "person_full_name": hh.person_full_name,
@@ -267,31 +224,14 @@ def _persist_household(hh: Any) -> None:
                 "address": hh.address,
                 "home_lat": hh.home_lat,
                 "home_lng": hh.home_lng,
-                "radius_mi": hh.radius_mi,
-                "description": dict(hh.description),
-                "diagnosis": hh.diagnosis,
-                "doctor": dict(hh.doctor),
                 "tree": [
                     {**m.__dict__, "phone": "web"} if os.environ.get(phone_env(m.id)) else m.__dict__ for m in hh.tree
                 ],
             }
         )
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=path.parent, prefix=".household-", suffix=".tmp", delete=False
-        ) as stream:
-            temporary = Path(stream.name)
-            stream.write(json.dumps(d, indent=2) + "\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    except (OSError, ValueError, TypeError) as e:
-        raise HTTPException(500, "Could not save the care profile. No profile changes were saved.") from e
-    finally:
-        if temporary is not None:
-            try:
-                temporary.unlink(missing_ok=True)
-            except OSError:
-                pass
+        path.write_text(json.dumps(d, indent=2) + "\n")
+    except OSError as e:
+        print(f"household not persisted: {e}")
 
 
 @router.post("/voice/samples/{kind}")
@@ -317,22 +257,10 @@ async def voice_sample(kind: str, request: Request) -> dict[str, Any]:
     return {"ok": True, "kind": kind, "seconds": _seconds(out), "url": f"/voice/samples/{kind}.wav"}
 
 
-def _ffmpeg_executable() -> str:
-    installed = shutil.which("ffmpeg")
-    if installed:
-        return installed
-    try:
-        import imageio_ffmpeg
-
-        return imageio_ffmpeg.get_ffmpeg_exe()
-    except ImportError:
-        return "ffmpeg"
-
-
 def _ffmpeg(src: Path, dst: Path) -> bool:
     try:
         r = subprocess.run(
-            [_ffmpeg_executable(), "-y", "-loglevel", "error", "-i", str(src), "-ac", "1", "-ar", "16000", str(dst)],
+            ["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-ac", "1", "-ar", "16000", str(dst)],
             capture_output=True,
             timeout=60,
             check=False,
@@ -402,7 +330,7 @@ def _concat(clips: list[Path], dst: Path) -> bool:
     try:
         r = subprocess.run(
             [
-                _ffmpeg_executable(),
+                "ffmpeg",
                 "-y",
                 "-loglevel",
                 "error",

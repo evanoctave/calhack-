@@ -125,14 +125,6 @@ def police_report(hh: Household, inc: Incident, line: str, exited: datetime, his
         prior = "No prior wandering on record."
     heading = inc.heading if inc.heading != "unknown" else "direction not seen"
     doctor = f"Doctor: {hh.doctor.get('name')} {hh.doctor.get('phone', '')}. " if hh.doctor.get("name") else ""
-    if inc.cause == "help":
-        return (
-            f"The Help button at {hh.address or 'the home door'} was pressed at {hhmm(exited)}. "
-            f"An exit and the person's current location have not been confirmed. "
-            f"Care profile: {hh.person_full_name or hh.person_name}, age {hh.person_age or 'unknown'}, {desc}. "
-            f"{hh.diagnosis or 'Has dementia'}. Clothing description: {line}; verify against the photo. "
-            f"Medications: {meds}. {doctor}Check the door camera and confirm what help is needed."
-        )
     return (
         f"Missing and at risk. {hh.person_full_name or hh.person_name}, age {hh.person_age or 'unknown'}, {desc}. "
         f"{hh.diagnosis or 'Has dementia'}. Last seen at home, {hh.address or 'home address on file'}, at {hhmm(exited)}, "
@@ -159,10 +151,9 @@ def build(
     sections = rank(places, (hh.home_lat, hh.home_lng), hh.radius_mi, now, list(hh.familiar_places), list(hh.contacts))
     exited = inc.exited_at or now
     line = clothing_line(clothing)
-    prose_text = prose(hh, hhmm(exited), line, inc.cause)
+    prose_text = prose(hh, hhmm(exited), line)
     return {
         "incident_id": inc.id,
-        "cause": inc.cause,
         "person_name": hh.person_name,
         "photo": hh.person_photo,
         "exit_frames": frames[:3],
@@ -199,13 +190,8 @@ def hhmm(dt: datetime) -> str:
     return dt.strftime("%I:%M %p").lstrip("0")
 
 
-def prose(hh: Household, hhmm: str, line: str, cause: str = "door") -> str:
+def prose(hh: Household, hhmm: str, line: str) -> str:
     """Two template sentences from fields; the model never adds facts here."""
-    if cause == "help":
-        return (
-            f"Help was requested at the door at {hhmm}. "
-            "Check the door camera and speak with the person there; an exit has not been confirmed."
-        )
     return (
         f"{hh.person_name} left home at {hhmm} wearing {line}. "
         f"Most people are found within {hh.radius_mi:g} miles; check the hazards first, then call the open places."

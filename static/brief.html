@@ -1,13 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Nightfall brief</title><script>
-// Existing SMS links keep working. Use the React brief when its build is installed.
-// Add ?legacy=1 to open the original brief while troubleshooting.
-if (!new URLSearchParams(location.search).has('legacy')) {
-  fetch('/ui/index.html', { method: 'HEAD', cache: 'no-store' }).then(function (r) {
-    if (r.ok) location.replace('/ui/index.html#/brief/' + encodeURIComponent(location.hash.slice(1)));
-  }).catch(function () { /* The original brief below remains available. */ });
-}
-</script><link rel="stylesheet" href="/tokens.css"><script src="/app.js"></script>
+<title>Nightfall brief</title><link rel="stylesheet" href="/tokens.css"><script src="/app.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head><body>
 <header><div><h1 id="title">Missing-person brief</h1><div id="sub" class="muted small"></div></div><div class="row"><span id="timer" class="pill danger"></span><button onclick="toggleTheme()">Theme</button></div></header>

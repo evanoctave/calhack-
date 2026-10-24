@@ -65,32 +65,9 @@ class Incident:
     checkin: str = "none"
     checkin_who: str = ""
     attire_night: bool = False
-    face_conf: float = 1.0
-    footwear: str = ""
-    top_type: str = ""
-    bottom_type: str = ""
-    approaches_15m: int = 1  # set by the API from recent door approaches
-    prior_exit_hours: tuple[float, ...] = ()  # set by the API from the wander history
-    cause: str = "door"
 
     def features(self) -> Features:
-        t = self.opened_at
-        return Features(
-            identity=self.identity,
-            direction=self.direction,
-            checkin=self.checkin,
-            attire_night=self.attire_night,
-            in_window=self.night_mode,
-            hour=(t.hour + t.minute / 60) if t else None,
-            armed=self.night_mode,
-            face_conf=self.face_conf,
-            footwear=self.footwear,
-            top_type=self.top_type,
-            bottom_type=self.bottom_type,
-            prior_exit_hours=self.prior_exit_hours,
-            approaches_15m=self.approaches_15m,
-            lines_unheeded=max(0, self.lines_spoken - 1) if self.direction == "exit" else 0,
-        )
+        return Features(self.identity, self.direction, self.checkin, self.attire_night, self.night_mode)
 
     def verdict(self) -> RuleVerdict:
         return wander_score(self.features())
@@ -165,20 +142,13 @@ def _absorb(inc: Incident, ev: Event) -> None:
         inc.checkin_who = str(p.get("who", ""))
     if "attire_night" in p:
         inc.attire_night = bool(p["attire_night"])
-    if isinstance(p.get("face_conf"), (int, float)):
-        inc.face_conf = float(p["face_conf"])
-    for k in ("footwear", "top_type", "bottom_type"):
-        if isinstance(p.get(k), str):
-            setattr(inc, k, p[k])
 
 
 def _stand_down(inc: Incident, ev: Event) -> Transition:
     """A care-circle member identified themselves, or the face is a known other: no wander."""
     _absorb(inc, ev)
     v = inc.verdict()
-    # "force" is a family member's word from the phone or a door restart; a name said at the door only stands
-    # down when the evidence agrees (the confabulation guard keeps "it's Mike" from Dad's own face ringing on)
-    if not ev.payload.get("force") and v.action != "ignore":
+    if v.action != "ignore" and inc.checkin != "self_other":
         return _ignored(inc, ev, f"R11 score {v.score}, staying alert")
     who = inc.checkin_who or ("another person" if inc.identity == "other" else "")
     actions: tuple[str, ...] = (
@@ -325,8 +295,7 @@ def _ack(inc: Incident, ev: Event) -> Transition:
 def _tick_escalating(inc: Incident, ev: Event) -> Transition:
     dl = inc.deadline_at
     if dl is not None and ev.ts >= dl:
-        detail = "15 minutes since help request" if inc.cause == "help" else "15 minutes since exit"
-        return _t(inc, State.EXHAUSTED, ("banner:call_911",), "R3", detail)
+        return _t(inc, State.EXHAUSTED, ("banner:call_911",), "R3", "15 minutes since exit")
     return _ignored(inc, ev, "escalating")
 
 
@@ -342,9 +311,8 @@ def _sos(inc: Incident, ev: Event) -> Transition:
     if inc.state in (State.ESCALATING, State.ACKED, State.EXHAUSTED):
         return _ignored(inc, ev, "already escalated")
     inc.opened_at = inc.opened_at or ev.ts
-    inc.cause = "help"
-    # Retain the escalation clock; this timestamp is not evidence of a physical exit.
     inc.exited_at = ev.ts
+    inc.identity = "match"
     return _t(
         inc,
         State.ESCALATING,

@@ -15,27 +15,15 @@ from typing import Any, Final
 from nightfall import brief as briefmod
 from nightfall.household import Household
 from nightfall.integrations import anthropic_llm
-from nightfall.script import BANNED, pick, validate
+from nightfall.script import BANNED, SCRIPT, fill, validate
 
 PERSONA_SYSTEM: Final = (
-    "You are {caregiver}, talking to {person} through the speaker by the front door in the middle of the night. "
-    "{person} has memory loss and is trying to go out. Talk the way a loving family member really talks at 2 AM: "
-    "ordinary words, contractions, short sentences, calm and unhurried.\n"
-    "How to sound real:\n"
-    "- Answer what {person} just said before anything else. Agree with the feeling, not the facts "
-    "(they want to get to work: they've always been the first one in).\n"
-    "- Then offer one small, easy next step: come inside, sit down for a minute, wait for you, go back to bed.\n"
-    "- A gentle yes-or-no question often works better than an instruction.\n"
-    "- Don't sound like an announcement. No 'please be advised', no lists, no 'sweetheart' every line.\n"
-    "- Never repeat a sentence or an opening you've already said in this conversation. Change how you start.\n"
-    "- Use their name at most once every few lines.\n"
-    "Hard rules: one or two sentences, under 120 characters total. Never argue, correct, or say no. Never mention "
-    "memory, illness, confusion, or medicine. Don't invent objects, pets, people, food, weather, or places; only "
-    "mention what's in the notes or the conversation. Never claim the door is locked or that someone is on the way unless the conversation says so. No digits except a clock time. Reply with the spoken words only.\n"
-    "Examples of the tone (don't copy them):\n"
-    "They say: I have to get to the office. You say: You've always been the first one in. It's still dark, though. Sit with me a minute?\n"
-    "They say: Where's my car? You say: The car's put away for the night. Come on in, I'll be right there.\n"
-    "They say nothing. You say: Hey, it's late. How about we head back to bed together?"
+    "You speak as {caregiver}, the adult child of {person}, who has memory loss and is at the front "
+    "door in the middle of the night. Write exactly one short spoken line (under 120 characters) that "
+    "gently turns them back toward bed. Warm, concrete, present tense. Never argue, never correct, never "
+    "mention memory, illness, confusion or the word 'no'. Do not invent objects, pets, people, food, weather "
+    "or places; you may only reference what appears in the notes provided or in the conversation. Never "
+    "mention medicine. No digits except a clock time. Reply with the line only."
 )
 VISION_SYSTEM: Final = (
     "You describe clothing in a single still frame for a missing-person notice. Return JSON only with keys "
@@ -75,8 +63,9 @@ def next_line(hh: Household, history: Sequence[tuple[str, str]], hits: Sequence[
     """
     last = next((t for s, t in reversed(history) if s == "person"), "")
     turn = sum(1 for s, _ in history if s == "system")
-    said = {t for s, t in history if s == "system"}
-    fallback = pick("closed_place" if _STORE_WORDS.search(last) else "again" if turn < 3 else "comfort", hh, said)
+    fallback = fill(
+        SCRIPT["closed_place"] if _STORE_WORDS.search(last) else SCRIPT["again"] if turn < 3 else SCRIPT["comfort"], hh
+    )
     if not anthropic_llm.enabled():
         return fallback, "mock"
     try:

@@ -6,7 +6,6 @@ Rejected: WebRTC (needs TURN once the phone is on cellular; the tunnel already c
 from __future__ import annotations
 
 import asyncio
-from contextlib import suppress
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -20,7 +19,6 @@ class LiveHub:
     def __init__(self) -> None:
         self.listeners: set[WebSocket] = set()
         self.talker: str | None = None
-        self.talker_socket: WebSocket | None = None
         self.frames = 0
 
     async def broadcast(self, data: bytes) -> None:
@@ -129,9 +127,7 @@ async def ws_talk(ws: WebSocket, member_id: str) -> None:
         await ws.close(code=4403)
         return
     await ws.accept()
-    previous_socket = live.talker_socket
     live.talker = member_id
-    live.talker_socket = ws
     store.takeover_by = member_id
     from nightfall.actions import emit
 
@@ -139,31 +135,24 @@ async def ws_talk(ws: WebSocket, member_id: str) -> None:
     store.hub.publish("dashboard", {"type": "live", "on": True, "by": m.name, "member_id": member_id})
     await live.status({"type": "live", "on": True, "by": m.name})
     try:
-        if previous_socket is not None:
-            # A previously disconnected socket must not break its replacement.
-            with suppress(Exception):
-                await previous_socket.close(code=4001, reason="Talk moved to another connection")
         while True:
             msg = await ws.receive()
             if msg.get("type") == "websocket.disconnect":
                 break
             data = msg.get("bytes")
-            if data and live.talker_socket is ws:
+            if data:
                 live.frames += 1
                 await live.broadcast(data)
     except WebSocketDisconnect:
         pass
     finally:
-        # A reconnect can open before the old socket finishes closing, even for
-        # the same member. Only the active session owns the live/takeover state.
-        if live.talker_socket is ws:
-            live.talker_socket = None
+        if live.talker == member_id:
             live.talker = None
-            if store.takeover_by == member_id and not store.takeover_explicit:
-                store.takeover_by = None
-            emit(store, {"type": "live", "on": False, "by": m.name, "member_id": member_id})
-            store.hub.publish("dashboard", {"type": "live", "on": False, "by": m.name, "member_id": member_id})
-            await live.status({"type": "live", "on": False, "by": m.name})
+        if store.takeover_by == member_id and not store.takeover_explicit:
+            store.takeover_by = None
+        emit(store, {"type": "live", "on": False, "by": m.name, "member_id": member_id})
+        store.hub.publish("dashboard", {"type": "live", "on": False, "by": m.name, "member_id": member_id})
+        await live.status({"type": "live", "on": False, "by": m.name})
 
 
 @router.websocket("/ws/door")

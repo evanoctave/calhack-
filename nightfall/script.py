@@ -18,38 +18,6 @@ SCRIPT: Final[dict[str, str]] = {
     "visitor_bye": "Thanks for coming by. Have a good night.",
 }
 
-# More ways to say the scripted lines, in the order the door uses them: each time a line is needed, the first
-# variant not already said tonight. Variant one is SCRIPT itself. All are pre-synthesized at boot.
-VARIANTS: Final[dict[str, tuple[str, ...]]] = {
-    "open": (
-        SCRIPT["open"],
-        "Hey {person}, it's {caregiver}. It's still nighttime. Come on back to bed with me.",
-        "Hi {person}, it's just me, {caregiver}. Everybody's asleep. Let's get you back to bed.",
-    ),
-    "again": (
-        SCRIPT["again"],
-        "It's okay, {person}. It's still dark out. Come on in and sit down for me.",
-        "I'm right here. It's way too early to head out. Let's go back to bed.",
-        "You don't need to go anywhere tonight. Come back in, I've got everything handled.",
-    ),
-    "comfort": (
-        SCRIPT["comfort"],
-        "You're okay. You're home, and I'm right here with you.",
-        "Everything's taken care of, {person}. Let's rest now.",
-    ),
-    "closed_place": (
-        SCRIPT["closed_place"],
-        "They're closed this late. We'll go first thing in the morning, okay?",
-    ),
-}
-
-
-def pick(key: str, hh: Household, said: set[str] | frozenset[str] = frozenset()) -> str:
-    """The first variant of a scripted line not already said tonight (the last one if all were)."""
-    lines = [fill(t, hh) for t in VARIANTS.get(key, (SCRIPT[key],))]
-    return next((ln for ln in lines if ln not in said), lines[-1])
-
-
 BANNED: Final[frozenset[str]] = frozenset(
     {"dementia", "alzheimer", "confused", "you can't", "stop", "no!", "wrong", "remember?", "i told you"}
 )
