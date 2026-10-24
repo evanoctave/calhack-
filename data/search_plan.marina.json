@@ -1,0 +1,178 @@
+{
+  "profile_id": "HH-DEMO",
+  "generated_at": "2026-10-25T23:30:00Z",
+  "home": {
+    "lat": 37.8,
+    "lng": -122.44,
+    "radius_mi": 1.5
+  },
+  "open_late": [
+    {
+      "category": "fuel",
+      "name": "Lombard Gas & Mart",
+      "lat": 37.8015,
+      "lng": -122.441,
+      "hours": "24/7",
+      "phone": "(415) 555-0101",
+      "source": "fixture",
+      "distance_mi": 0.12,
+      "open_now": true
+    },
+    {
+      "category": "diner",
+      "name": "Bayview Diner",
+      "lat": 37.7985,
+      "lng": -122.4385,
+      "hours": "24/7",
+      "phone": "(415) 555-0103",
+      "source": "fixture",
+      "distance_mi": 0.13,
+      "open_now": true
+    },
+    {
+      "category": "transit",
+      "name": "Marina Transit Stop",
+      "lat": 37.802,
+      "lng": -122.437,
+      "hours": "04:00-01:00",
+      "phone": "(415) 555-0105",
+      "source": "fixture",
+      "distance_mi": 0.21,
+      "open_now": true
+    },
+    {
+      "category": "convenience",
+      "name": "Marina Corner Market",
+      "lat": 37.8003,
+      "lng": -122.4455,
+      "hours": "24/7",
+      "phone": "(415) 555-0102",
+      "source": "fixture",
+      "distance_mi": 0.3,
+      "open_now": true
+    },
+    {
+      "category": "hospital",
+      "name": "Marina Medical Center ED",
+      "lat": 37.796,
+      "lng": -122.442,
+      "hours": "24/7",
+      "phone": "(415) 555-0104",
+      "source": "fixture",
+      "distance_mi": 0.3,
+      "open_now": true
+    },
+    {
+      "category": "fuel",
+      "name": "Lyon St Fuel",
+      "lat": 37.797,
+      "lng": -122.447,
+      "hours": "24/7",
+      "phone": "(415) 555-0107",
+      "source": "fixture",
+      "distance_mi": 0.43,
+      "open_now": true
+    },
+    {
+      "category": "convenience",
+      "name": "Chestnut Quick Stop",
+      "lat": 37.8007,
+      "lng": -122.435,
+      "hours": "",
+      "phone": "(415) 555-0108",
+      "source": "fixture",
+      "distance_mi": 0.28,
+      "open_now": null
+    },
+    {
+      "category": "pharmacy",
+      "name": "Marina Pharmacy",
+      "lat": 37.7998,
+      "lng": -122.4392,
+      "hours": "07:00-22:00",
+      "phone": "(415) 555-0106",
+      "source": "fixture",
+      "distance_mi": 0.05,
+      "open_now": false
+    }
+  ],
+  "hazards": [
+    {
+      "category": "water",
+      "name": "Palace of Fine Arts lagoon",
+      "lat": 37.8022,
+      "lng": -122.448,
+      "hours": "",
+      "phone": "",
+      "source": "fixture",
+      "distance_mi": 0.46
+    },
+    {
+      "category": "construction",
+      "name": "Construction site, Lombard St",
+      "lat": 37.7995,
+      "lng": -122.431,
+      "hours": "",
+      "phone": "",
+      "source": "fixture",
+      "distance_mi": 0.49
+    },
+    {
+      "category": "water",
+      "name": "Marina Green waterfront",
+      "lat": 37.8075,
+      "lng": -122.441,
+      "hours": "",
+      "phone": "",
+      "source": "fixture",
+      "distance_mi": 0.52
+    },
+    {
+      "category": "motorway",
+      "name": "US-101 approach (Doyle Dr)",
+      "lat": 37.804,
+      "lng": -122.454,
+      "hours": "",
+      "phone": "",
+      "source": "fixture",
+      "distance_mi": 0.81
+    }
+  ],
+  "route": {
+    "stops": [
+      {
+        "name": "Palace of Fine Arts, walked there every morning",
+        "lat": 37.8029,
+        "lng": -122.4486,
+        "distance_mi": 0.51,
+        "eta_min": 10
+      },
+      {
+        "name": "Old flat on Chestnut St, lived there 30 years",
+        "lat": 37.8003,
+        "lng": -122.435,
+        "distance_mi": 0.27,
+        "eta_min": 5
+      },
+      {
+        "name": "Corner church, attended every Sunday",
+        "lat": 37.799,
+        "lng": -122.44,
+        "distance_mi": 0.07,
+        "eta_min": 1
+      }
+    ]
+  },
+  "local_contacts": [
+    {
+      "name": "SFPD non-emergency",
+      "phone": "(415) 553-0123"
+    },
+    {
+      "name": "Silver Alert",
+      "phone": "",
+      "note": "Police request it through CHP. Call 911 or SFPD and ask them to evaluate a Silver Alert."
+    }
+  ],
+  "source": "fixture"
+}

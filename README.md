@@ -29,14 +29,14 @@ Demo knobs: `DOOR_WAIT_S=5 ESCALATION_STEP_S=10 ./run.sh` shortens the waits.
 ## What is real vs mock
 
 Real now: state machine, rules R0-R4/R8/R9, escalation ladder, HMAC brief tokens, ranking, SSE phone ring, webcam motion zone and exit frames.
-Mock now: voice (browser TTS), clothing (fixture), places (Fullerton fixture), phone call (SSE page). Each lane replaces its mock behind the same interface.
+Mock now: voice (browser TTS), clothing (fixture), places (Marina fixture), phone call (SSE page). Each lane replaces its mock behind the same interface.
 
 ## Layout
 
 ```
 nightfall/   engine (pure state machine), escalation, notify, brief, search, script, household, store, actions, api
 static/      dashboard.html, phone.html, brief.html, tokens.css (light + dark), app.js
-data/        household.json, places.fullerton.json
+data/        household.json, places.marina.json
 tests/       engine, escalation, brief, api
 docs/        API.md (the contract between lanes)
 ```
