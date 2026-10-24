@@ -90,6 +90,22 @@ async def door_command(body: CommandIn) -> dict[str, Any]:
     return {"ok": True}
 
 
+class TelemetryIn(BaseModel):
+    event: str
+    detail: str = ""
+
+
+@router.post("/door/telemetry")
+async def door_telemetry(body: TelemetryIn) -> dict[str, Any]:
+    """Door page reports what it sees and hears (detector state, audio play results) for debugging at the table."""
+    store = _store()
+    from nightfall.actions import emit
+
+    emit(store, {"type": "door", "event": body.event[:40], "detail": body.detail[:200]})
+    print(f"door: {body.event} {body.detail[:120]}")
+    return {"ok": True}
+
+
 class TakeoverIn(BaseModel):
     member_id: str
     on: bool = True

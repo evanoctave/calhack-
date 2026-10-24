@@ -3,6 +3,7 @@
 const Cam = {model: null, video: null, canvas: null, ctx: null, overlay: null, octx: null, ring: [], personFrames: [],
              present: false, hits: 0, misses: 0, lastEvent: "", lostMs: 1500, lastSeenAt: 0, relayAt: 0, busy: false, on: false, heights: [], awayAt: 0, face: null, faceMisses: 0, faceTick: 0, facing: "", awaySince: 0, awayLostSent: false, awayHoldMs: 5000, track: []};
 
+function camTele(event, detail) { fetch("/door/telemetry", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({event, detail: String(detail || "")})}).catch(() => {}); }
 function camStatus(t) { const el = document.getElementById("camstat"); if (el) el.textContent = t; }
 
 async function startCam() {
@@ -14,8 +15,8 @@ async function startCam() {
   Cam.ctx = Cam.canvas.getContext("2d", {willReadFrequently: true});
   Cam.overlay = document.getElementById("overlay"); Cam.octx = Cam.overlay.getContext("2d");
   Cam.on = true; camStatus("loading detector...");
-  try { Cam.model = await cocoSsd.load({base: "lite_mobilenet_v2"}); camStatus("detector ready. walk into frame = approach; out of frame 1.5 s = exit timer."); }
-  catch (e) { camStatus("detector failed to load (offline?); falling back to motion"); }
+  try { Cam.model = await cocoSsd.load({base: "lite_mobilenet_v2"}); camStatus("detector ready. walk into frame = approach; out of frame 1.5 s = exit timer."); camTele("detector_ready", "coco-ssd"); }
+  catch (e) { camStatus("detector failed to load (offline?); falling back to motion"); camTele("detector_failed", String(e)); }
   loadFace(); loadFaceApi();
   setInterval(camTick, 250);
 }
@@ -30,15 +31,15 @@ async function camTick() {
     let present = false, boxes = [];
     if (Cam.model) {
       const preds = await Cam.model.detect(Cam.canvas);
-      boxes = preds.filter(p => p.class === "person" && p.score > 0.5);
+      boxes = preds.filter(p => p.class === "person" && p.score > 0.55 && p.bbox[3] > 70);
       present = boxes.length > 0;
     } else present = motionFallback();
     drawBoxes(boxes, present);
     if (present && blob) { Cam.personFrames.push(blob); if (Cam.personFrames.length > 3) Cam.personFrames.shift(); }
     const now = Date.now();
     if (present) { Cam.hits++; Cam.lastSeenAt = now; trackAway(boxes, now); await checkFace(true, now); await identify(now); } else { Cam.hits = 0; Cam.heights = []; Cam.faceMisses = 0; Cam.awaySince = 0; Cam.awayLostSent = false; }
-    if (!Cam.present && Cam.hits >= 2) { Cam.present = true; await onEnter(); }
-    if (Cam.present && now - Cam.lastSeenAt >= Cam.lostMs) { Cam.present = false; await onLost(); }
+    if (!Cam.present && Cam.hits >= 2) { Cam.present = true; camTele("person_present", boxes.map(b => Math.round(b.bbox[3]) + "px " + Math.round(b.score * 100) + "%").join(",")); await onEnter(); }
+    if (Cam.present && now - Cam.lastSeenAt >= Cam.lostMs) { Cam.present = false; camTele("person_absent", "no person for " + Cam.lostMs + " ms"); await onLost(); }
     const active = window.lastState && window.lastState.incident && !["CLOSED", "RETURNED", "ACKED"].includes(window.lastState.incident.state);
     if (blob && now - Cam.relayAt > (active ? 400 : 1000)) {
       Cam.relayAt = now; const fd = new FormData(); fd.append("f", blob, "f.jpg"); fetch("/cam/frame", {method: "POST", body: fd}).catch(() => {});

@@ -44,7 +44,7 @@ html, body { height: 100%; } body { padding: 0; background: #06101d; color: #eef
     <div class="caption"><div class="pillrow"><span class="dpill"><span id="persondot" class="dot"></span><span id="persontxt">no person</span></span><span class="dpill" id="idtxt">identity: unknown</span><span class="dpill" id="camstat">camera off</span></div></div>
   </div></div>
   <div class="bottom"><div class="status"><div id="enrolled">nobody enrolled</div><div id="integ"></div><div class="small">Controls live on the caregiver's phone. <a href="/dashboard.html" style="color:#7fa7ff">admin</a></div></div>
-    <button class="help" onclick="sos()">HELP<small>calls the family</small></button></div>
+    <div><button class="help" onclick="sos()">HELP<small>calls the family</small></button><div class="small" style="text-align:center;margin-top:8px"><a href="#" onclick="testSpeaker();return false" style="color:#7fa7ff">test speaker</a></div></div></div>
 </div>
 <script>
 let last = null, serverOffset = 0, pending = null, audioOk = false;
@@ -64,11 +64,20 @@ function tick() {
 }
 setInterval(tick, 200);
 function showSpeak(who, text) { $("speakwho").textContent = who; $("speaktxt").textContent = text; $("speak").classList.add("on"); clearTimeout(showSpeak.t); showSpeak.t = setTimeout(() => $("speak").classList.remove("on"), 9000); }
-function playAtDoor(e) {
+function tele(event, detail) { fetch("/door/telemetry", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({event, detail: String(detail || "")})}).catch(() => {}); }
+async function playAtDoor(e) {
   const who = e.line_source && e.line_source.startsWith("human:") ? e.line_source.slice(6) + " (family)" : "Nightfall · " + (last && last.household.caregiver_name || "family") + "'s voice";
   showSpeak(who, e.mode === "clip" ? "your family member's voice" : e.text);
-  if (e.url) { const a = new Audio(e.url); a.onplay = () => { audioOk = true; }; a.play().catch(() => { pending = e; if (e.mode !== "clip") speak(e.text); }); } else speak(e.text);
+  if (!e.url) { tele("speak_browser_tts", e.text); speak(e.text); return; }
+  try {
+    const r = await fetch(e.url, {cache: "no-store"}); if (!r.ok) throw new Error("audio " + r.status);
+    const blob = await r.blob(); const a = new Audio(URL.createObjectURL(blob)); a.volume = 1;
+    a.onplay = () => { audioOk = true; tele("audio_playing", e.url + " " + Math.round(blob.size / 1024) + "KB"); };
+    a.onended = () => tele("audio_ended", e.url);
+    await a.play();
+  } catch (err) { pending = e; tele("audio_blocked", String(err)); $("camstat").textContent = "SPEAKER BLOCKED: click anywhere on this page"; if (e.mode !== "clip") speak(e.text); }
 }
+function testSpeaker() { playAtDoor({url: "", text: "This is the Nightfall door speaker.", mode: "browser_tts"}); post("/door/command", {cmd: "say_test"}); }
 document.addEventListener("click", () => { if (pending) { const e = pending; pending = null; playAtDoor(e); } }, true);
 sse("/sse/dashboard", e => {
   if (e.type === "speak") playAtDoor(e);
@@ -83,7 +92,7 @@ async function runCommand(c) {
   if (c.cmd === "say_test") speak("This is the Nightfall door speaker.");
 }
 async function sos() { await post("/event", {kind: "sos"}); showSpeak("Nightfall", "Calling the family now."); refresh(); }
-async function startDoor() { $("start").classList.add("hidden"); try { const c = new (window.AudioContext || window.webkitAudioContext)(); c.resume(); } catch (e) {} startCam(); doorConnect(); }
+async function startDoor() { $("start").classList.add("hidden"); try { const c = new (window.AudioContext || window.webkitAudioContext)(); await c.resume(); const a = new Audio("/voice/silence.wav"); a.volume = 0.01; await a.play().catch(() => {}); } catch (e) {} tele("door_started", navigator.userAgent.slice(0, 60)); startCam(); doorConnect(); }
 // Live voice from the phone (PCM over /ws/door)
 const Spk = {ws: null, ctx: null, t: 0};
 function doorConnect() {
