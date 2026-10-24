@@ -81,3 +81,36 @@ def test_every_pair_resolves() -> None:
             inc.exited_at = at(0)
             tr = step(inc, Event(kind, at(1), {"member_id": "x"}))
             assert tr.rule in {"ignored", "R0", "R1", "R2", "R3", "R4", "R10"}
+
+
+def test_person_enter_lost_back() -> None:
+    inc = Incident("INC-1")
+    tr = step(inc, Event("person_enter", at(0)))
+    assert inc.state == State.CONVERSATION and "speak:open" in tr.actions and inc.person_in_frame
+    assert step(inc, Event("tick", at(engine.LINE_GAP_S - 1))).rule == "ignored"
+    tr = step(inc, Event("tick", at(engine.LINE_GAP_S)))
+    assert tr.detail == "auto line" and inc.lines_spoken == 2
+    tr = step(inc, Event("person_lost", at(12)))
+    assert inc.state == State.DOOR_OPEN and "capture_exit_frames" in tr.actions and tr.detail == "person left the frame"
+    step(inc, Event("person_back", at(15)))
+    assert inc.state == State.RETURNED
+
+
+def test_person_back_after_exit_cancels() -> None:
+    inc = Incident("INC-1")
+    step(inc, Event("person_enter", at(0)))
+    step(inc, Event("person_lost", at(5)))
+    step(inc, Event("tick", at(5 + engine.DOOR_WAIT_S)))
+    assert inc.state == State.ESCALATING
+    tr = step(inc, Event("person_back", at(40)))
+    assert inc.state == State.RETURNED and set(tr.actions) == {"cancel_escalation", "notify:returned"}
+
+
+def test_auto_lines_stop_at_budget() -> None:
+    inc = Incident("INC-1")
+    step(inc, Event("person_enter", at(0)))
+    spoken = 1
+    for i in range(1, 8):
+        tr = step(inc, Event("tick", at(i * engine.LINE_GAP_S)))
+        spoken += "speak:again" in tr.actions
+    assert spoken == engine.MAX_LINES

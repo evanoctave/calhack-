@@ -28,12 +28,21 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
             store.history = []
             _speak(store, fill(SCRIPT["open"], store.hh), "script")
         elif a == "speak:again":
-            reply = str(tr_payload(tr, inc, store).get("text", ""))
-            store.history.append(("person", reply))
-            hits = [h["text"] for h in await store.memory.search(reply, 2)]
-            emit(store, {"type": "memory", "query": reply, "hits": hits, "source": store.memory.source})
+            if store.takeover_by:
+                emit(store, {"type": "takeover_skip", "by": store.takeover_by})
+                continue
+            reply = str(tr_payload(tr, inc, store).get("text", "")) if tr.detail != "auto line" else ""
+            hits: list[str] = []
+            if reply:
+                store.history.append(("person", reply))
+                hits = [h["text"] for h in await store.memory.search(reply, 2)]
+                emit(store, {"type": "memory", "query": reply, "hits": hits, "source": store.memory.source})
             line, source = llm.next_line(store.hh, store.history, hits)
             _speak(store, line, source)
+        elif a == "notify:returned":
+            for m in store.hh.tree:
+                store.hub.publish(f"phone:{m.id}", {"type": "returned", "incident_id": inc.id})
+            emit(store, {"type": "returned", "incident_id": inc.id})
         elif a == "capture_exit_frames":
             store.hub.publish("dashboard", {"type": "exit_frames_request", "incident_id": inc.id})
         elif a == "build_brief":

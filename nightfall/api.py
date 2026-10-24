@@ -5,7 +5,6 @@ State lives in nightfall.store.Store; side effects of transitions live in nightf
 from __future__ import annotations
 
 import asyncio
-import base64
 import json
 import os
 import secrets
@@ -13,7 +12,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, AsyncIterator
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -25,11 +24,13 @@ from nightfall.actions import run_actions as _run_actions
 from nightfall.escalation import LADDER
 from nightfall.household import TreeMember, load
 from nightfall.integrations import anthropic_llm, cartesia, twilio
+from nightfall.api_cam import router as cam_router
+from nightfall.api_setup import router as setup_router
 from nightfall.api_voice import router as voice_router
 from nightfall.store import ROOT, Store
 
-PUBLIC_URL = os.environ.get("PUBLIC_URL", "http://127.0.0.1:8000")
-MAX_FRAME = 200 * 1024
+PUBLIC_URL = os.environ.get("PUBLIC_URL") or "http://127.0.0.1:8000"
+CALL_911_S = float(os.environ.get("CALL_911_S", "45"))
 
 
 store = Store()
@@ -76,8 +77,13 @@ class ArmIn(BaseModel):
 
 async def _step(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
     async with store.lock:
-        if store.inc is None or store.inc.state == engine.State.CLOSED:
+        done = (engine.State.CLOSED, engine.State.RETURNED, engine.State.ACKED, engine.State.EXHAUSTED)
+        fresh = kind in ("motion", "person_enter", "door_open")
+        if store.inc is None or store.inc.state == engine.State.CLOSED or (store.inc.state in done and fresh):
+            if store.inc is not None and store.inc.state != engine.State.CLOSED:
+                await store.runner.cancel(store.inc.id)
             store.inc = engine.Incident(id=f"INC-{secrets.token_hex(4)}", night_mode=store.night())
+            store.takeover_by, store.call_911_sent = None, False
         inc = store.inc
         inc.night_mode = store.night()
         store.last_payload = payload
@@ -99,8 +105,16 @@ async def _warm_memory() -> None:
 async def _ticker() -> None:
     while True:
         await asyncio.sleep(1)
-        if store.inc is not None and store.inc.state in (engine.State.DOOR_OPEN, engine.State.ESCALATING):
+        inc = store.inc
+        if inc is not None and inc.state in (engine.State.CONVERSATION, engine.State.DOOR_OPEN, engine.State.ESCALATING):
             await _step("tick", {})
+        if inc is not None and inc.exited_at is not None and not store.call_911_sent and inc.state in (
+            engine.State.ESCALATING, engine.State.ACKED, engine.State.EXHAUSTED
+        ) and (store.now() - inc.exited_at).total_seconds() >= CALL_911_S:
+            store.call_911_sent = True
+            for m in store.hh.tree:
+                store.hub.publish(f"phone:{m.id}", {"type": "call_911_option", "incident_id": inc.id, "out_of_view_s": CALL_911_S})
+            _emit(store, {"type": "call_911_option", "incident_id": inc.id})
 
 
 @app.get("/health")
@@ -164,23 +178,6 @@ async def tree(body: TreeIn) -> dict[str, Any]:
     return {"member_id": m.id, "phone_url": f"{PUBLIC_URL}/phone.html#{m.id}"}
 
 
-@app.post("/frames/{incident_id}")
-async def frames(incident_id: str, request: Request) -> dict[str, Any]:
-    form = await request.form()
-    out: list[str] = []
-    for f in form.values():
-        if isinstance(f, UploadFile):
-            data = await f.read()
-            if len(data) > MAX_FRAME:
-                raise HTTPException(413, "frame over 200 KB")
-            out.append("data:image/jpeg;base64," + base64.b64encode(data).decode())
-            store.frame_bytes[incident_id] = data
-    store.frames[incident_id] = (store.frames.get(incident_id, []) + out)[-3:]
-    if incident_id in store.briefs:
-        store.briefs[incident_id]["exit_frames"] = store.frames[incident_id]
-    return {"frame_ids": [f"FR-{i}" for i in range(len(store.frames[incident_id]))]}
-
-
 @app.get("/brief/{token}")
 async def get_brief(token: str) -> dict[str, Any]:
     try:
@@ -224,8 +221,10 @@ async def reset() -> dict[str, Any]:
     store.inc, store.frames, store.briefs = None, {}, {}
     store.log.clear()
     store.history, store.frame_bytes = [], {}
+    store.takeover_by, store.call_911_sent, store.latest_frame = None, False, b""
     store.runner.rings.clear()
     store.hh = load(ROOT / "data" / "household.json")
+    store.places = briefmod.load_places(os.environ.get("PLACES_FILE") or ROOT / "data" / "places.fullerton.json")
     from nightfall.memory import Memory
 
     store.memory = Memory(store.hh)
@@ -239,4 +238,6 @@ async def index() -> FileResponse:
 
 
 app.include_router(voice_router)
+app.include_router(cam_router)
+app.include_router(setup_router)
 app.mount("/", StaticFiles(directory=str(ROOT / "static")), name="static")

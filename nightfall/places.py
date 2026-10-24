@@ -12,6 +12,7 @@ from typing import Any, Final
 
 from nightfall.search import haversine_mi
 
+HAZARD_CATS: Final = frozenset({"water", "rail", "motorway", "construction"})
 SEARCHES: Final = ["24 hour gas station", "24 hour convenience store", "24 hour restaurant",
                    "hospital emergency room", "24 hour pharmacy", "train station"]
 _CAT: Final[tuple[tuple[re.Pattern[str], str], ...]] = (

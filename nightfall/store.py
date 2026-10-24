@@ -20,7 +20,7 @@ from nightfall.memory import Memory
 from nightfall.notify import Hub, SseNotifier, TwilioNotifier
 
 ROOT = Path(__file__).resolve().parent.parent
-PUBLIC_URL = os.environ.get("PUBLIC_URL", "http://127.0.0.1:8000")
+PUBLIC_URL = os.environ.get("PUBLIC_URL") or "http://127.0.0.1:8000"
 
 
 class Store:
@@ -37,6 +37,10 @@ class Store:
         self.history: list[tuple[str, str]] = []
         self.last_payload: dict[str, Any] = {}
         self.frame_bytes: dict[str, bytes] = {}
+        self.latest_frame: bytes = b""
+        self.latest_frame_at: float = 0.0
+        self.takeover_by: str | None = None
+        self.call_911_sent: bool = False
         self.night_mode: bool = True
         self.hub = Hub()
         notifier = TwilioNotifier(self.hub, self.link, PUBLIC_URL, self.log) if twilio.enabled() else SseNotifier(self.hub, self.link, self.log)
