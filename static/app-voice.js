@@ -54,13 +54,14 @@ function pttTap(ev) { ev.preventDefault(); recToggle($("r-ptt"), $("r-pttstat"),
   $("r-pttstat").textContent = r.ok ? "Your voice is playing at the door (" + Math.round(blob.size / 1024) + " KB)." : "Clip failed: " + (j.detail || r.status); }); }
 // Live voice: mic -> 16 kHz Int16 PCM -> WebSocket -> door speaker on the laptop. Tap to go live, tap to stop.
 const Live = {ws: null, ctx: null, src: null, proc: null, on: false, sent: 0};
-async function liveToggle() {
-  const btn = $("r-live"), stat = $("r-livestat");
-  if (Live.on) { liveStop(); btn.classList.remove("on"); btn.textContent = "Go live (talk through the door)"; stat.textContent = "Live voice ended. AI resumes unless you keep the takeover on."; return; }
+async function liveToggle(btnId, statId) {
+  const btn = $(btnId || "r-live"), stat = $(statId || "r-livestat");
+  if (Live.on) { liveStop(); btn.classList.remove("on"); btn.textContent = btn.dataset.idle || "Talk through the door"; stat.textContent = "Mic off. The door speaker is quiet."; if (incident) post("/takeover", {member_id: member, on: false}); return; }
+  btn.dataset.idle = btn.dataset.idle || btn.textContent;
   let stream; try { stream = await micStream(); } catch (e) { stat.textContent = "Microphone blocked. Allow the mic for this site."; return; }
   const proto = location.protocol === "https:" ? "wss" : "ws"; const ws = new WebSocket(`${proto}://${location.host}/ws/talk/${member}`); ws.binaryType = "arraybuffer";
-  ws.onopen = () => { Live.on = true; btn.classList.add("on"); btn.textContent = "Live: tap to stop"; stat.textContent = "You are live at the door. Speak normally."; $("r-takeover").hidden = false; $("r-tobtn").textContent = "Hand back to the AI"; };
-  ws.onclose = () => { if (Live.on) { liveStop(); btn.classList.remove("on"); btn.textContent = "Go live (talk through the door)"; stat.textContent = "Connection dropped. Tap to go live again."; } };
+  ws.onopen = () => { Live.on = true; btn.classList.add("on"); btn.textContent = "Mic on · tap to stop"; stat.textContent = "You are live at the door. Speak normally."; if ($("r-takeover")) { $("r-takeover").hidden = false; $("r-tobtn").textContent = "Hand back to the AI"; } };
+  ws.onclose = () => { if (Live.on) { liveStop(); btn.classList.remove("on"); btn.textContent = btn.dataset.idle || "Talk through the door"; stat.textContent = "Connection dropped. Tap to talk again."; } };
   ws.onerror = () => { stat.textContent = "Could not open the live channel."; };
   Live.ws = ws; Live.ctx = new (window.AudioContext || window.webkitAudioContext)(); await Live.ctx.resume();
   Live.src = Live.ctx.createMediaStreamSource(stream); Live.proc = Live.ctx.createScriptProcessor(2048, 1, 1);

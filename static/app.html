@@ -48,6 +48,7 @@
   <div id="h-cd" class="banner" hidden style="margin:0 0 12px"><b id="h-cdt">Out of view</b><div id="h-cds" class="small"></div></div>
   <div class="hero" style="height:200px"><img id="h-feed" alt="front door camera" style="display:none"><div class="door" id="h-door"></div><div class="line"></div></div>
   <p class="cap" id="h-feedcap">Front door camera · connecting…</p>
+  <button class="rec mt" id="h-live" onclick="liveToggle('h-live','h-livestat')">Talk through the door</button><p class="cap" id="h-livestat">Tap, speak, your voice plays on the door speaker live. Tap again to stop.</p>
   <div class="card mt"><div class="row big"><div><span class="k" id="h-watch">Watching over Robert</span><span class="sub2" id="h-cam">Front entrance camera</span></div><span id="h-check" style="color:var(--ok);font-size:20px">✓</span></div></div>
   <div class="label">Tonight</div>
   <div class="card"><div class="row"><span class="k">Latest event</span><span class="v" id="h-event">No exit detected</span></div>
@@ -117,7 +118,7 @@
     <div style="display:flex;gap:8px;margin-top:10px"><button class="btn small primary" id="r-listen" onclick="listenOnce()">Tap, then speak</button><input id="r-ask" placeholder="ask: where should I look?"><button class="btn small" onclick="askTyped()">Ask</button></div></div>
   <div class="label">Talk to him yourself</div>
   <div class="card" style="padding:14px 18px">
-    <button class="rec" id="r-live" onclick="liveToggle()">Go live (talk through the door)</button><p class="cap" id="r-livestat">Your voice plays at the door in real time. The agent keeps watching and escalating.</p>
+    <button class="rec" id="r-live" onclick="liveToggle('r-live','r-livestat')">Talk through the door</button><p class="cap" id="r-livestat">Your voice plays at the door in real time. The agent keeps watching and escalating.</p>
     <button class="btn small primary mt" id="r-tobtn" onclick="toggleTakeover()">Take over the voice</button><span class="muted small" id="r-tostat" style="margin-left:8px">AI is speaking for you.</span>
     <div id="r-takeover" hidden><div class="chips mt"><span class="chip" onclick="sayText(this.textContent)">Dad, it's me. Come back inside, I'm on my way.</span><span class="chip" onclick="sayText(this.textContent)">Wait right there by the door. I'll be two minutes.</span><span class="chip" onclick="sayText(this.textContent)">Everything's okay. Let's sit down, I'm coming.</span></div>
       <div style="display:flex;gap:8px;margin-top:10px"><input id="r-text" placeholder="type what to say in your voice"><button class="btn small" onclick="sayTyped()">Say</button></div>
