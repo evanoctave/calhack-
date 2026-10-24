@@ -35,11 +35,19 @@ Transports, same brain:
 
 `llm.brief_prose(fields)` -> two sentences from fields; template is the mock and the fallback.
 
+## Memory (Moss)
+
+`memory.Memory` builds one Moss index per household from the caregiver's notes (familiar places, habits)
+in a background task at boot (about 7 s cold, 60 s the first time an index is created). Until it is ready
+searches return nothing so the door never waits. Hits feed `llm.next_line`, the brief's habits section and
+the call agent's fact sheet. Mock is TF-IDF over the same notes.
+
 ## Env
 
 ```
 MOCK=0
-CARTESIA_API_KEY=  CARTESIA_VOICE_ID=  CARTESIA_ASSISTANT_VOICE_ID=
+CARTESIA_API_KEY=  CARTESIA_VOICE_ID=<clone or stock Michelle>  CARTESIA_ASSISTANT_VOICE_ID=<stock Skylar>
+MOSS_PROJECT_ID=   MOSS_PROJECT_KEY=
 ANTHROPIC_API_KEY= ANTHROPIC_MODEL=claude-opus-5
 TWILIO_ACCOUNT_SID= TWILIO_AUTH_TOKEN= TWILIO_FROM=
 PUBLIC_URL=https://<tunnel>   # Twilio must reach /twiml and /voice
