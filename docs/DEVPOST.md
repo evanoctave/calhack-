@@ -16,7 +16,7 @@ Six in ten people living with dementia will wander at least once, and the Alzhei
 
 Those minutes usually go to the wrong things. A caregiver woken at 2 AM spends them finding a recent photo, trying to remember what Dad was wearing, and guessing which way he went. The people we built for are the roughly 11 million unpaid dementia caregivers in the US, most often an adult child aged 45 to 65 who moved a parent in and cannot afford overnight care. They sleep with one ear open. Door alarms only tell them the door opened. Nothing in the house tries to turn the person around, and nothing hands the family a brief they can read to a dispatcher.
 
-**TODO:** one sentence from a real caregiver conversation (who, what surprised us).
+Evan's mother cared for her grandmother with dementia. What stayed with us was how she described the gap: "I didn't have what I needed," and that Silver Alerts get broadcast to a whole neighborhood "because there's no other way unless someone is watching them constantly, at all times." Nightfall is the someone watching at night.
 
 ## What it does
 
@@ -89,7 +89,7 @@ It also has to tell a wander apart from everything else that happens at a front 
 - What police need in the first minutes is well documented and short. The hard part is having it ready at 2 AM, not knowing what it is.
 - Bounded model jobs are easier to trust and to test than open-ended ones. Validators plus scripted fallbacks let us use Claude where it is strong and keep it away from the rest.
 
-**TODO:** one lesson from the caregiver conversation.
+- From Evan's mother: the hardest part was not the emergency but losing the connection ("they're in a different world") while still carrying everything else. That is why the door speaks in a familiar voice instead of arguing, and why the family decides, not the software.
 
 ## What's next for Nightfall
 

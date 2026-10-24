@@ -2,6 +2,10 @@
 
 **Life Alert inside a doorbell camera, for families keeping a parent with dementia at home.**
 
+> "It was very hard taking care of my grandmother. It was hard seeing her memory diminish, and knowing that I couldn't take care of her. I couldn't get her to understand why she couldn't do things, and we just couldn't connect anymore. I didn't have what I needed. There is nothing you can say or do that would connect with them, because they're in a different world. That's why, when you see the Silver Alerts, they're broadcast around the entire neighborhood, telling everyone to look for them, because there's no other way unless someone is watching them constantly, at all times. Assistance is required, especially to balance everything else I have to do."
+>
+> Evan's mother, who cared for her grandmother with dementia
+
 Six in ten people with dementia will wander. Half of those not found within 24 hours are seriously hurt or die
 (Alzheimer's Association figures). Tonight, a caregiver's first fifteen minutes go to finding a photo, remembering
 what Dad was wearing, and guessing which way he went.
