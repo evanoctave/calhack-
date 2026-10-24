@@ -35,6 +35,10 @@ async function camTick() {
       present = boxes.length > 0;
     } else present = motionFallback();
     drawBoxes(boxes, present);
+    if (Date.now() < (Cam.armAt || 0)) {  // arming delay after Start: the person who tapped it is not "Dad"
+      camStatus("arming in " + Math.ceil((Cam.armAt - Date.now()) / 1000) + " s: step out of frame"); return;
+    }
+    if (Cam.armAt) { Cam.armAt = 0; Cam.hits = 0; camStatus("armed. walk into frame = approach; out of frame 1.5 s = exit timer."); camTele("armed", ""); }
     if (present && blob) { Cam.personFrames.push(blob); if (Cam.personFrames.length > 3) Cam.personFrames.shift(); }
     const now = Date.now();
     if (present) { Cam.hits++; Cam.lastSeenAt = now; trackAway(boxes, now); await checkFace(true, now); await identify(now); } else { Cam.hits = 0; Cam.heights = []; Cam.faceMisses = 0; Cam.awaySince = 0; Cam.awayLostSent = false; }

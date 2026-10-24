@@ -68,13 +68,14 @@ setInterval(tick, 200);
 function showSpeak(who, text) { $("speakwho").textContent = who; $("speaktxt").textContent = text; $("speak").classList.add("on"); clearTimeout(showSpeak.t); showSpeak.t = setTimeout(() => $("speak").classList.remove("on"), 9000); }
 function tele(event, detail) { fetch("/door/telemetry", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({event, detail: String(detail || "")})}).catch(() => {}); }
 const Cur = {audio: null, src: null, live: false};
-const Out = {ctx: null, started: false};  // one AudioContext, unlocked by the Start tap; Chrome never autoplay-blocks it after that
+const Out = {ctx: null, started: false, line: ""};
+const ARM_DELAY_MS = 5000;  // one AudioContext, unlocked by the Start tap; Chrome never autoplay-blocks it after that
 function cutAudio(reason) { if (Cur.src) { try { Cur.src.onended = null; Cur.src.stop(); } catch (err) {} Cur.src = null; } if (Cur.audio) { try { Cur.audio.pause(); Cur.audio.currentTime = 0; } catch (err) {} Cur.audio = null; } try { speechSynthesis.cancel(); } catch (err) {} $("speak").classList.remove("on"); tele("audio_cut", reason || ""); }
 async function playAtDoor(e) {
   if (!Out.started) { tele("speak_dropped_not_started", e.text); return; }  // a reloaded tab stays silent until Start
   if (Cur.live && !(e.line_source || "").startsWith("human:") && e.mode !== "clip") { tele("speak_dropped_live", e.text); return; }
   const who = e.line_source && e.line_source.startsWith("human:") ? e.line_source.slice(6) + " (family)" : "Nightfall · " + (last && last.household.caregiver_name || "family") + "'s voice";
-  showSpeak(who, e.mode === "clip" ? "your family member's voice" : e.text);
+  showSpeak(who, e.mode === "clip" ? "your family member's voice" : e.text); Out.line = e.mode === "clip" ? "" : (e.text || "");
   if (!e.url) { tele("speak_browser_tts", e.text); speak(e.text); return; }
   try {
     const r = await fetch(e.url, {cache: "no-store"}); if (!r.ok) throw new Error("audio " + r.status);
@@ -114,7 +115,30 @@ async function runCommand(c) {
   if (c.cmd === "say_test") speak("This is the Nightfall door speaker.");
 }
 async function sos() { await post("/event", {kind: "sos"}); showSpeak("Nightfall", "Calling the family now."); refresh(); }
-async function startDoor() { $("start").classList.add("hidden"); Out.started = true; try { const c = new (window.AudioContext || window.webkitAudioContext)(); await c.resume(); Out.ctx = c; const a = new Audio("/voice/silence.wav"); a.volume = 0.01; await a.play().catch(() => {}); } catch (e) {} tele("door_started", navigator.userAgent.slice(0, 60)); startCam(); doorConnect(); micConnect(); videoConnect(); }
+// The door listens: Chrome speech recognition -> /event reply. Barge-in cuts the door's line the moment the
+// person talks; the door's own voice picked up by the mic is ignored as echo (word overlap with the line).
+const Ear = {rec: null, on: false};
+const words = t => (t.toLowerCase().match(/[a-z']+/g) || []);
+function isEcho(heard) {
+  const h = words(heard); if (!h.length || !Out.line || !(Cur.src || Cur.audio)) return false;
+  const line = new Set(words(Out.line)); return h.filter(w => line.has(w)).length / h.length > 0.6;
+}
+function earStart() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR || Ear.on) return;
+  const r = new SR(); r.lang = "en-US"; r.continuous = true; r.interimResults = true; Ear.rec = r; Ear.on = true;
+  r.onresult = ev => {
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      const res = ev.results[i], text = res[0].transcript.trim(); if (!text || isEcho(text)) continue;
+      const inc = last && last.incident; if (!inc || !["CONVERSATION", "VISITOR", "WATCHING", "DOOR_OPEN"].includes(inc.state)) continue;
+      if (Cur.src || Cur.audio) cutAudio("barge-in");
+      if (res.isFinal) { tele("heard", text); post("/event", {kind: "reply", text}); }
+    }
+  };
+  r.onerror = e => tele("ear_error", e.error);
+  r.onend = () => { Ear.on = false; if (Out.started) setTimeout(earStart, 300); };  // Chrome ends sessions; keep listening
+  try { r.start(); tele("ear_on", ""); } catch (e) { Ear.on = false; }
+}
+async function startDoor() { $("start").classList.add("hidden"); Out.started = true; Cam.armAt = Date.now() + ARM_DELAY_MS; earStart(); try { const c = new (window.AudioContext || window.webkitAudioContext)(); await c.resume(); Out.ctx = c; const a = new Audio("/voice/silence.wav"); a.volume = 0.01; await a.play().catch(() => {}); } catch (e) {} tele("door_started", navigator.userAgent.slice(0, 60)); startCam(); doorConnect(); micConnect(); videoConnect(); }
 // Live voice from the phone (PCM over /ws/door)
 const Spk = {ws: null, ctx: null, t: 0};
 function doorConnect() {
