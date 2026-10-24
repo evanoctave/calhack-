@@ -30,14 +30,14 @@ def test_clothing_enum_coercion() -> None:
 
 def test_build_sections_and_meds() -> None:
     hh = load("data/household.json")
-    places = brief.load_places("data/places.fullerton.json")
+    places = brief.load_places("data/places.marina.json")
     inc = Incident("INC-1")
     inc.exited_at = NOW
     b = brief.build(hh, inc, brief.mock_clothing(), places, [], NOW)
-    assert len(b["hazards"]) == 4 and b["hazards"][0]["name"].startswith("Brea Creek")
-    assert b["call_first"][0]["name"].startswith("Chevron")
+    assert len(b["hazards"]) == 4 and b["hazards"][0]["name"].startswith("Palace of Fine Arts lagoon")
+    assert b["call_first"][0]["name"].startswith("Lombard Gas")
     names = [p["name"] for p in b["call_first"]]
-    assert names.index("CVS, Chapman Ave") > names.index("Denny's, Orangethorpe")
+    assert names.index("Marina Pharmacy") > names.index("Bayview Diner")
     assert not any("(far)" in p["name"] for p in b["hazards"] + b["call_first"])
     assert len(b["medications"]) == 3
     from dataclasses import replace

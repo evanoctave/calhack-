@@ -111,10 +111,7 @@ def build(
     sections = rank(places, (hh.home_lat, hh.home_lng), hh.radius_mi, now, list(hh.familiar_places), list(hh.contacts))
     exited = inc.exited_at or now
     line = clothing_line(clothing)
-    prose = (
-        f"{hh.person_name} left home at {exited.strftime('%-I:%M %p')} wearing {line}. "
-        f"Most people are found within {hh.radius_mi:g} miles; check the hazards first, then call the open places."
-    )
+    prose_text = prose(hh, hhmm(exited), line)
     return {
         "incident_id": inc.id,
         "person_name": hh.person_name,
@@ -125,18 +122,23 @@ def build(
         "medications": list(hh.medications) if hh.meds_opt_in else [],
         "last_seen_at": exited.isoformat(),
         "deadline_at": (inc.deadline_at or exited).isoformat(),
-        "last_seen_hhmm": exited.strftime("%-I:%M %p"),
-        "deadline_hhmm": (inc.deadline_at or exited).strftime("%-I:%M %p"),
+        "last_seen_hhmm": hhmm(exited),
+        "deadline_hhmm": hhmm(inc.deadline_at or exited),
         "home": {"lat": hh.home_lat, "lng": hh.home_lng, "radius_mi": hh.radius_mi},
         "hazards": sections.hazards,
         "call_first": sections.call_first,
         "familiar": sections.familiar,
         "contacts": sections.contacts,
-        "prose": prose,
+        "prose": prose_text,
         "places_source": places[0].get("source", "fixture") if places else "none",
         "habits": [{"text": h["text"], "kind": h.get("kind", "habit")} for h in (habits or [])],
         "memory_source": memory_source,
     }
+
+
+def hhmm(dt: datetime) -> str:
+    """12-hour clock without a leading zero, Windows-safe (no %-I)."""
+    return dt.strftime("%I:%M %p").lstrip("0")
 
 
 def prose(hh: Household, hhmm: str, line: str) -> str:

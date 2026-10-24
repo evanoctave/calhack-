@@ -27,7 +27,7 @@ def test_good_model_output_used(monkeypatch) -> None:
 
 
 def test_memory_hits() -> None:
-    assert llm.memory_hits(hh, "I have to get to Ralphs")[0].startswith("Ralphs")
+    assert "Palace" in llm.memory_hits(hh, "I have to get to the Palace")[0]
     assert llm.memory_hits(hh, "hello") == []
 
 

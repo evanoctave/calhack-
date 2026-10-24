@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "profile.schema.json",
+  "title": "Profile",
+  "description": "The person being watched over, plus the household's call order.",
+  "type": "object",
+  "required": ["id", "name", "photo", "medications", "familiar_places", "contacts", "home"],
+  "properties": {
+    "id": {"type": "string"},
+    "name": {"type": "string"},
+    "age": {"type": "integer", "minimum": 0},
+    "photo": {"type": "string", "description": "URL path or data: URI"},
+    "height_build": {"type": "string", "description": "Free text, e.g. 5ft 9in, slim"},
+    "medications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "dose"],
+        "properties": {"name": {"type": "string"}, "dose": {"type": "string"}, "note": {"type": "string"}}
+      }
+    },
+    "familiar_places": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "lat", "lng"],
+        "properties": {"name": {"type": "string"}, "lat": {"type": "number"}, "lng": {"type": "number"}}
+      }
+    },
+    "contacts": {
+      "type": "array",
+      "description": "In call order: index 0 is called first. tier groups contacts rung together.",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "phone", "tier"],
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "phone": {"type": "string", "description": "E.164, or \"web\" for the in-browser demo phone"},
+          "tier": {"type": "integer", "minimum": 1, "maximum": 3},
+          "note": {"type": "string"}
+        }
+      }
+    },
+    "voice_id": {"type": "string", "description": "Cartesia voice id of the cloned caregiver voice (consent required)"},
+    "home": {
+      "type": "object",
+      "required": ["lat", "lng", "radius_mi"],
+      "properties": {"lat": {"type": "number"}, "lng": {"type": "number"}, "radius_mi": {"type": "number"}}
+    }
+  }
+}

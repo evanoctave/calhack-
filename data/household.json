@@ -5,8 +5,8 @@
   "caregiver_name": "Sarah",
   "night_start": "21:00",
   "night_end": "06:00",
-  "home_lat": 33.8704,
-  "home_lng": -117.9242,
+  "home_lat": 37.8,
+  "home_lng": -122.44,
   "radius_mi": 1.5,
   "meds_opt_in": true,
   "tree": [
@@ -48,44 +48,44 @@
   ],
   "familiar_places": [
     {
-      "name": "Old house on Malvern Ave, lived there 30 years",
-      "lat": 33.8745,
-      "lng": -117.939
+      "name": "Palace of Fine Arts, walked there every morning",
+      "lat": 37.8029,
+      "lng": -122.4486
     },
     {
-      "name": "Ralphs on Chapman, went every morning",
-      "lat": 33.872,
-      "lng": -117.911
+      "name": "Old flat on Chestnut St, lived there 30 years",
+      "lat": 37.8003,
+      "lng": -122.435
     },
     {
-      "name": "St. Mary's church",
-      "lat": 33.865,
-      "lng": -117.93
+      "name": "Corner church, attended every Sunday",
+      "lat": 37.799,
+      "lng": -122.44
     }
   ],
   "contacts": [
     {
-      "name": "Fullerton PD non-emergency",
-      "phone": "(714) 738-6800"
+      "name": "SFPD non-emergency",
+      "phone": "(415) 553-0123"
     },
     {
       "name": "Silver Alert",
       "phone": "",
-      "note": "California runs Silver Alert; ask the police to issue one."
+      "note": "Police request it through CHP. Call 911 or SFPD and ask them to evaluate a Silver Alert."
     }
   ],
   "notes": [
     {
       "kind": "habit",
-      "text": "Walks toward the train tracks when he thinks he is going to work at the rail yard"
+      "text": "Walks toward the Palace of Fine Arts when he thinks he is going to work; he was a groundskeeper there"
     },
     {
       "kind": "habit",
-      "text": "Goes to the Ralphs grocery store on Chapman for coffee and the newspaper every morning"
+      "text": "Goes to the Marina Corner Market for coffee and the newspaper every morning"
     },
     {
       "kind": "habit",
-      "text": "Looks for his old dog Buddy in the backyard and down the alley"
+      "text": "Looks for his old dog Buddy on the Marina Green and down the alley"
     },
     {
       "kind": "medical_note",
@@ -93,7 +93,7 @@
     },
     {
       "kind": "habit",
-      "text": "Sits on the bench at St. Mary's church when he is upset"
+      "text": "Sits on the steps of the corner church on Chestnut when he is upset"
     }
   ]
 }

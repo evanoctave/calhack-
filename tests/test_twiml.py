@@ -21,7 +21,7 @@ def test_twiml_call_flow(client: TestClient) -> None:
     r = client.post(f"/twiml/{inc}/TM-SARAH")
     assert r.status_code == 200 and "<Gather" in r.text and "navy hoodie" in r.text and 'input="speech"' in r.text
     r = client.post(f"/twiml/{inc}/TM-SARAH/turn", data={"SpeechResult": "where should I look"})
-    assert "Brea Creek" in r.text and "<Gather" in r.text
+    assert "Palace of Fine Arts lagoon" in r.text and "<Gather" in r.text
     r = client.post(f"/twiml/{inc}/TM-SARAH/turn", data={"SpeechResult": "I've got him"})
     assert "<Hangup/>" in r.text
     assert client.get("/state").json()["incident"]["acked_by"] == "TM-SARAH"

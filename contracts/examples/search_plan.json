@@ -1,0 +1,24 @@
+{
+  "profile_id": "HH-DEMO",
+  "generated_at": "2026-10-25T23:30:00Z",
+  "home": {"lat": 37.8000, "lng": -122.4400, "radius_mi": 1.5},
+  "open_late": [
+    {"category": "fuel", "name": "Lombard Gas & Mart", "lat": 37.8015, "lng": -122.4410, "distance_mi": 0.12, "phone": "(415) 555-0101", "hours": "24/7", "open_now": true, "source": "fixture"},
+    {"category": "diner", "name": "Bayview Diner", "lat": 37.7985, "lng": -122.4385, "distance_mi": 0.14, "phone": "(415) 555-0103", "hours": "24/7", "open_now": true, "source": "fixture"}
+  ],
+  "hazards": [
+    {"category": "water", "name": "Palace of Fine Arts lagoon", "lat": 37.8022, "lng": -122.4480, "distance_mi": 0.46, "source": "fixture"},
+    {"category": "motorway", "name": "US-101 approach (Doyle Dr)", "lat": 37.8040, "lng": -122.4540, "distance_mi": 0.81, "source": "fixture"}
+  ],
+  "route": {
+    "stops": [
+      {"name": "Corner church, attended every Sunday", "lat": 37.7990, "lng": -122.4400, "eta_min": 1, "distance_mi": 0.07},
+      {"name": "Palace of Fine Arts, walked there every morning", "lat": 37.8029, "lng": -122.4486, "eta_min": 10, "distance_mi": 0.5}
+    ]
+  },
+  "local_contacts": [
+    {"name": "SFPD non-emergency", "phone": "(415) 553-0123"},
+    {"name": "Silver Alert", "phone": "", "note": "Police request it through CHP. Call 911 or SFPD and ask them to evaluate a Silver Alert."}
+  ],
+  "source": "fixture"
+}
