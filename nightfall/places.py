@@ -66,8 +66,10 @@ def from_google(items: list[dict[str, Any]], home: tuple[float, float]) -> list[
         if not name or name.lower() in seen:
             continue
         seen.add(name.lower())
-        out.append({"category": _cat(name, str(it.get("categoryName", ""))), "name": name, "lat": float(loc["lat"]),
-                    "lng": float(loc["lng"]), "hours": hours_spec(it.get("openingHours")), "phone": str(it.get("phone") or ""),
+        lat, lng = float(loc["lat"]), float(loc["lng"])
+        out.append({"category": _cat(name, str(it.get("categoryName", ""))), "name": name, "lat": lat, "lng": lng,
+                    "distance_mi": round(haversine_mi(home[0], home[1], lat, lng), 2),
+                    "hours": hours_spec(it.get("openingHours")), "phone": str(it.get("phone") or ""),
                     "address": str(it.get("address") or ""), "source": "apify"})
     return out
 
@@ -94,6 +96,7 @@ def from_overpass(elements: list[dict[str, Any]], home: tuple[float, float]) -> 
         dup = next((p for p in out if p["name"] == label and haversine_mi(p["lat"], p["lng"], lat, lng) < 0.25), None)
         if dup is not None:
             continue
-        out.append({"category": cat, "name": str(label), "lat": lat, "lng": lng, "hours": "", "phone": "", "source": "apify"})
-    out.sort(key=lambda p: haversine_mi(home[0], home[1], p["lat"], p["lng"]))
+        out.append({"category": cat, "name": str(label), "lat": lat, "lng": lng, "hours": "", "phone": "", "source": "apify",
+                    "distance_mi": round(haversine_mi(home[0], home[1], lat, lng), 2)})
+    out.sort(key=lambda p: p["distance_mi"])
     return out
