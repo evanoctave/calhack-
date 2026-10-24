@@ -22,6 +22,10 @@ if [ requirements.txt -nt .venv/.installed ]; then
 fi
 PY=.venv/bin/python
 
+# Person detector for the camera. Cached in static/vendor (gitignored); the demo
+# falls back to motion detection if this fails, so a download problem is not fatal.
+if [ ! -s static/vendor/efficientdet_lite0.tflite ]; then scripts/fetch_models.sh || true; fi
+
 # Load .env line by line, skipping comments, blanks and blank values. An exported
 # empty ANTHROPIC_API_KEY would shadow a real credential from `ant auth login`.
 # Read in a loop rather than sourcing: process substitution is not available on
@@ -50,6 +54,16 @@ export MOCK="${MOCK:-1}"
 case "${1:-serve}" in
   serve) exec $PY -m uvicorn nightfall.api:app --host 127.0.0.1 --port "${PORT:-8000}" ;;
   test) exec $PY -m pytest -q ;;
-  check) $PY -m pytest -q && $PY -c "import nightfall.api" && echo "check: green" ;;
+  check)
+    $PY -m pytest -q && $PY -c "import nightfall.api"
+    # cam.js logic, when a working node is on PATH. A version manager shim can exist
+    # and still fail, so probe it rather than trusting command -v.
+    if node --version >/dev/null 2>&1; then
+      node --test tests/cam.test.js >/dev/null || { echo "cam.js tests: FAILED"; exit 1; }
+      echo "cam.js tests: ok"
+    else
+      echo "cam.js tests: skipped (no working node on PATH)"
+    fi
+    echo "check: green" ;;
   *) echo "usage: ./run.sh [serve|test|check]"; exit 2 ;;
 esac

@@ -1,6 +1,9 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Nightfall</title><link rel="stylesheet" href="/tokens.css"><script src="/app.js"></script>
-<style>#cam { width: 100%; max-width: 420px; border-radius: var(--radius); border: 1px solid var(--border); background: #000; }</style>
+<title>Nightfall</title><link rel="stylesheet" href="/tokens.css"><script src="/app.js"></script><script src="/cam.js"></script>
+<style>.camwrap { position: relative; width: 100%; max-width: 420px; }
+#cam, #overlay { display: block; width: 100%; border-radius: var(--radius); }
+#cam { border: 1px solid var(--border); background: #000; }
+#overlay { position: absolute; inset: 0; pointer-events: none; }</style>
 </head><body>
 <header>
   <div><h1>Nightfall</h1><div class="muted small">Night-exit guardian. Mock mode, no keys.</div></div>
@@ -24,8 +27,8 @@
   </section>
   <section class="card">
     <h2>Camera (laptop webcam)</h2>
-    <video id="cam" autoplay muted playsinline></video>
-    <div class="row" style="margin-top:8px"><button onclick="startCam()">Enable camera</button><span id="camstat" class="muted small">off. Motion in the zone posts a motion event; exit frames are kept for the brief.</span></div>
+    <div class="camwrap"><video id="cam" autoplay muted playsinline></video><canvas id="overlay"></canvas></div>
+    <div class="row" style="margin-top:8px"><button onclick="startCam()">Enable camera</button><span id="camstat" class="muted small">off. A person entering the frame starts the conversation; leaving the red door zone and not coming back is the exit.</span></div>
   </section>
   <section class="card">
     <h2>Family tree</h2>
@@ -76,30 +79,5 @@ sse("/sse/dashboard", async e => {
   refresh();
 });
 document.addEventListener("keydown", e => { if (e.target.tagName === "INPUT") return; if (e.key === "o") ev("door_open"); if (e.key === "c") ev("door_close"); if (e.key === "m") ev("motion"); });
-// Camera: 5 fps canvas diff in the right third of the frame (the "door zone"); 3 consecutive hits post motion.
-let ring = [], prev = null, hits = 0, lastMotion = 0, stream = null;
-const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d", {willReadFrequently: true});
-async function startCam() {
-  try { stream = await navigator.mediaDevices.getUserMedia({video: {width: 320, height: 240}}); } catch (e) { document.getElementById("camstat").textContent = "camera denied; use the buttons"; return; }
-  const v = document.getElementById("cam"); v.srcObject = stream; canvas.width = 320; canvas.height = 240;
-  document.getElementById("camstat").textContent = "on. door zone = right third.";
-  setInterval(tick, 200);
-}
-function tick() {
-  const v = document.getElementById("cam"); if (!v.videoWidth) return;
-  ctx.drawImage(v, 0, 0, 320, 240);
-  const d = ctx.getImageData(213, 0, 107, 240).data; let sum = 0;
-  if (prev) { for (let i = 0; i < d.length; i += 16) sum += Math.abs(d[i] - prev[i]); }
-  const score = sum / (d.length / 16); prev = d;
-  canvas.toBlob(b => { if (b) { ring.push(b); if (ring.length > 150) ring.shift(); } }, "image/jpeg", 0.6);
-  hits = score > 18 ? hits + 1 : 0;
-  if (hits >= 3 && Date.now() - lastMotion > 10000) { lastMotion = Date.now(); hits = 0; ev("motion"); }
-}
-async function postFrames(id) {
-  if (!ring.length) return;
-  const fd = new FormData(); const n = ring.length;
-  [n - 25, n - 10, n - 1].filter(i => i >= 0).forEach((i, k) => fd.append("f" + k, ring[i], "f" + k + ".jpg"));
-  await fetch("/frames/" + id, {method: "POST", body: fd});
-}
 refresh(); setInterval(refresh, 5000);
 </script></body></html>
