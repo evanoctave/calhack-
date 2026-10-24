@@ -1,6 +1,6 @@
 """Fetch live places for the household and write data/places.<slug>.live.json.
 
-Usage: .venv/bin/python scripts/run_actor.py [--slug fullerton] [--no-google]
+Usage: python scripts/run_actor.py [--slug marina] [--no-google]
 Hazards from Overpass (free); open-at-night places from the Apify Google Maps scraper (APIFY_TOKEN).
 Without a token, hazards still come from Overpass and the call-first rows fall back to the fixture.
 """
@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -20,9 +21,20 @@ from nightfall.household import load
 from nightfall.integrations import apify, overpass
 
 
+def load_env(path: Path) -> None:
+    """Export KEY=value lines from .env without overriding the real environment (run.sh does this on Linux)."""
+    if not path.exists():
+        return
+    for line in path.read_text().splitlines():
+        key, sep, val = line.partition("=")
+        if sep and not key.lstrip().startswith("#"):
+            os.environ.setdefault(key.strip(), val.split(" #")[0].strip())
+
+
 def main() -> int:
+    load_env(ROOT / ".env")
     ap = argparse.ArgumentParser()
-    ap.add_argument("--slug", default="fullerton")
+    ap.add_argument("--slug", default="marina")
     ap.add_argument("--no-google", action="store_true")
     a = ap.parse_args()
     hh = load(ROOT / "data" / "household.json")
