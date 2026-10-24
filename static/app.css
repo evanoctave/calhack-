@@ -200,3 +200,16 @@ input:focus, select:focus { outline: none; border-color: rgba(36, 93, 214, 0.5);
 .field select, .field textarea { background: transparent; border: 0; padding: 0; font: 600 16px/22px var(--font); border-radius: 0; box-shadow: none; resize: vertical; }
 .field select:focus, .field textarea:focus { box-shadow: none; }
 .row .x { flex: none; width: 30px; height: 30px; border-radius: 15px; border: 0; background: var(--glass); color: var(--muted); font: 500 18px/1 var(--font); cursor: pointer; }
+/* Morning report */
+.bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; height: 120px; }
+.bars .col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; }
+.bars .stack { width: 100%; max-width: 28px; display: flex; flex-direction: column-reverse; gap: 2px; flex: 1; justify-content: flex-start; }
+.bars .seg-exit, .bars .seg-door { border-radius: 6px; min-height: 0; }
+.bars .seg-exit { background: var(--red); opacity: .85; } .bars .seg-door { background: var(--blue); opacity: .35; }
+.bars .day { font: 500 12px/16px var(--font); color: var(--muted); } .bars .col.last .day { color: var(--ink); font-weight: 600; }
+.bars .col.sample .stack { opacity: .55; }
+.legend { display: flex; gap: 16px; margin-top: 12px; font: 400 12px/16px var(--font); color: var(--muted); }
+.legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.legend .sw.exit { background: var(--red); opacity: .85; } .legend .sw.door { background: var(--blue); opacity: .35; }
+
+.summary { font: 500 17px/26px var(--font); margin: 0; text-wrap: pretty; color: var(--ink); }

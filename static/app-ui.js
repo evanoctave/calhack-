@@ -2,7 +2,7 @@
 let S = null, member = "", incident = null, feedTimer = null, mapObj = null, mapLayer = null, soundOn = false, acked = false;
 function $(id) { return document.getElementById(id); }
 function go(name) { location.hash = "#" + name; }
-const SCREENS = ["setup", "profile", "medical", "voice", "voices", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "takeover", "brief", "search", "responding", "back", "emergency", "help"];
+const SCREENS = ["setup", "profile", "medical", "report", "voice", "voices", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "takeover", "brief", "search", "responding", "back", "emergency", "help"];
 function show(name) {
   if (name === "respond") name = "call";
   if (!SCREENS.includes(name)) name = "home";
@@ -11,6 +11,7 @@ function show(name) {
   if (name === "area") setTimeout(renderArea, 50);
   if (name === "voices") loadVoices();
   if (name === "medical") loadMedical();
+  if (name === "report") loadReport();
   window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", () => show(location.hash.slice(1) || "home"));

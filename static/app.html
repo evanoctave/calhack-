@@ -144,9 +144,25 @@
   <p class="media-cap"><span id="h-cam">Front entrance</span> · <span id="h-feedcap">Live</span></p>
   <div class="card pad"><p class="title green" id="h-watch">Watching over Dad</p><p class="body" id="h-event">No exit detected.</p>
     <span id="h-camstat" hidden></span><span id="h-last" hidden></span><span id="h-voice" hidden></span><span id="h-tree" hidden></span></div>
+  <div class="card"><div class="row link" onclick="go('report')"><div><span class="k">Morning report</span><span class="sub2" id="h-report">How last night went</span></div></div></div>
   <button class="btn" onclick="go('setup')">Care settings</button>
   <p class="cap" id="h-demo"></p>
   <div class="actions"><button class="btn primary" onclick="testAlert()">Try the night scenario</button><button class="btn" onclick="go('talk')">Talk to the door</button></div>
+</section>
+
+<section id="s-report" class="screen">
+  <header class="head"><a class="back" onclick="go('home')">Home</a><p class="eyebrow">Morning report</p><h1 id="rp-title">Last night</h1><p class="sub" id="rp-date"></p></header>
+  <div id="rp-sample" class="card pad" hidden><p class="title">Includes sample nights</p><p class="body">Nights without real events are filled with demo data until there are three of your own.</p></div>
+  <div class="card pad"><p class="summary" id="rp-summary">Loading…</p>
+    <div class="inline mt"><button class="btn small" id="rp-listen" onclick="listenReport()">Listen</button><span class="cap" id="rp-source"></span></div></div>
+  <p class="label" id="rp-evlabel">At the door</p>
+  <div class="card" id="rp-events"></div>
+  <p class="label">This week</p>
+  <div class="card pad"><div class="bars" id="rp-bars"></div>
+    <div class="legend"><span><i class="sw exit"></i>Left the house</span><span><i class="sw door"></i>Came to the door</span></div></div>
+  <div class="card"><div class="row"><span class="k" id="rp-nightsk">Nights he left</span><span class="v" id="rp-nights"></span></div>
+    <div class="row"><span class="k">Usual time</span><span class="v" id="rp-usual"></span></div>
+    <div class="row"><span class="k">Typical time outside</span><span class="v" id="rp-typical"></span></div></div>
 </section>
 
 <section id="s-door" class="screen">
@@ -306,5 +322,5 @@
     <button class="answer" onclick="answerFromOverlay()"><span class="disc"><svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg></span>Answer</button>
   </div>
 </div>
-<script src="/app-ui.js"></script><script src="/app-voice.js"></script><script src="/app-medical.js"></script>
+<script src="/app-ui.js"></script><script src="/app-voice.js"></script><script src="/app-medical.js"></script><script src="/app-report.js"></script>
 </body></html>
