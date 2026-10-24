@@ -5,8 +5,8 @@
   "caregiver_name": "Sarah",
   "night_start": "21:00",
   "night_end": "06:00",
-  "home_lat": 33.8704,
-  "home_lng": -117.9242,
+  "home_lat": 37.8000,
+  "home_lng": -122.4400,
   "radius_mi": 1.5,
   "meds_opt_in": true,
   "tree": [
@@ -20,12 +20,12 @@
     {"name": "no insulin", "dose": "", "note": ""}
   ],
   "familiar_places": [
-    {"name": "Old house on Malvern Ave, lived there 30 years", "lat": 33.8745, "lng": -117.9390},
-    {"name": "Ralphs on Chapman, went every morning", "lat": 33.8720, "lng": -117.9110},
-    {"name": "St. Mary's church", "lat": 33.8650, "lng": -117.9300}
+    {"name": "Palace of Fine Arts, walked there every morning", "lat": 37.8029, "lng": -122.4486},
+    {"name": "Old flat on Chestnut St, lived there 30 years", "lat": 37.8003, "lng": -122.4350},
+    {"name": "Corner church, attended every Sunday", "lat": 37.7990, "lng": -122.4400}
   ],
   "contacts": [
-    {"name": "Fullerton PD non-emergency", "phone": "(714) 738-6800"},
-    {"name": "Silver Alert", "phone": "", "note": "California runs Silver Alert; ask the police to issue one."}
+    {"name": "SFPD non-emergency", "phone": "(415) 553-0123"},
+    {"name": "Silver Alert", "phone": "", "note": "Police request it through CHP. Call 911 or SFPD and ask them to evaluate a Silver Alert."}
   ]
 }

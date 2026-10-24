@@ -24,6 +24,11 @@ def test_example_matches_schema(name):
     _validator(name).validate(json.loads((ROOT / "examples" / f"{name}.json").read_text()))
 
 
+def test_demo_search_plan_fixture_matches_schema():
+    plan = ROOT.parent / "data" / "search_plan.marina.json"
+    _validator("search_plan").validate(json.loads(plan.read_text()))
+
+
 def test_sse_examples_match_schema():
     v = _validator("sse_events")
     for event in json.loads((ROOT / "examples" / "sse_events.json").read_text()):

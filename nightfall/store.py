@@ -26,7 +26,7 @@ class Store:
 
     def __init__(self) -> None:
         self.hh: Household = load(ROOT / "data" / "household.json")
-        self.places = briefmod.load_places(ROOT / "data" / "places.fullerton.json")
+        self.places = briefmod.load_places(ROOT / "data" / "places.marina.json")
         self.inc: engine.Incident | None = None
         self.log: list[dict[str, Any]] = []
         self.frames: dict[str, list[str]] = {}
