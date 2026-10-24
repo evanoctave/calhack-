@@ -6,6 +6,7 @@
 :root[data-theme="dark"] { --bg1: #0f1d33; --bg2: #16284a; --glass: rgba(255,255,255,.07); --glass2: rgba(255,255,255,.04); --line: rgba(255,255,255,.08);
   --text: #eef2f8; --muted: #9fb0c8; --accent: #7fa7ff; --accent-bg: rgba(127,167,255,.18); --ok: #4cc17a; --ok-bg: rgba(76,193,122,.14);
   --danger: #ff7b7b; --warn: #e0a84a; --tab: rgba(255,255,255,.06); color-scheme: dark; }
+[hidden] { display: none !important; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; min-height: 100%; }
 body { font: 15px/1.45 var(--font); color: var(--text); background: linear-gradient(180deg, var(--bg1), var(--bg2)); padding: env(safe-area-inset-top, 0) 0 calc(96px + env(safe-area-inset-bottom, 0)); }
