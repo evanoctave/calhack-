@@ -58,3 +58,8 @@ def test_unknown_clothing_is_not_read_as_see_photo() -> None:
     b["clothing_line"] = "see photo"
     assert "wearing see photo" not in call_agent.opening(hh, b, "Sarah")
     assert "photo on the brief" in call_agent.handle(hh, b, "Sarah", "what was he wearing").say
+
+
+def test_responding_with_a_question_answers_it() -> None:
+    r = call_agent.handle(hh, make_brief(), "Sarah", "Okay, I'm on my way. What was he wearing?")
+    assert r.intent == "responding" and r.ack and "navy hoodie" in r.say

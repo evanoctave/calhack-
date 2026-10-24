@@ -104,13 +104,11 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
     if RESPONDING.search(t):
         first = brief["hazards"][0] if brief["hazards"] else None
         where = f" Check {first['name']} first, {first['distance_mi']} miles from home." if first else ""
-        return Reply(
-            f"Thank you. I've told the family you're on it, so the other calls stop.{where} "
-            f"Say I've got him when he's safe, or ask me anything.",
-            "responding",
-            False,
-            True,
-        )
+        say = f"Thank you. I've told the family you're on it, so the other calls stop.{where}"
+        rest_text = RESPONDING.sub(" ", t)  # "on my way, what was he wearing?" answers the question too
+        if any(p.search(rest_text) for p in (HAZARDS, CLOTHES, MEDS, CALLS)):
+            return Reply(f"{say} {handle(hh, brief, member_name, rest_text).say}", "responding", False, True)
+        return Reply(f"{say} Say I've got him when he's safe, or ask me anything.", "responding", False, True)
     if REPEAT.search(t):
         return Reply(opening(hh, brief, member_name), "repeat")
     if HAZARDS.search(t):
