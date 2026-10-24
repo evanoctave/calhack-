@@ -1,0 +1,34 @@
+import pytest
+from fastapi.testclient import TestClient
+
+from nightfall import api, escalation
+from starlette.websockets import WebSocketDisconnect
+
+from nightfall.api_live import live
+
+
+@pytest.fixture
+def client(monkeypatch):
+    monkeypatch.setattr(escalation, "LADDER", ((1, 0.05), (2, 0.05), (3, 0.0)))
+    with TestClient(api.app) as c:
+        c.post("/reset")
+        yield c
+        c.post("/reset")
+
+
+def test_live_relay(client: TestClient) -> None:
+    with client.websocket_connect("/ws/door") as door:
+        assert door.receive_json()["on"] is False
+        with client.websocket_connect("/ws/talk/TM-SARAH") as talk:
+            assert door.receive_json() == {"type": "live", "on": True, "by": "Sarah"}
+            talk.send_bytes(b"\x00\x01" * 1024)
+            assert door.receive_bytes() == b"\x00\x01" * 1024
+            assert client.get("/app/state").json()["live_by"] == "TM-SARAH"
+            assert api.store.takeover_by == "TM-SARAH"
+        assert door.receive_json()["on"] is False
+    assert live.talker is None and len(live.listeners) == 0
+
+
+def test_live_rejects_unknown_member(client: TestClient) -> None:
+    with pytest.raises(WebSocketDisconnect), client.websocket_connect("/ws/talk/TM-NOBODY") as ws:
+        ws.receive_bytes()

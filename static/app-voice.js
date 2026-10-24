@@ -52,3 +52,25 @@ function pttTap(ev) { ev.preventDefault(); recToggle($("r-ptt"), $("r-pttstat"),
   $("r-pttstat").textContent = "Sending…"; const fd = new FormData(); fd.append("member_id", member); fd.append("clip", blob, type.includes("mp4") ? "clip.mp4" : "clip.webm");
   const r = await fetch("/say/clip", {method: "POST", body: fd}); const j = await r.json().catch(() => ({}));
   $("r-pttstat").textContent = r.ok ? "Your voice is playing at the door (" + Math.round(blob.size / 1024) + " KB)." : "Clip failed: " + (j.detail || r.status); }); }
+// Live voice: mic -> 16 kHz Int16 PCM -> WebSocket -> door speaker on the laptop. Tap to go live, tap to stop.
+const Live = {ws: null, ctx: null, src: null, proc: null, on: false, sent: 0};
+async function liveToggle() {
+  const btn = $("r-live"), stat = $("r-livestat");
+  if (Live.on) { liveStop(); btn.classList.remove("on"); btn.textContent = "Go live (talk through the door)"; stat.textContent = "Live voice ended. AI resumes unless you keep the takeover on."; return; }
+  let stream; try { stream = await micStream(); } catch (e) { stat.textContent = "Microphone blocked. Allow the mic for this site."; return; }
+  const proto = location.protocol === "https:" ? "wss" : "ws"; const ws = new WebSocket(`${proto}://${location.host}/ws/talk/${member}`); ws.binaryType = "arraybuffer";
+  ws.onopen = () => { Live.on = true; btn.classList.add("on"); btn.textContent = "Live: tap to stop"; stat.textContent = "You are live at the door. Speak normally."; $("r-takeover").hidden = false; $("r-tobtn").textContent = "Hand back to the AI"; };
+  ws.onclose = () => { if (Live.on) { liveStop(); btn.classList.remove("on"); btn.textContent = "Go live (talk through the door)"; stat.textContent = "Connection dropped. Tap to go live again."; } };
+  ws.onerror = () => { stat.textContent = "Could not open the live channel."; };
+  Live.ws = ws; Live.ctx = new (window.AudioContext || window.webkitAudioContext)(); await Live.ctx.resume();
+  Live.src = Live.ctx.createMediaStreamSource(stream); Live.proc = Live.ctx.createScriptProcessor(2048, 1, 1);
+  const inRate = Live.ctx.sampleRate, ratio = inRate / 16000;
+  Live.proc.onaudioprocess = e => {
+    if (!Live.ws || Live.ws.readyState !== 1) return;
+    const f = e.inputBuffer.getChannelData(0), n = Math.floor(f.length / ratio), out = new Int16Array(n);
+    for (let i = 0; i < n; i++) { const v = f[Math.floor(i * ratio)]; out[i] = Math.max(-1, Math.min(1, v)) * 32767; }
+    Live.ws.send(out.buffer); Live.sent++; if (Live.sent % 20 === 0) stat.textContent = "Live at the door · " + Math.round(Live.sent * n / 16000) + " s";
+  };
+  Live.src.connect(Live.proc); Live.proc.connect(Live.ctx.destination);
+}
+function liveStop() { Live.on = false; try { Live.proc && Live.proc.disconnect(); Live.src && Live.src.disconnect(); } catch (e) {} try { Live.ws && Live.ws.close(); } catch (e) {} Live.ws = null; Live.sent = 0; }

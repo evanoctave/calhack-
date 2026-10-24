@@ -1,7 +1,7 @@
 // Person detection in the browser (TensorFlow.js coco-ssd), ring buffer, live relay to phones.
 // Events: person_enter (3 consecutive hits after absence), person_lost (absent LOST_S), person_back.
 const Cam = {model: null, video: null, canvas: null, ctx: null, overlay: null, octx: null, ring: [], personFrames: [],
-             present: false, hits: 0, misses: 0, lastEvent: "", lostMs: 1500, lastSeenAt: 0, relayAt: 0, busy: false, on: false};
+             present: false, hits: 0, misses: 0, lastEvent: "", lostMs: 1500, lastSeenAt: 0, relayAt: 0, busy: false, on: false, heights: [], awayAt: 0};
 
 function camStatus(t) { const el = document.getElementById("camstat"); if (el) el.textContent = t; }
 
@@ -35,7 +35,7 @@ async function camTick() {
     drawBoxes(boxes, present);
     if (present && blob) { Cam.personFrames.push(blob); if (Cam.personFrames.length > 3) Cam.personFrames.shift(); }
     const now = Date.now();
-    if (present) { Cam.hits++; Cam.lastSeenAt = now; } else { Cam.hits = 0; }
+    if (present) { Cam.hits++; Cam.lastSeenAt = now; trackAway(boxes, now); } else { Cam.hits = 0; Cam.heights = []; }
     if (!Cam.present && Cam.hits >= 2) { Cam.present = true; await onEnter(); }
     if (Cam.present && now - Cam.lastSeenAt >= Cam.lostMs) { Cam.present = false; await onLost(); }
     if (blob && now - Cam.relayAt > 400 && window.lastState && window.lastState.incident && !["CLOSED"].includes(window.lastState.incident.state)) {
@@ -59,6 +59,12 @@ function drawBoxes(boxes, present) {
   const t = document.getElementById("persontxt"); if (t) t.textContent = present ? "person in frame" : "no person";
 }
 
+// Moving away from the camera (toward the door): the person's box shrinks by 15% within about a second.
+function trackAway(boxes, now) {
+  const h = Math.max(...boxes.map(b => b.bbox[3])); Cam.heights.push([now, h]); Cam.heights = Cam.heights.filter(([t]) => now - t < 1200);
+  if (Cam.heights.length < 4) return; const first = Cam.heights[0][1];
+  if (h < first * 0.85 && now - Cam.awayAt > 15000) { Cam.awayAt = now; camStatus("moving away from the camera: voice starts"); const st = window.lastState && window.lastState.incident ? window.lastState.incident.state : ""; if (!["CONVERSATION", "DOOR_OPEN", "ESCALATING"].includes(st)) post("/event", {kind: "person_enter", payload: {source: "coco-ssd", reason: "moving away"}}).then(() => window.refresh && refresh()); }
+}
 async function onEnter() {
   const st = window.lastState && window.lastState.incident ? window.lastState.incident.state : "";
   const kind = ["DOOR_OPEN", "ESCALATING"].includes(st) ? "person_back" : "person_enter";

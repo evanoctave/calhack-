@@ -122,6 +122,22 @@ sse("/sse/dashboard", async e => {
 });
 document.addEventListener("keydown", e => { if (e.target.tagName === "INPUT") return; if (e.key === "o") ev("door_open"); if (e.key === "c") ev("door_close"); if (e.key === "m") ev("person_enter"); if (e.key === "l") ev("person_lost"); if (e.key === "b") ev("person_back"); });
 refresh(); setInterval(refresh, 5000);
+// Live voice from a relative: PCM 16 kHz Int16 frames over /ws/door, scheduled back-to-back with a 120 ms jitter buffer.
+const Door = {ws: null, ctx: null, t: 0};
+function doorConnect() {
+  const proto = location.protocol === "https:" ? "wss" : "ws"; const ws = new WebSocket(`${proto}://${location.host}/ws/door`); ws.binaryType = "arraybuffer"; Door.ws = ws;
+  ws.onmessage = ev => {
+    if (typeof ev.data === "string") { const m = JSON.parse(ev.data); if (m.type === "live") { nowPlaying(m.on ? "LIVE: " + m.by + " speaking through the door" : "door speaker idle", false); if (m.on) { const b = document.getElementById("takeover"); b.hidden = false; b.textContent = m.by + " is live at the door. AI lines paused."; } } return; }
+    if (!Door.ctx) { Door.ctx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 16000}); Door.t = 0; }
+    const pcm = new Int16Array(ev.data), buf = Door.ctx.createBuffer(1, pcm.length, 16000), ch = buf.getChannelData(0);
+    for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
+    const src = Door.ctx.createBufferSource(); src.buffer = buf; src.connect(Door.ctx.destination);
+    const now = Door.ctx.currentTime; if (Door.t < now + 0.05) Door.t = now + 0.12; src.start(Door.t); Door.t += buf.duration;
+    if (Door.ctx.state === "suspended") Door.ctx.resume();
+  };
+  ws.onclose = () => setTimeout(doorConnect, 2000);
+}
+doorConnect();
 fetch("/health").then(r => r.json()).then(h => { const m = h.mock; const live = Object.keys(m).filter(k => !m[k]); document.getElementById("integ").textContent = live.length ? "live: " + live.join(", ") : "mock mode"; document.getElementById("integ").className = "pill " + (live.length ? "ok" : ""); });
 </script>
 </div></body></html>

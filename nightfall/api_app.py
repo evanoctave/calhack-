@@ -95,6 +95,7 @@ async def app_state(member: str = "") -> dict[str, Any]:
         "rings": rings,
         "ladder_step_s": store_ladder_step(),
         "takeover_by": store.takeover_by,
+        "live_by": _live_by(),
         "call_911": store.call_911_sent,
         "voice": {
             "voice_id": vid,
@@ -108,6 +109,12 @@ async def app_state(member: str = "") -> dict[str, Any]:
         "places_source": store.places_source(),
         "live_frame": bool(store.latest_frame) and time.time() - store.latest_frame_at < 10,
     }
+
+
+def _live_by() -> str | None:
+    from nightfall.api_live import live
+
+    return live.talker
 
 
 def store_ladder_step() -> float:

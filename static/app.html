@@ -99,11 +99,14 @@
   <div class="topline"><a class="back" onclick="go('alert')">‹ Alert</a><span class="tag">On the line</span></div>
   <h1>You're on the line</h1><p class="sub" id="r-sub">Nightfall is talking to Robert at the door.</p>
   <img id="r-feed" class="feed" alt="live door camera"><p class="cap" id="r-feedcap">Live camera at the door</p>
+  <div class="card mt" id="r-monitor" style="padding:12px 18px"><span class="small muted">Agent monitoring</span><div id="r-monitortxt" style="font-weight:500">Watching the door</div></div>
   <div class="label">Nightfall agent</div>
   <div class="card" style="padding:14px 18px"><div id="r-say" class="muted">Connecting…</div>
     <div style="display:flex;gap:8px;margin-top:10px"><button class="btn small primary" id="r-listen" onclick="listenOnce()">Tap, then speak</button><input id="r-ask" placeholder="ask: where should I look?"><button class="btn small" onclick="askTyped()">Ask</button></div></div>
   <div class="label">Talk to him yourself</div>
-  <div class="card" style="padding:14px 18px"><button class="btn small primary" id="r-tobtn" onclick="toggleTakeover()">Take over the voice</button><span class="muted small" id="r-tostat" style="margin-left:8px">AI is speaking for you.</span>
+  <div class="card" style="padding:14px 18px">
+    <button class="rec" id="r-live" onclick="liveToggle()">Go live (talk through the door)</button><p class="cap" id="r-livestat">Your voice plays at the door in real time. The agent keeps watching and escalating.</p>
+    <button class="btn small primary mt" id="r-tobtn" onclick="toggleTakeover()">Take over the voice</button><span class="muted small" id="r-tostat" style="margin-left:8px">AI is speaking for you.</span>
     <div id="r-takeover" hidden><div class="chips mt"><span class="chip" onclick="sayText(this.textContent)">Dad, it's me. Come back inside, I'm on my way.</span><span class="chip" onclick="sayText(this.textContent)">Wait right there by the door. I'll be two minutes.</span><span class="chip" onclick="sayText(this.textContent)">Everything's okay. Let's sit down, I'm coming.</span></div>
       <div style="display:flex;gap:8px;margin-top:10px"><input id="r-text" placeholder="type what to say in your voice"><button class="btn small" onclick="sayTyped()">Say</button></div>
       <button class="rec mt" id="r-ptt" onclick="pttTap(event)">Tap to talk (your real voice)</button><p class="cap" id="r-pttstat"></p></div></div>

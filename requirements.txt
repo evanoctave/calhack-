@@ -7,3 +7,4 @@ pytest-asyncio>=0.24
 anthropic>=1.0
 ruff>=0.6
 moss>=1.21
+websockets>=12

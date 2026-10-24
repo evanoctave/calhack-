@@ -126,6 +126,17 @@ def _person_lost(inc: Incident, ev: Event) -> Transition:
     )
 
 
+def _lost_from_idle(inc: Incident, ev: Event) -> Transition:
+    """Person walked out of view before any approach was seen: speak now and start the exit clock."""
+    first = _motion(inc, ev)
+    if first.rule == "ignored":
+        return first
+    second = _person_lost(inc, ev)
+    return Transition(
+        first.from_state, second.to_state, first.actions + second.actions, "R2", "left the frame without stopping"
+    )
+
+
 def _person_back_door(inc: Incident, ev: Event) -> Transition:
     inc.person_in_frame = True
     inc.seen_inside = True
@@ -199,6 +210,7 @@ def _close(inc: Incident, ev: Event) -> Transition:
 TRANSITIONS: Final[dict[tuple[State, str], Handler]] = {
     (State.ARMED_IDLE, "motion"): _motion,
     (State.ARMED_IDLE, "person_enter"): _motion,
+    (State.ARMED_IDLE, "person_lost"): _lost_from_idle,
     (State.CONVERSATION, "tick"): _tick_conversation,
     (State.CONVERSATION, "person_lost"): _person_lost,
     (State.DOOR_OPEN, "person_back"): _person_back_door,

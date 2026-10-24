@@ -114,3 +114,11 @@ def test_auto_lines_stop_at_budget() -> None:
         tr = step(inc, Event("tick", at(i * engine.LINE_GAP_S)))
         spoken += "speak:again" in tr.actions
     assert spoken == engine.MAX_LINES
+
+
+def test_lost_from_idle_speaks_and_starts_exit_clock() -> None:
+    inc = Incident("INC-1")
+    tr = step(inc, Event("person_lost", at(0)))
+    assert inc.state == State.DOOR_OPEN and "speak:open" in tr.actions and "capture_exit_frames" in tr.actions
+    step(inc, Event("tick", at(engine.DOOR_WAIT_S)))
+    assert inc.state == State.ESCALATING

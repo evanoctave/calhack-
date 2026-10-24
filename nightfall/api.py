@@ -24,6 +24,7 @@ from nightfall.actions import emit as _emit
 from nightfall.actions import run_actions as _run_actions
 from nightfall.api_app import router as app_router
 from nightfall.api_cam import router as cam_router
+from nightfall.api_live import router as live_router
 from nightfall.api_setup import router as setup_router
 from nightfall.api_voice import router as voice_router
 from nightfall.escalation import LADDER
@@ -290,4 +291,5 @@ app.include_router(voice_router)
 app.include_router(cam_router)
 app.include_router(setup_router)
 app.include_router(app_router)
+app.include_router(live_router)
 app.mount("/", StaticFiles(directory=str(ROOT / "static")), name="static")
