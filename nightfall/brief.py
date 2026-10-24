@@ -75,7 +75,7 @@ def build(hh: Household, inc: Incident, clothing: dict[str, Any], places: list[d
                     list(hh.familiar_places), list(hh.contacts))
     exited = inc.exited_at or now
     line = clothing_line(clothing)
-    prose = (f"{hh.person_name} left home at {exited.strftime('%-I:%M %p')} wearing {line}. "
+    prose = (f"{hh.person_name} left home at {exited.strftime('%I:%M %p').lstrip('0')} wearing {line}. "
              f"Most people are found within {hh.radius_mi:g} miles; check the hazards first, then call the open places.")
     return {
         "incident_id": inc.id, "person_name": hh.person_name, "photo": hh.person_photo,
