@@ -11,7 +11,7 @@ from typing import Any
 
 from nightfall import brief as briefmod
 from nightfall import engine, llm, voice
-from nightfall.script import SCRIPT, fill
+from nightfall.script import SCRIPT, fill, pick
 from nightfall.store import Store
 
 
@@ -33,10 +33,10 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
             # rather than replaying "Hi Dad, it's ..." from the top.
             recent = store.last_open_at is not None and (store.now() - store.last_open_at).total_seconds() < REGREET_S
             if recent and store.history:
-                await _speak(store, fill(SCRIPT["again"], store.hh), "script")
+                await _speak(store, pick("again", store.hh, {t for _, t in store.history}), "script")
             else:
                 store.history = []
-                await _speak(store, fill(SCRIPT["open"], store.hh), "script")
+                await _speak(store, pick("open", store.hh, store.said_tonight), "script")
             store.last_open_at = store.now()
         elif a == "speak:again":
             if store.takeover_by:
@@ -130,6 +130,7 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
 async def _speak(store: Store, line: str, source: str) -> None:
     """Resolve audio for a line (Cartesia or browser TTS) off the event loop and push it to the dashboard."""
     store.history.append(("system", line))
+    store.said_tonight.add(line)
     ref = await asyncio.to_thread(voice.say, line, store.hh.persona)
     emit(
         store,

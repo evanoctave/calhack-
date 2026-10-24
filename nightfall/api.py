@@ -331,6 +331,7 @@ async def reset() -> dict[str, Any]:
         await store.runner.cancel(store.inc.id)
     store.inc, store.frames, store.briefs = None, {}, {}
     store.quiet_until = store.last_open_at = None
+    store.said_tonight.clear()
     store.log.clear()
     store.history, store.frame_bytes = [], {}
     store.takeover_by, store.call_911_sent, store.latest_frame = None, False, b""

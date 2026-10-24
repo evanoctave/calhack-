@@ -41,7 +41,8 @@ BYE: Final = re.compile(r"\b(bye|goodbye|hang up|that'?s all|thanks|thank you)\b
 
 QA_SYSTEM: Final = (
     "You are the Nightfall assistant on a phone call with a family member whose relative with memory loss has "
-    "just left home at night. Answer the question in one or two short spoken sentences using ONLY the facts "
+    "just left home at night. Answer like a calm, kind person on the phone: contractions, plain words, one or two short "
+    "spoken sentences, using ONLY the facts "
     "below. If the facts do not contain the answer, say you do not have that and suggest they open the brief. "
     "Never invent places, times, medications or directions. Facts:\n{facts}"
 )
@@ -55,8 +56,26 @@ class Reply:
     ack: bool = False
 
 
-def _names(items: list[dict[str, Any]], n: int) -> str:
-    return ", ".join(p["name"] for p in items[:n]) or "none listed"
+def _spoken(name: str, place: bool = True) -> str:
+    """A name as you'd say it: 'X, Lombard St' -> 'X on Lombard St'; notes after a comma dropped otherwise."""
+    head, _, rest = name.partition(", ")
+    if not rest:
+        return name
+    return f"{head} on {rest}" if place and rest[:1].isupper() and len(rest.split()) <= 3 else head
+
+
+def _and(xs: list[str]) -> str:
+    if not xs:
+        return ""
+    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
+
+
+def _names(items: list[dict[str, Any]], n: int, place: bool = True) -> str:
+    return _and([_spoken(p["name"], place) for p in items[:n]]) or "none listed"
+
+
+def _miles(r: float) -> str:
+    return {0.5: "half a mile", 1.0: "a mile", 1.5: "a mile and a half", 2.0: "two miles"}.get(r, f"{r:g} miles")
 
 
 def _wearing(hh: Household, brief: dict[str, Any]) -> str:
@@ -64,18 +83,33 @@ def _wearing(hh: Household, brief: dict[str, Any]) -> str:
     line = brief["clothing_line"]
     if not line or line == "see photo":
         return "What he was wearing is in the photo on the brief."
-    return f"He was wearing {line}."
+    parts = [p.strip() for p in line.split(",") if p.strip()]
+    feet = [p for p in parts if p in ("barefoot", "slippers", "socks")]
+    clothes = [p for p in parts if p not in feet]
+    said = _and([("a " if i == 0 and not c.endswith("s") else "") + c for i, c in enumerate(clothes)])
+    tail = {"barefoot": ", and he's barefoot", "slippers": ", in slippers", "socks": ", in his socks"}
+    end = tail.get(feet[0], "") if feet else ""
+    if said:
+        return f"He's in {said}{end}."
+    return f"He's {feet[0]}." if feet else f"He was wearing {line}."
 
 
 def opening(hh: Household, brief: dict[str, Any], member_name: str) -> str:
     """The first thing the agent says. Facts only, from the brief, no model."""
     t = brief["last_seen_hhmm"]
     for_whom = "" if member_name == hh.caregiver_name else f" for {hh.caregiver_name}"
+    hz, open_now = brief["hazards"], brief["call_first"]
+    look = (
+        f" Start close: check {_spoken(hz[0]['name'])} first"
+        + (f", then {_spoken(hz[1]['name'])}." if len(hz) > 1 else ".")
+        if hz
+        else ""
+    )
+    call = f" {_spoken(open_now[0]['name'])} is open right now if you want to call." if open_now else ""
     return (
-        f"{member_name}, this is Nightfall calling{for_whom}. {hh.person_name} left the house at {t}. "
-        f"{_wearing(hh, brief)} Most people are found within {brief['home']['radius_mi']:g} miles. "
-        f"The nearest hazards are {_names(brief['hazards'], 2)}. Open now nearby: {_names(brief['call_first'], 2)}. "
-        f"Say I'm on my way to stop the other calls, or ask me a question."
+        f"Hi {member_name}, it's Nightfall{for_whom}. {hh.person_name} just walked out the front door, at {t}. "
+        f"{_wearing(hh, brief)} Most people are found within {_miles(brief['home']['radius_mi'])}.{look}{call} "
+        f"Say I'm on my way and I'll stop the other calls, or ask me anything."
     )
 
 
@@ -103,26 +137,31 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
     """One caller turn. Deterministic intents first, then the model, then a safe default."""
     t = text.strip()
     if not t:
-        return Reply("I did not catch that. Say I've got him, or ask me where to look.", "silence")
+        return Reply("Sorry, I didn't catch that. You can say I've got him, or ask where to look.", "silence")
     if ACK.search(t) and not (RESPONDING.search(t) and not FOUND.search(t)):  # "got it, on my way" = responding
         return Reply(
-            f"Thank you. I am telling the rest of the family {hh.person_name} is safe. Goodbye.", "ack", True, True
+            f"Oh, good. I'll let the rest of the family know {hh.person_name}'s safe. Goodnight.", "ack", True, True
         )
     if RESPONDING.search(t):
         first = brief["hazards"][0] if brief["hazards"] else None
-        where = f" Check {first['name']} first, {first['distance_mi']} miles from home." if first else ""
-        say = f"Thank you. I've told the family you're on it, so the other calls stop.{where}"
+        where = (
+            f" Head for {_spoken(first['name'])} first, it's {first['distance_mi']} miles from the house."
+            if first
+            else ""
+        )
+        say = f"Okay. I've told everyone you're on your way, so nobody else gets called.{where}"
         rest_text = RESPONDING.sub(" ", t)  # "on my way, what was he wearing?" answers the question too
         if any(p.search(rest_text) for p in (HAZARDS, CLOTHES, MEDS, CALLS)):
             return Reply(f"{say} {handle(hh, brief, member_name, rest_text).say}", "responding", False, True)
-        return Reply(f"{say} Say I've got him when he's safe, or ask me anything.", "responding", False, True)
+        return Reply(f"{say} Tell me when you've got him, or ask me anything.", "responding", False, True)
     if REPEAT.search(t):
         return Reply(opening(hh, brief, member_name), "repeat")
     if HAZARDS.search(t):
         habit = brief.get("habits", [{}])[0].get("text", "") if brief.get("habits") else ""
-        tail = f" The caregiver noted: {habit}." if habit else ""
+        tail = f" One more thing from your notes: {habit}." if habit else ""
         return Reply(
-            f"Check the hazards first: {_names(brief['hazards'], 4)}. Then the familiar places: {_names(brief['familiar'], 3)}.{tail}",
+            f"Start with {_names(brief['hazards'], 3)}. Those are the risky spots. "
+            f"After that, try the places he knows: {_names(brief['familiar'], 3, place=False)}.{tail}",
             "hazards",
         )
     if CLOTHES.search(t):
@@ -133,13 +172,13 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
     if CALLS.search(t):
         first = brief["call_first"][:3]
         return Reply(
-            "Open now: "
-            + "; ".join(f"{p['name']} at {p.get('phone') or 'no number'}" for p in first)
-            + ". The numbers are tappable on the brief.",
+            "These are open right now: "
+            + "; ".join(f"{p['name']}" + (f", {p['phone']}" if p.get("phone") else "") for p in first)
+            + ". You can tap the numbers on the brief.",
             "calls",
         )
     if BYE.search(t):
-        return Reply("Goodbye. The brief stays open on your phone.", "bye", True)
+        return Reply("Okay. The brief stays open on your phone. Good luck.", "bye", True)
     if anthropic_llm.enabled():
         try:
             out = anthropic_llm.complete(QA_SYSTEM.format(facts=facts(hh, brief)), t, max_tokens=600)
@@ -149,5 +188,5 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
         except Exception as e:  # noqa: BLE001
             print(f"anthropic qa fallback: {e}")
     return Reply(
-        "I can tell you what he was wearing, the hazards, or who to call. Everything else is on the brief.", "unknown"
+        "I can tell you what he's wearing, where to look, or who's open to call. The rest is on the brief.", "unknown"
     )
