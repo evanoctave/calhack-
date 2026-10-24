@@ -41,6 +41,9 @@ class Household:
     person_full_name: str = ""
     person_age: int = 0
     address: str = ""
+    description: dict[str, str] = field(default_factory=dict)  # height, weight, hair, eyes, sex, build, marks
+    diagnosis: str = ""
+    doctor: dict[str, str] = field(default_factory=dict)  # name, phone
 
     def members_at(self, tier: int) -> list[TreeMember]:
         """Tree members at exactly this tier."""
@@ -92,4 +95,7 @@ def load(path: str | Path) -> Household:
         person_full_name=str(raw.get("person_full_name", "")),
         person_age=int(raw.get("person_age", 0) or 0),
         address=str(raw.get("address", "")),
+        description={k: str(v) for k, v in dict(raw.get("description", {})).items()},
+        diagnosis=str(raw.get("diagnosis", "")),
+        doctor={k: str(v) for k, v in dict(raw.get("doctor", {})).items()},
     )

@@ -14,6 +14,11 @@
   <div class="label">Short name they answer to · age</div><div style="display:flex;gap:8px"><input id="p-short" placeholder="Dad"><input id="p-age" type="number" placeholder="74" style="width:110px"></div>
   <div class="label">Home address</div><input id="p-addr" placeholder="120 Example St, San Francisco">
   <div class="label">Your name (caregiver)</div><input id="p-care" placeholder="Sarah">
+  <div class="label">What police ask for · physical description</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><input id="p-sex" placeholder="sex"><input id="p-height" placeholder="height"><input id="p-weight" placeholder="weight"><input id="p-hair" placeholder="hair"><input id="p-eyes" placeholder="eyes"><input id="p-build" placeholder="build"></div>
+  <input id="p-marks" class="mt" placeholder="distinguishing marks, gait, glasses">
+  <div class="label">Diagnosis, in the words you'd tell a dispatcher</div><input id="p-diag" placeholder="Alzheimer's, moderate stage; may not answer to his name">
+  <div class="label">Doctor</div><div style="display:flex;gap:8px"><input id="p-docname" placeholder="name, clinic"><input id="p-docphone" placeholder="phone" style="width:140px"></div>
   <div class="label">Familiar places</div><div class="card" id="p-places"></div>
   <div class="label">Care circle · Call order</div><div class="card" id="p-tree"></div>
   <div style="display:flex;gap:8px;margin-top:8px"><input id="p-newname" placeholder="Add a contact name"><button class="btn small" onclick="addMember()">Add</button></div>
@@ -91,6 +96,9 @@
     <div class="row"><span class="k">Also wearing</span><span class="v" id="b-wear2">—</span></div>
     <div class="row"><span class="k">Backup contact</span><span class="v" id="b-backup">—</span></div></div>
   <p class="cap" id="b-conf">Clothing is AI-described. Verify against the image.</p>
+  <div class="label">Read this to the dispatcher</div>
+  <div class="card" style="padding:14px 18px"><div id="b-police" style="line-height:1.5"></div><div class="row" style="padding:10px 0 0;border:0"><button class="btn small" onclick="copyPolice()">Copy</button><a class="btn small" href="tel:911" style="text-decoration:none;color:var(--danger)">Call 911</a><span class="cap" id="b-copied"></span></div></div>
+  <p class="cap">Police classify this as "missing and at risk". Ask for a Silver Alert. Nightfall never dials.</p>
   <div id="b-respond"><button class="btn primary" onclick="respond()">I'm responding</button></div>
   <div id="b-responding" class="ok-card mt" hidden><b>You're responding</b><span>Your care circle has been notified.</span></div>
   <button class="btn" onclick="go('search')">Search details & contacts</button>
@@ -104,6 +112,7 @@
   <div class="label">Familiar places</div><div class="card" id="sr-fam"></div>
   <div class="label">Check first · hazards</div><div class="card" id="sr-haz"></div>
   <div class="label">Call first · open now</div><div class="card" id="sr-call"></div>
+  <div class="label">Wander history</div><div class="card" id="sr-history"></div>
   <div class="label">Care notes</div><div class="card" id="sr-notes"></div>
   <div class="label">Contacts</div><div class="card" id="sr-contacts"></div>
   <div id="sr-911" class="banner" hidden>Out of view and not found. <a href="tel:911" style="color:inherit;font-weight:600">Call 911</a>. You decide; Nightfall never dials.</div>

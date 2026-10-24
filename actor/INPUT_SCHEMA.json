@@ -1,0 +1,53 @@
+{
+  "title": "night-search-radius input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "lat": {
+      "title": "Home latitude",
+      "type": "number",
+      "description": "Latitude of the home.",
+      "editor": "number",
+      "prefill": 37.8
+    },
+    "lng": {
+      "title": "Home longitude",
+      "type": "number",
+      "description": "Longitude of the home.",
+      "editor": "number",
+      "prefill": -122.44
+    },
+    "radius_mi": {
+      "title": "Search radius (miles)",
+      "type": "number",
+      "description": "Most people with dementia are found within 1.5 miles.",
+      "default": 1.5,
+      "editor": "number"
+    },
+    "familiar_places": {
+      "title": "Familiar places",
+      "type": "array",
+      "description": "Places the person used to go: [{name, lat, lng}].",
+      "editor": "json",
+      "default": []
+    },
+    "google_maps": {
+      "title": "Fetch open-at-night places with the Google Maps Scraper",
+      "type": "boolean",
+      "default": true,
+      "editor": "checkbox",
+      "description": "Also call Apify's Google Maps Scraper for 24-hour gas stations, stores, diners, ER, pharmacy and transit with phones and hours."
+    },
+    "max_per_search": {
+      "title": "Max places per search term",
+      "type": "integer",
+      "default": 6,
+      "editor": "number",
+      "description": "Cap per search term to control cost."
+    }
+  },
+  "required": [
+    "lat",
+    "lng"
+  ]
+}

@@ -73,6 +73,9 @@ async def app_state(member: str = "") -> dict[str, Any]:
             "notes": list(hh.notes),
             "medications": list(hh.medications) if hh.meds_opt_in else [],
             "contacts": list(hh.contacts),
+            "description": dict(hh.description),
+            "diagnosis": hh.diagnosis,
+            "doctor": dict(hh.doctor),
         },
         "incident": None
         if inc is None
@@ -104,6 +107,8 @@ async def app_state(member: str = "") -> dict[str, Any]:
             "exit_frame": (store.frames.get(inc.id) or [""])[-1],
             "clothing_line": store.briefs[inc.id]["clothing_line"] if inc.id in store.briefs else "",
             "clothing": store.briefs[inc.id]["clothing"] if inc.id in store.briefs else None,
+            "police_report": store.briefs[inc.id].get("police_report", "") if inc.id in store.briefs else "",
+            "history": store.briefs[inc.id].get("history") if inc.id in store.briefs else None,
         },
         "rings": rings,
         "ladder_step_s": store_ladder_step(),
@@ -168,6 +173,9 @@ class ProfileIn(BaseModel):
     person_age: int | None = None
     caregiver_name: str | None = None
     address: str | None = None
+    description: dict[str, str] | None = None
+    diagnosis: str | None = None
+    doctor: dict[str, str] | None = None
 
 
 @router.post("/profile")

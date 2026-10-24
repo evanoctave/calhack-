@@ -80,6 +80,8 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
             for m in store.hh.tree:
                 store.hub.publish(f"phone:{m.id}", {"type": "sos", "incident_id": inc.id})
             emit(store, {"type": "sos", "incident_id": inc.id})
+        elif a == "log:returned":
+            _record_history(store, inc, tr)
         elif a == "notify:returned":
             for m in store.hh.tree:
                 store.hub.publish(f"phone:{m.id}", {"type": "returned", "incident_id": inc.id})
@@ -89,6 +91,7 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
         elif a == "build_brief":
             clothing = await _clothing_now(store, inc.id)
             habits = await store.memory.search("where does he go when he leaves at night", 3)
+
             store.briefs[inc.id] = briefmod.build(
                 store.hh,
                 inc,
@@ -111,6 +114,7 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
                 store.hub.publish(f"phone:{m.id}", {"type": "deadline", "incident_id": inc.id})
         elif a == "delete_frames":
             store.frames.pop(inc.id, None)
+            _record_history(store, inc, tr)
 
 
 async def _speak(store: Store, line: str, source: str) -> None:
@@ -193,3 +197,21 @@ def start_vision(store: Store, incident_id: str) -> None:
             store.vision_tasks.pop(incident_id, None)
 
     store.vision_tasks[incident_id] = asyncio.create_task(run())
+
+
+def _record_history(store: Store, inc: engine.Incident, tr: engine.Transition) -> None:
+    """Append the closed incident's outcome facts to data/history.json (R10: facts only, no frames)."""
+    from nightfall import history as hist
+
+    outcome = {"RETURNED": "returned", "ACKED": "acked", "EXHAUSTED": "exhausted", "CLOSED": "closed"}.get(
+        tr.to_state.value, "closed"
+    )
+    if inc.acked_by:
+        outcome = "acked"
+    if "stand down" in tr.detail:
+        outcome = "stand_down"
+    if inc.exited_at is None and tr.to_state == engine.State.RETURNED:
+        return
+    hist.record(
+        inc.id, inc.opened_at, inc.exited_at, store.now(), outcome, inc.heading, inc.acked_by, inc.verdict().score
+    )

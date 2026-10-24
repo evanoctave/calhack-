@@ -74,8 +74,31 @@ tests/       engine, escalation, brief, api
 docs/        API.md (the contract between lanes)
 ```
 
+## What police ask for first, and where Nightfall has it ready
+
+From AARP, the Alzheimer's Association, the BJA law-enforcement guide and the Herbert Protocol toolkit, the first
+questions a dispatcher asks when a person with dementia is missing, and where each answer lives in the brief:
+
+| Dispatcher asks | Where it is |
+|---|---|
+| Full name, age, physical description, a recent photo | profile photo, name and age at the top of the brief, description in the dispatcher script |
+| What they were wearing | clothing from the exit frame (AI-described, the frame shown beside it) |
+| When and where last seen, which way they went | exit time, home address, heading relative to the door camera |
+| That they have dementia, other conditions, medication list, doctor | diagnosis in the caregiver's words, medications (opt-in), doctor contact |
+| Prior wandering: how often, how long, where found | wander history from past incidents |
+| Routines and familiar routes | familiar places and habits from the care notes, pinned on the map |
+| Classify as "missing and at risk", ask for a Silver Alert | the dispatcher script opens with those words |
+
+The brief carries a "Read this to the dispatcher" paragraph assembled from those fields, with a Copy button. Sources:
+[AARP: what to do if an older person is missing](https://www.aarp.org/caregiving/basics/dementia-wandering-finding-missing-person/),
+[BJA: Alzheimer's-aware law enforcement program guide](https://bja.ojp.gov/sites/g/files/xyckuh186/files/Publications/AlzheimersAware.pdf),
+[Herbert Protocol toolkit](https://herbertprotocol.com/carer-toolkits/how-to-find-missing-person-with-dementia/),
+[Alzheimer's Association: wandering](https://www.alz.org/help-support/caregiving/stages-behaviors/wandering).
+
 ## Evidence
 
-Figures are the Alzheimer's Association's claims as cited in advocacy testimony and NCOA: six in ten people
-with dementia wander; up to half of those not found in 24 hours are seriously injured or die; most are found
-within 1.5 miles; call emergency services after a 15-minute search.
+Figures are the Alzheimer's Association's claims: six in ten people living with dementia will wander at least once
+([alz.org wandering tip sheet](https://www.alz.org/getmedia/e4480fd3-e7fe-4bcb-81b3-30066c57de7f/alzheimers-dementia-wandering-behavior-ts.pdf));
+if not found within 24 hours, up to half risk serious injury or death ([NCOA](https://www.ncoa.org/article/understanding-wandering-risks/));
+most are found within 1.5 miles of where they were last seen, some sources say 94% ([Washoe County Sheriff](https://washoesheriff.com/general-information/staying-safe/wandering-prevention-alzheimers-and-dementia-walkaways.php));
+the Association's guidance is to begin search efforts immediately and call 911 after 15 minutes.

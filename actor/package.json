@@ -1,0 +1,1 @@
+{"name": "night-search-radius", "version": "0.1.0", "type": "module", "description": "Hazards, open-at-night places and familiar places around a home, for finding a missing person with dementia.", "main": "main.js", "scripts": {"start": "node main.js"}, "dependencies": {"apify": "^3.2.0"}, "license": "MIT"}

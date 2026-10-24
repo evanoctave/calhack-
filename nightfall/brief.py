@@ -97,6 +97,45 @@ def mock_clothing() -> dict[str, Any]:
     )
 
 
+def police_report(hh: Household, inc: Incident, line: str, exited: datetime, history: dict[str, Any]) -> str:
+    """The sentences a caregiver reads to the dispatcher, in the order police ask for them."""
+    d = hh.description
+    parts = (
+        d.get("sex"),
+        d.get("height"),
+        d.get("weight"),
+        d.get("hair") and f"{d['hair']} hair",
+        d.get("eyes") and f"{d['eyes']} eyes",
+        d.get("build"),
+        d.get("marks"),
+    )
+    desc = ", ".join(v for v in parts if v)
+    meds = (
+        "; ".join(f"{m['name']} {m['dose']}".strip() for m in hh.medications)
+        if hh.meds_opt_in and hh.medications
+        else "medication list on request"
+    )
+    if history.get("count"):
+        prior = (
+            f"Has wandered {history['count']} time(s) before, typically found within {history['typical_minutes']:g} minutes"
+            + (", usually heading " + "/".join(history["headings"]) if history.get("headings") else "")
+            + "."
+        )
+    else:
+        prior = "No prior wandering on record."
+    heading = inc.heading if inc.heading != "unknown" else "direction not seen"
+    doctor = f"Doctor: {hh.doctor.get('name')} {hh.doctor.get('phone', '')}. " if hh.doctor.get("name") else ""
+    return (
+        f"Missing and at risk. {hh.person_full_name or hh.person_name}, age {hh.person_age or 'unknown'}, {desc}. "
+        f"{hh.diagnosis or 'Has dementia'}. Last seen at home, {hh.address or 'home address on file'}, at {hhmm(exited)}, "
+        f"heading {heading}. Wearing {line}. On foot. Medications: {meds}. {prior} Familiar places: "
+        + "; ".join(p["name"] for p in hh.familiar_places[:3])
+        + ". "
+        + doctor
+        + "Please consider a Silver Alert."
+    )
+
+
 def build(
     hh: Household,
     inc: Incident,
@@ -106,6 +145,7 @@ def build(
     now: datetime,
     habits: list[dict[str, Any]] | None = None,
     memory_source: str = "mock",
+    history: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble the brief from structured fields. No model text here."""
     sections = rank(places, (hh.home_lat, hh.home_lng), hh.radius_mi, now, list(hh.familiar_places), list(hh.contacts))
@@ -133,6 +173,15 @@ def build(
         "places_source": places[0].get("source", "fixture") if places else "none",
         "habits": [{"text": h["text"], "kind": h.get("kind", "habit")} for h in (habits or [])],
         "memory_source": memory_source,
+        "person_full_name": hh.person_full_name or hh.person_name,
+        "person_age": hh.person_age,
+        "description": dict(hh.description),
+        "diagnosis": hh.diagnosis,
+        "doctor": dict(hh.doctor),
+        "address": hh.address,
+        "heading": inc.heading,
+        "history": history or {"count": 0, "last": [], "typical_minutes": 0, "headings": []},
+        "police_report": police_report(hh, inc, line, exited, history or {"count": 0}),
     }
 
 

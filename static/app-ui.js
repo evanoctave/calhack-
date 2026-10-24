@@ -47,7 +47,10 @@ function render() {
   $("h-tree").textContent = h.tree.map((m, i) => (i + 1) + " " + m.name).join(" → ");
   $("h-demo").textContent = "Demo session · " + (S.places_source === "apify" ? "Live places" : "Sample places") + " · memory " + S.memory_source;
   // profile
-  if (document.activeElement.tagName !== "INPUT") { $("p-name").value = h.person_full_name; $("p-short").value = h.person_name; $("p-age").value = h.person_age || ""; $("p-addr").value = h.address; $("p-care").value = h.caregiver_name; }
+  if (document.activeElement.tagName !== "INPUT") { $("p-name").value = h.person_full_name; $("p-short").value = h.person_name; $("p-age").value = h.person_age || ""; $("p-addr").value = h.address; $("p-care").value = h.caregiver_name;
+    const d = h.description || {}; ["sex", "height", "weight", "hair", "eyes", "build", "marks"].forEach(k => { $("p-" + k).value = d[k] || ""; }); $("p-diag").value = h.diagnosis || ""; $("p-docname").value = (h.doctor || {}).name || ""; $("p-docphone").value = (h.doctor || {}).phone || ""; }
+  $("b-police").textContent = inc && inc.police_report ? inc.police_report : "Appears when an exit is detected.";
+  const hs = inc && inc.history; $("sr-history").innerHTML = hs && hs.count ? `<div class="row"><span class="k">${hs.count} prior exit${hs.count > 1 ? "s" : ""}</span><span class="v">typically found in ${hs.typical_minutes} min${hs.headings.length ? ", heading " + hs.headings.join("/") : ""}</span></div>` + hs.last.map(r => `<div class="row"><span class="k" style="font-weight:400">${hhmm(r.exited_at)} · ${esc(r.outcome)}</span><span class="v">${r.minutes_out} min · ${esc(r.heading)}</span></div>`).join("") : '<div class="row"><span class="muted">No prior wandering on record.</span></div>';
   $("p-places").innerHTML = h.familiar_places.map(p => `<div class="row"><span class="k">${esc(p.name)}</span></div>`).join("") || '<div class="row"><span class="muted">none yet</span></div>';
   $("p-tree").innerHTML = h.tree.map((m, i) => `<div class="row"><div><span class="k">${i + 1} · ${esc(m.name)}</span><span class="sub2">${i === 0 ? "Call first" : "Next if no answer"} · tier ${m.tier}${m.id === member ? " · this phone" : ""}</span></div></div>`).join("");
   $("p-ladder").textContent = h.tree.length > 1 ? `If ${h.tree[0].name} does not answer in ${S.ladder_step_s} sec, we call ${h.tree[1].name}.` : "";
@@ -139,8 +142,11 @@ function renderMap() {
   if (b) { b.hazards.slice(0, 6).forEach(p => L.circleMarker([p.lat, p.lng], {radius: 6, color: "#c62828", fillOpacity: .7}).addTo(mapLayer).bindPopup(esc(p.name))); b.call_first.slice(0, 6).forEach(p => L.circleMarker([p.lat, p.lng], {radius: 6, color: "#1f8a4c", fillOpacity: .7}).addTo(mapLayer).bindPopup(esc(p.name))); }
   setTimeout(() => mapObj.invalidateSize(), 100);
 }
+function copyPolice() { const t = $("b-police").textContent; (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { $("b-copied").textContent = "copied"; }).catch(() => { $("b-copied").textContent = "select and copy"; }); }
 async function saveProfile() {
-  const r = await post("/profile", {person_full_name: $("p-name").value, person_name: $("p-short").value || undefined, person_age: parseInt($("p-age").value) || undefined, caregiver_name: $("p-care").value || undefined, address: $("p-addr").value || undefined});
+  const description = {}; ["sex", "height", "weight", "hair", "eyes", "build", "marks"].forEach(k => { description[k] = $("p-" + k).value.trim(); });
+  const r = await post("/profile", {person_full_name: $("p-name").value, person_name: $("p-short").value || undefined, person_age: parseInt($("p-age").value) || undefined, caregiver_name: $("p-care").value || undefined, address: $("p-addr").value || undefined,
+    description, diagnosis: $("p-diag").value.trim(), doctor: {name: $("p-docname").value.trim(), phone: $("p-docphone").value.trim()}});
   if (!r.ok) { alert(r.detail || "could not save"); return; } await refresh(); go("voice");
 }
 async function addMember() { const n = $("p-newname").value.trim(); if (!n) return; await post("/tree", {name: n, phone: "web", tier: Math.min(3, (S.household.tree.length || 0) + 1)}); $("p-newname").value = ""; refresh(); }

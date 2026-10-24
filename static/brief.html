@@ -7,6 +7,7 @@
 <div class="grid" id="main" hidden>
   <section class="card"><h2>Photo and exit frames</h2><div class="frames"><img id="photo" class="photo" alt="photo"><span id="frames"></span></div>
     <p id="prose"></p><p><strong>Wearing:</strong> <span id="clothing"></span> <span id="conf" class="muted small"></span></p></section>
+  <section class="card" style="grid-column: 1 / -1"><h2>Read this to the dispatcher</h2><p id="police"></p></section>
   <section class="card"><h2>Medications</h2><ul id="meds" class="list"></ul><h2 style="margin-top:12px">Contacts</h2><ul id="contacts" class="list"></ul></section>
   <section class="card" style="grid-column: 1 / -1"><h2>Search map, <span id="radius"></span> mile radius <span id="src" class="pill"></span></h2><div id="map"></div></section>
   <section class="card"><h2>Check first (hazards)</h2><ul id="hazards" class="list"></ul></section>
@@ -25,7 +26,7 @@ async function load() {
   document.getElementById("sub").textContent = "Shared with " + b.viewer + ". Link expires in 24 hours.";
   document.getElementById("photo").src = b.photo;
   document.getElementById("frames").innerHTML = (b.exit_frames || []).map(f => `<img src="${esc(f)}" alt="exit frame">`).join("");
-  document.getElementById("prose").textContent = b.prose; document.getElementById("clothing").textContent = b.clothing_line;
+  document.getElementById("prose").textContent = b.prose; document.getElementById("police").textContent = b.police_report || ""; document.getElementById("clothing").textContent = b.clothing_line;
   document.getElementById("conf").textContent = b.clothing_line === "see photo" ? "" : "(model confidence " + Math.round(b.clothing.confidence * 100) + "%, verify against the frame)";
   document.getElementById("meds").innerHTML = b.medications.length ? b.medications.map(m => `<li>${esc(m.name)} ${esc(m.dose)} ${esc(m.note)}</li>`).join("") : "<li class='muted'>not shared</li>";
   document.getElementById("contacts").innerHTML = b.contacts.map(c => `<li>${esc(c.name)} ${tel(c)} ${esc(c.note || "")}</li>`).join("");

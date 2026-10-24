@@ -98,5 +98,19 @@
   ],
   "person_full_name": "Robert Miller",
   "person_age": 74,
-  "address": "Marina District, San Francisco, CA"
+  "address": "Marina District, San Francisco, CA",
+  "description": {
+    "sex": "male",
+    "height": "5 ft 10 in",
+    "weight": "165 lb",
+    "hair": "white, short",
+    "eyes": "brown",
+    "build": "slim",
+    "marks": "walks with a slight limp, left leg"
+  },
+  "diagnosis": "Alzheimer's disease, moderate stage; may not answer to his name; may believe he is going to work",
+  "doctor": {
+    "name": "Dr. Priya Nair, UCSF Memory and Aging Center",
+    "phone": "(415) 555-0199"
+  }
 }
