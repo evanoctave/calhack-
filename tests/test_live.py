@@ -31,3 +31,16 @@ def test_live_relay(client: TestClient) -> None:
 def test_live_rejects_unknown_member(client: TestClient) -> None:
     with pytest.raises(WebSocketDisconnect), client.websocket_connect("/ws/talk/TM-NOBODY") as ws:
         ws.receive_bytes()
+
+
+def test_door_mic_relay(client: TestClient) -> None:
+    from nightfall.api_live import doormic
+
+    with client.websocket_connect("/ws/door-mic") as door:
+        assert door.receive_json() == {"type": "listeners", "count": 0}
+        with client.websocket_connect("/ws/listen/TM-SARAH") as phone:
+            assert door.receive_json() == {"type": "listeners", "count": 1}
+            door.send_bytes(b"\x02\x00" * 512)
+            assert phone.receive_bytes() == b"\x02\x00" * 512
+        assert door.receive_json() == {"type": "listeners", "count": 0}
+    assert doormic.door is None and not doormic.listeners

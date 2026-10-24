@@ -32,6 +32,8 @@ function render() {
   if (inc && inc.exited_at && !inc.acked_by && ["ESCALATING", "EXHAUSTED"].includes(inc.state) && S.rings.some(r => r.member_ids.includes(member)) && rungFor !== inc.id) ringNow(inc.id, (h.person_full_name.split(" ")[0] || h.person_name) + " has left the house at " + hhmm(inc.exited_at) + ". Open the brief.");
   if (!$("incoming").hidden && (!inc || inc.id !== rungFor || inc.acked_by || ["RETURNED", "CLOSED"].includes(inc.state))) { $("incoming").hidden = true; stopRing(); }
   if (!$("incoming").hidden) fillIncoming();
+  if (inc && inc.visitor && $("visitor").hidden && !$("visitor").dataset.dismissed) showVisitor("");
+  if ((!inc || !inc.visitor) && !$("visitor").hidden) hideVisitor();
   $("clock").textContent = hhmm(S.now);
   // home
   $("h-title").textContent = S.night_mode ? "Night watch is on" : "Night watch is off";
@@ -109,6 +111,11 @@ async function enrollCmd(label) { const name = $("h-enrollname").value.trim(); i
 async function loadEnrolled() { try { const f = (await (await fetch("/enroll")).json()).faces; $("h-enrolled").textContent = f.length ? f.map(x => x.name + (x.label === "person" ? " (watched)" : "")).join(", ") : "none"; } catch (e) {} }
 let homeFeed = null;
 function startHomeFeed() { if (homeFeed) return; homeFeed = setInterval(() => { const u = "/cam/latest.jpg?t=" + Date.now(); const p = new Image(); p.onload = () => { const img = $("h-feed"); img.src = u; img.style.display = "block"; $("h-door").style.display = "none"; $("h-feedcap").textContent = "Front door camera · live"; }; p.onerror = () => { $("h-feedcap").textContent = "Front door camera · no frame (start the door screen on the laptop)"; }; p.src = u; }, 1000); }
+let visFeed = null;
+function showVisitor(said) { $("vis-said").textContent = said || ""; $("visitor").hidden = false; if (!visFeed) visFeed = setInterval(() => { const u = "/cam/latest.jpg?t=" + Date.now(); const p = new Image(); p.onload = () => { $("vis-feed").src = u; }; p.src = u; }, 500); }
+function hideVisitor() { $("visitor").hidden = true; if (visFeed) { clearInterval(visFeed); visFeed = null; } if (Listen.on) listenStop(); }
+function dismissVisitor() { $("visitor").dataset.dismissed = "1"; hideVisitor(); setTimeout(() => { delete $("visitor").dataset.dismissed; }, 120000); }
+function chime() { try { const c = new (window.AudioContext || window.webkitAudioContext)(); const t = c.currentTime; [[659, 0], [523, 0.35]].forEach(([f, d]) => { const o = c.createOscillator(), g = c.createGain(); o.frequency.value = f; g.gain.setValueAtTime(0.25, t + d); g.gain.exponentialRampToValueAtTime(0.001, t + d + 0.6); o.connect(g); g.connect(c.destination); o.start(t + d); o.stop(t + d + 0.6); }); } catch (e) {} if (navigator.vibrate) navigator.vibrate(200); }
 function cap(s) { s = s.replace(/unknown ?/g, "").trim(); return s ? s[0].toUpperCase() + s.slice(1) : "See photo"; }
 function setHero(id, inc) { const el = $(id); const f = inc && inc.exit_frame; el.innerHTML = f ? `<img src="${esc(f)}" alt="exit frame">` : '<div class="door"></div><div class="line"></div>'; }
 let briefLoaded = "";
@@ -166,6 +173,10 @@ function onEvent(e) {
   if (e.type === "ring") { ringNow(e.incident_id, e.message); refresh(); }
   if (e.type === "acked" || e.type === "returned") { stopRing(); refresh(); }
   if (e.type === "brief_updated" || e.type === "deadline" || e.type === "call_911_option" || e.type === "takeover") refresh();
+  if (e.type === "visitor") { showVisitor(""); chime(); refresh(); }
+  if (e.type === "visitor_said") { $("vis-said").textContent = e.said ? 'They said: "' + e.said + '"' : ""; }
+  if (e.type === "visitor_left") { hideVisitor(); notice("Visitor left", e.detail || ""); refresh(); }
+  if (e.type === "home") { notice(e.who === "other" ? "A household member is home" : (S.household.person_full_name.split(" ")[0] || "He") + " came back in", "No alert. Recognized at the door."); refresh(); }
   if (e.type === "sos") { ringNow(e.incident_id, "Help button pressed at the door."); refresh(); }
   if (e.type === "stand_down") { stopRing(); $("incoming").hidden = true; notice((e.who || "A household member") + " stepped out", "No alert. " + (e.detail || "")); refresh(); }
   if (e.type === "watch_only") { notice("Someone left, watching only", "Nightfall is not ringing the family for this one. " + (e.detail || "")); refresh(); }

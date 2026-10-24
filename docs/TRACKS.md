@@ -25,6 +25,15 @@ Deterministic wander score, every input owned by code and logged with its reason
 Baseline 60. Under 30 ignore; 30-59 speak at the door but do not ring; 60+ ring. Unknown everything still rings:
 a false alarm costs one phone one ring, a miss can cost a life. No PIN, nothing for the person to remember.
 
+## Ring camera half (R13): visitors and homecomings
+
+Anyone approaching from the outside (track starts at the door edge) never triggers the night redirect. A known
+household face or the monitored person coming back in = "home" notice, no sound. Anyone else = visitor, any hour:
+the door greets them in the neutral assistant voice ("you've reached the household, can I help you?"), the phone
+gets a doorbell chime with the live feed, Talk (phone mic to door speaker) and Listen (door mic to phone),
+and a transcript of what they said. The visitor incident closes when they leave or after two minutes. The
+HELP button (R12) and the night wander flow (R0-R11) are untouched by visitors.
+
 ## Named community (Anthropic)
 
 Adult children in Orange County caring for a parent with dementia at home overnight, without paid help.

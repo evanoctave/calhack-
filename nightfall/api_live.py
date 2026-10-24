@@ -42,6 +42,76 @@ class LiveHub:
 live = LiveHub()
 
 
+class DoorMicHub:
+    """Door microphone -> every phone that is listening. The door only streams while someone listens."""
+
+    def __init__(self) -> None:
+        self.listeners: dict[WebSocket, str] = {}
+        self.door: WebSocket | None = None
+        self.frames = 0
+
+    async def broadcast(self, data: bytes) -> None:
+        for ws in list(self.listeners):
+            try:
+                await ws.send_bytes(data)
+            except Exception:  # noqa: BLE001
+                self.listeners.pop(ws, None)
+
+    async def tell_door(self) -> None:
+        if self.door is not None:
+            try:
+                await self.door.send_json({"type": "listeners", "count": len(self.listeners)})
+            except Exception:  # noqa: BLE001
+                self.door = None
+
+
+doormic = DoorMicHub()
+
+
+@router.websocket("/ws/door-mic")
+async def ws_door_mic(ws: WebSocket) -> None:
+    """Door page sends its microphone as 16 kHz Int16 PCM; receives {"type":"listeners","count":n}."""
+    await ws.accept()
+    doormic.door = ws
+    await doormic.tell_door()
+    try:
+        while True:
+            msg = await ws.receive()
+            if msg.get("type") == "websocket.disconnect":
+                break
+            data = msg.get("bytes")
+            if data:
+                doormic.frames += 1
+                await doormic.broadcast(data)
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if doormic.door is ws:
+            doormic.door = None
+
+
+@router.websocket("/ws/listen/{member_id}")
+async def ws_listen(ws: WebSocket, member_id: str) -> None:
+    """Phone side: hears the door microphone."""
+    store = _store()
+    if store.hh.member(member_id) is None:
+        await ws.close(code=4403)
+        return
+    await ws.accept()
+    doormic.listeners[ws] = member_id
+    await doormic.tell_door()
+    try:
+        while True:
+            msg = await ws.receive()
+            if msg.get("type") == "websocket.disconnect":
+                break
+    except WebSocketDisconnect:
+        pass
+    finally:
+        doormic.listeners.pop(ws, None)
+        await doormic.tell_door()
+
+
 def _store() -> Any:
     from nightfall.api import store
 

@@ -48,7 +48,8 @@
   <div id="h-cd" class="banner" hidden style="margin:0 0 12px"><b id="h-cdt">Out of view</b><div id="h-cds" class="small"></div></div>
   <div class="hero" style="height:200px"><img id="h-feed" alt="front door camera" style="display:none"><div class="door" id="h-door"></div><div class="line"></div></div>
   <p class="cap" id="h-feedcap">Front door camera · connecting…</p>
-  <button class="rec mt" id="h-live" onclick="liveToggle('h-live','h-livestat')">Talk through the door</button><p class="cap" id="h-livestat">Tap, speak, your voice plays on the door speaker live. Tap again to stop.</p>
+  <div style="display:flex;gap:8px" class="mt"><button class="rec" id="h-live" onclick="liveToggle('h-live','h-livestat')">Talk</button><button class="rec" id="h-listen" style="background:var(--accent-bg);color:var(--accent)" onclick="listenToggle('h-listen')">Listen</button></div>
+  <p class="cap" id="h-livestat">Talk: your voice plays on the door speaker live. Listen: hear the door microphone on this phone.</p>
   <div class="card mt"><div class="row big"><div><span class="k" id="h-watch">Watching over Robert</span><span class="sub2" id="h-cam">Front entrance camera</span></div><span id="h-check" style="color:var(--ok);font-size:20px">✓</span></div></div>
   <div class="label">Tonight</div>
   <div class="card"><div class="row"><span class="k">Latest event</span><span class="v" id="h-event">No exit detected</span></div>
@@ -137,6 +138,13 @@
 <audio id="ring" loop hidden></audio>
 <div id="arm" style="position:fixed;inset:0;background:linear-gradient(180deg,var(--bg1),var(--bg2));display:flex;align-items:center;justify-content:center;z-index:50;padding:24px">
   <div class="card" style="padding:24px;max-width:360px;text-align:center"><h1 style="font-size:24px">Arm this phone</h1><p class="sub">One tap lets Nightfall ring and speak on this phone tonight.</p><button class="btn primary" onclick="armPhone()">Arm alerts</button></div></div>
+<div id="visitor" hidden style="position:fixed;inset:0;background:linear-gradient(180deg,#16284a,#0f1d33);color:#fff;z-index:55;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center">
+  <div style="font-size:14px;opacity:.8;margin-bottom:8px">Nightfall · doorbell</div><div style="font-size:28px;font-weight:700">Someone's at the door</div>
+  <div id="vis-said" style="margin:10px 0;opacity:.9;min-height:22px"></div>
+  <img id="vis-feed" class="feed" style="max-width:360px;margin:8px 0 16px" alt="door camera">
+  <div style="display:flex;gap:8px;width:100%;max-width:360px"><button class="rec" id="vis-talk" onclick="liveToggle('vis-talk','vis-stat')">Talk</button><button class="rec" id="vis-listen" style="background:rgba(127,167,255,.25);color:#fff" onclick="listenToggle('vis-listen')">Listen</button></div>
+  <p class="cap" id="vis-stat" style="color:#cdd8ea">Nightfall greeted them in the assistant voice. Talk to answer the door yourself.</p>
+  <button class="btn" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.3)" onclick="dismissVisitor()">Not now</button></div>
 <div id="incoming" hidden style="position:fixed;inset:0;background:rgba(198,40,40,.96);color:#fff;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center">
   <div style="font-size:14px;opacity:.85;margin-bottom:8px">Nightfall · incoming alert</div><div id="inc-title" style="font-size:30px;font-weight:700;line-height:1.15">Robert left home</div><div id="inc-msg" style="margin:10px 0 18px;opacity:.9"></div>
   <div style="background:rgba(255,255,255,.12);border-radius:16px;padding:14px 16px;text-align:left;width:100%;max-width:360px;margin-bottom:22px;font-size:15px;line-height:1.5">

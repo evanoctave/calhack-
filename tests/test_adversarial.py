@@ -63,8 +63,10 @@ def test_reply_naming_a_care_circle_member_stands_down(client: TestClient) -> No
 
 
 def test_arrival_then_real_approach_is_not_poisoned(client: TestClient) -> None:
-    r = client.post("/event", json={"kind": "person_enter", "payload": {"direction": "entry"}}).json()
-    assert r["rule"] == "ignored" and "arrival" in r["detail"]
+    r = client.post(
+        "/event", json={"kind": "person_enter", "payload": {"direction": "entry", "identity": "other"}}
+    ).json()
+    assert r["rule"] == "R13" and "came home" in r["detail"]
     r = client.post("/event", json={"kind": "person_enter"}).json()
     assert r["to"] == "CONVERSATION"
     r = client.post("/event", json={"kind": "features", "payload": {"identity": "other", "attire_night": True}}).json()

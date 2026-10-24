@@ -40,10 +40,20 @@ def test_attire() -> None:
     assert not attire_is_night({"top_type": "jacket", "bottom_type": "jeans", "footwear": "sneakers"})
 
 
-def test_arrival_is_ignored() -> None:
+def test_arrival_is_a_visitor_or_a_homecoming() -> None:
     inc = Incident("INC-1")
     tr = step(inc, Event("person_enter", at(0), {"direction": "entry"}))
-    assert tr.rule == "ignored" and "arrival" in tr.detail and inc.state == State.ARMED_IDLE
+    assert inc.state == State.VISITOR and "speak:visitor_open" in tr.actions and "notify:visitor" in tr.actions
+    step(inc, Event("reply", at(5), {"text": "Hi, it's the neighbor, just dropping off mail"}))
+    assert inc.state == State.VISITOR
+    tr = step(inc, Event("person_lost", at(20)))
+    assert inc.state == State.CLOSED and "notify:visitor_left" in tr.actions
+    home = Incident("INC-2")
+    tr = step(home, Event("person_enter", at(0), {"direction": "entry", "identity": "other"}))
+    assert home.state == State.ARMED_IDLE and "notify:home" in tr.actions
+    day = Incident("INC-3", night_mode=False)
+    step(day, Event("person_enter", at(0), {"direction": "entry"}))
+    assert day.state == State.VISITOR, "doorbell works in daytime"
 
 
 def test_checkin_stands_down_before_and_after_exit() -> None:

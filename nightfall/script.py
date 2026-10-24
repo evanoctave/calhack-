@@ -13,6 +13,9 @@ SCRIPT: Final[dict[str, str]] = {
     "closed_place": "The store is closed right now. Let's go back to bed and go in the morning.",
     "comfort": "You're home. You're safe. I'm right here.",
     "goodnight": "Good night, {person}. I love you.",
+    "visitor_open": "Hi, you've reached the {caregiver} household. Can I help you?",
+    "visitor_reply": "Thank you. I'll let the family know you're here.",
+    "visitor_bye": "Thanks for coming by. Have a good night.",
 }
 
 BANNED: Final[frozenset[str]] = frozenset(

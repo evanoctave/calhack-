@@ -51,6 +51,31 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
             for m in store.hh.tree:
                 store.hub.publish(f"phone:{m.id}", {"type": "watch_only", "incident_id": inc.id, "detail": tr.detail})
             emit(store, {"type": "watch_only", "incident_id": inc.id, "detail": tr.detail})
+        elif a.startswith("speak:visitor_"):
+            line = fill(SCRIPT[a.split(":")[1]], store.hh)
+            store.history.append(("system", line))
+            ref = voice.say(line, "assistant")
+            emit(
+                store,
+                {
+                    "type": "speak",
+                    "text": line,
+                    "mode": ref["mode"],
+                    "url": ref["url"],
+                    "voice_source": ref["source"],
+                    "line_source": "concierge",
+                },
+            )
+        elif a in ("notify:visitor", "notify:visitor_said", "notify:visitor_left", "notify:home"):
+            kind = a.split(":")[1]
+            said = str(store.last_payload.get("text", "")) if kind == "visitor_said" else ""
+            who = inc.identity if kind == "home" else ""
+            for m in store.hh.tree:
+                store.hub.publish(
+                    f"phone:{m.id}",
+                    {"type": kind, "incident_id": inc.id, "said": said, "who": who, "detail": tr.detail},
+                )
+            emit(store, {"type": kind, "incident_id": inc.id, "said": said, "who": who, "detail": tr.detail})
         elif a == "notify:sos":
             for m in store.hh.tree:
                 store.hub.publish(f"phone:{m.id}", {"type": "sos", "incident_id": inc.id})

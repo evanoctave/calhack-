@@ -22,6 +22,7 @@ class State(str, Enum):
     ARMED_OFF = "ARMED_OFF"
     ARMED_IDLE = "ARMED_IDLE"
     CONVERSATION = "CONVERSATION"
+    VISITOR = "VISITOR"
     DOOR_OPEN = "DOOR_OPEN"
     ESCALATING = "ESCALATING"
     ACKED = "ACKED"
@@ -33,6 +34,7 @@ class State(str, Enum):
 DOOR_WAIT_S: Final[float] = float(os.environ.get("DOOR_WAIT_S", "20"))
 DEADLINE_S: Final[float] = 15 * 60
 MAX_LINES: Final[int] = 4
+VISITOR_MAX_S: Final[float] = float(os.environ.get("VISITOR_MAX_S", "120"))
 LINE_GAP_S: Final[float] = float(os.environ.get("LINE_GAP_S", "8"))
 
 
@@ -102,14 +104,25 @@ def _ignored(inc: Incident, ev: Event, why: str) -> Transition:
 
 
 def _motion(inc: Incident, ev: Event) -> Transition:
+    """Someone at the door. Entry from outside is a visitor or a return (any hour); otherwise the night redirect."""
+    inc.identity, inc.direction, inc.checkin, inc.checkin_who = "unknown", "unknown", "none", ""
+    _absorb(inc, ev)
+    if inc.direction == "entry":
+        if inc.identity == "other":
+            return _t(inc, State.ARMED_IDLE, ("notify:home",), "R13", "household member came home")
+        if inc.identity == "match":
+            return _t(inc, State.ARMED_IDLE, ("notify:home",), "R13", f"{'the person we watch'} came back in")
+        inc.opened_at = ev.ts
+        inc.lines_spoken = 1
+        inc.last_line_at = ev.ts
+        inc.person_in_frame = True
+        return _t(inc, State.VISITOR, ("speak:visitor_open", "notify:visitor"), "R13", "visitor at the door")
     if not inc.night_mode:
         return _ignored(inc, ev, "R0 outside night window")
     inc.opened_at = ev.ts
     inc.lines_spoken = 1
     inc.last_line_at = ev.ts
     inc.person_in_frame = ev.kind == "person_enter"
-    inc.identity, inc.direction, inc.checkin, inc.checkin_who = "unknown", "unknown", "none", ""
-    _absorb(inc, ev)
     v = inc.verdict()
     if v.action == "ignore":
         return _ignored(inc, ev, "R11 " + "; ".join(v.reasons))
@@ -287,6 +300,31 @@ def _sos(inc: Incident, ev: Event) -> Transition:
     )
 
 
+def _visitor_reply(inc: Incident, ev: Event) -> Transition:
+    inc.lines_spoken += 1
+    inc.last_line_at = ev.ts
+    return _t(inc, State.VISITOR, ("speak:visitor_reply", "notify:visitor_said"), "R13", "visitor spoke")
+
+
+def _visitor_left(inc: Incident, ev: Event) -> Transition:
+    inc.person_in_frame = False
+    return _t(inc, State.CLOSED, ("speak:visitor_bye", "notify:visitor_left"), "R13", "visitor left")
+
+
+def _visitor_tick(inc: Incident, ev: Event) -> Transition:
+    if inc.opened_at is not None and (ev.ts - inc.opened_at).total_seconds() >= VISITOR_MAX_S:
+        return _t(inc, State.CLOSED, ("notify:visitor_left",), "R13", "visitor timed out")
+    return _ignored(inc, ev, "visitor present")
+
+
+def _visitor_features(inc: Incident, ev: Event) -> Transition:
+    """A face match while a 'visitor' stands outside means the person we watch is coming back in."""
+    _absorb(inc, ev)
+    if inc.identity in ("match", "other"):
+        return _t(inc, State.CLOSED, ("notify:home",), "R13", "recognized at the door: " + inc.identity)
+    return Transition(inc.state, inc.state, (), "R13", "visitor, identity " + inc.identity)
+
+
 def _close(inc: Incident, ev: Event) -> Transition:
     return _t(inc, State.CLOSED, ("delete_frames",), "R10", "closed")
 
@@ -316,6 +354,13 @@ TRANSITIONS: Final[dict[tuple[State, str], Handler]] = {
     (State.ESCALATING, "ack"): _ack,
     (State.ESCALATING, "tick"): _tick_escalating,
     (State.EXHAUSTED, "ack"): _ack,
+    (State.VISITOR, "reply"): _visitor_reply,
+    (State.VISITOR, "person_lost"): _visitor_left,
+    (State.VISITOR, "tick"): _visitor_tick,
+    (State.VISITOR, "features"): _visitor_features,
+    (State.VISITOR, "person_enter"): _visitor_features,
+    (State.VISITOR, "sos"): _sos,
+    (State.VISITOR, "close"): _close,
     (State.ARMED_IDLE, "sos"): _sos,
     (State.CONVERSATION, "sos"): _sos,
     (State.DOOR_OPEN, "sos"): _sos,

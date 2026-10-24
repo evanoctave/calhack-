@@ -89,6 +89,7 @@ async def app_state(member: str = "") -> dict[str, Any]:
             "person_in_frame": inc.person_in_frame,
             "door_opened_at": inc.door_opened_at.isoformat() if inc.door_opened_at else None,
             "heading": inc.heading,
+            "visitor": inc.state.value == "VISITOR",
             "identity": inc.identity,
             "direction": inc.direction,
             "checkin": inc.checkin,

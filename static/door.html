@@ -41,6 +41,7 @@ html, body { height: 100%; } body { padding: 0; background: #06101d; color: #eef
     <div class="speak" id="speak"><b id="speakwho">Nightfall</b><span id="speaktxt"></span></div>
     <div class="count" id="count"><div class="n" id="countn">3.0</div><div class="l" id="countl">calling family in</div></div>
     <div class="live" id="livepill">LIVE · family speaking</div>
+    <div class="live" id="micpill" style="bottom:110px;background:rgba(127,167,255,.9)">MIC · family is listening</div>
     <div class="caption"><div class="pillrow"><span class="dpill"><span id="persondot" class="dot"></span><span id="persontxt">no person</span></span><span class="dpill" id="idtxt">identity: unknown</span><span class="dpill" id="camstat">camera off</span></div></div>
   </div></div>
   <div class="bottom"><div class="status"><div id="enrolled">nobody enrolled</div><div id="integ"></div><div class="small">Controls live on the caregiver's phone. <a href="/dashboard.html" style="color:#7fa7ff">admin</a></div></div>
@@ -53,8 +54,8 @@ window.refresh = async function () { last = await (await fetch("/state")).json()
 function render() {
   const inc = last.incident, st = inc ? inc.state : "ARMED_IDLE";
   $("mode").textContent = last.night_mode ? "Night watch is on" : "Night watch is off";
-  $("led").className = "led " + ({ESCALATING: "danger", EXHAUSTED: "danger", DOOR_OPEN: "warn", CONVERSATION: "accent"}[st] || "");
-  $("watching").textContent = {CONVERSATION: "Talking to " + last.household.person_name + " at the door", DOOR_OPEN: "Out of view", ESCALATING: inc && inc.acked_by ? "Family is on the line" : "Calling the family", EXHAUSTED: "Family told to call 911", RETURNED: "Back inside", ACKED: "Family is on the line"}[st] || "Watching the front door";
+  $("led").className = "led " + ({ESCALATING: "danger", EXHAUSTED: "danger", DOOR_OPEN: "warn", CONVERSATION: "accent", VISITOR: "accent"}[st] || "");
+  $("watching").textContent = {VISITOR: "Visitor at the door", CONVERSATION: "Talking to " + last.household.person_name + " at the door", DOOR_OPEN: "Out of view", ESCALATING: inc && inc.acked_by ? "Family is on the line" : "Calling the family", EXHAUSTED: "Family told to call 911", RETURNED: "Back inside", ACKED: "Family is on the line"}[st] || "Watching the front door";
 }
 function tick() {
   if (!last) return; const inc = last.incident, box = $("count");
@@ -92,13 +93,13 @@ async function runCommand(c) {
   if (c.cmd === "say_test") speak("This is the Nightfall door speaker.");
 }
 async function sos() { await post("/event", {kind: "sos"}); showSpeak("Nightfall", "Calling the family now."); refresh(); }
-async function startDoor() { $("start").classList.add("hidden"); try { const c = new (window.AudioContext || window.webkitAudioContext)(); await c.resume(); const a = new Audio("/voice/silence.wav"); a.volume = 0.01; await a.play().catch(() => {}); } catch (e) {} tele("door_started", navigator.userAgent.slice(0, 60)); startCam(); doorConnect(); }
+async function startDoor() { $("start").classList.add("hidden"); try { const c = new (window.AudioContext || window.webkitAudioContext)(); await c.resume(); const a = new Audio("/voice/silence.wav"); a.volume = 0.01; await a.play().catch(() => {}); } catch (e) {} tele("door_started", navigator.userAgent.slice(0, 60)); startCam(); doorConnect(); micConnect(); }
 // Live voice from the phone (PCM over /ws/door)
 const Spk = {ws: null, ctx: null, t: 0};
 function doorConnect() {
   const proto = location.protocol === "https:" ? "wss" : "ws"; const ws = new WebSocket(`${proto}://${location.host}/ws/door`); ws.binaryType = "arraybuffer"; Spk.ws = ws;
   ws.onmessage = ev => {
-    if (typeof ev.data === "string") { const m = JSON.parse(ev.data); if (m.type === "live") { $("livepill").classList.toggle("on", !!m.on); if (m.on) $("livepill").textContent = "LIVE · " + m.by + " speaking through the door"; } return; }
+    if (typeof ev.data === "string") { const m = JSON.parse(ev.data); if (m.type === "live") { $("livepill").classList.toggle("on", !!m.on); if (m.on) $("livepill").textContent = "LIVE · " + m.by + " speaking through the door"; Mic.talking = !!m.on; micUpdate(); } return; }
     if (!Spk.ctx) { Spk.ctx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 16000}); Spk.t = 0; }
     const pcm = new Int16Array(ev.data), buf = Spk.ctx.createBuffer(1, pcm.length, 16000), ch = buf.getChannelData(0);
     for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
@@ -107,6 +108,25 @@ function doorConnect() {
     if (Spk.ctx.state === "suspended") Spk.ctx.resume();
   };
   ws.onclose = () => setTimeout(doorConnect, 2000);
+}
+// Door microphone -> phones that are listening. Streams only while someone listens and nobody is talking through the door.
+const Mic = {ws: null, ctx: null, src: null, proc: null, listeners: 0, talking: false, stream: null};
+function micConnect() {
+  const proto = location.protocol === "https:" ? "wss" : "ws"; const ws = new WebSocket(`${proto}://${location.host}/ws/door-mic`); ws.binaryType = "arraybuffer"; Mic.ws = ws;
+  ws.onmessage = ev => { if (typeof ev.data === "string") { const m = JSON.parse(ev.data); if (m.type === "listeners") { Mic.listeners = m.count; micUpdate(); } } };
+  ws.onclose = () => setTimeout(micConnect, 2000);
+}
+async function micUpdate() {
+  const want = Mic.listeners > 0 && !Mic.talking;
+  $("micpill").classList.toggle("on", want);
+  if (want && !Mic.proc) {
+    try { Mic.stream = Mic.stream || await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true}}); } catch (e) { tele("door_mic_blocked", String(e)); return; }
+    Mic.ctx = Mic.ctx || new (window.AudioContext || window.webkitAudioContext)(); await Mic.ctx.resume();
+    Mic.src = Mic.ctx.createMediaStreamSource(Mic.stream); Mic.proc = Mic.ctx.createScriptProcessor(2048, 1, 1); const ratio = Mic.ctx.sampleRate / 16000;
+    Mic.proc.onaudioprocess = e => { if (!Mic.ws || Mic.ws.readyState !== 1 || Mic.talking) return; const f = e.inputBuffer.getChannelData(0), n = Math.floor(f.length / ratio), out = new Int16Array(n); for (let i = 0; i < n; i++) out[i] = Math.max(-1, Math.min(1, f[Math.floor(i * ratio)])) * 32767; Mic.ws.send(out.buffer); };
+    Mic.src.connect(Mic.proc); Mic.proc.connect(Mic.ctx.destination); tele("door_mic_on", "listeners " + Mic.listeners);
+  }
+  if (!want && Mic.proc) { try { Mic.proc.disconnect(); Mic.src.disconnect(); } catch (e) {} Mic.proc = null; Mic.src = null; tele("door_mic_off", ""); }
 }
 fetch("/health").then(r => r.json()).then(h => { const live = Object.keys(h.mock).filter(k => !h.mock[k]); $("integ").textContent = live.length ? "live: " + live.join(", ") : "mock mode"; });
 refresh(); setInterval(refresh, 5000);
