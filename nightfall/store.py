@@ -44,6 +44,8 @@ class Store:
         self.latest_frame_at: float = 0.0
         self.takeover_by: str | None = None
         self.call_911_sent: bool = False
+        self.voice_source: str = "clone" if os.environ.get("VOICE_IS_CLONE") == "1" else "stock"
+        self.voice_name: str = os.environ.get("VOICE_NAME", "")
         self.night_mode: bool = True
         self.hub = Hub()
         notifier = (

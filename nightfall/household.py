@@ -38,6 +38,9 @@ class Household:
     contacts: tuple[dict[str, str], ...] = field(default_factory=tuple)
     persona: str = "caregiver_clone"
     notes: tuple[dict[str, str], ...] = field(default_factory=tuple)
+    person_full_name: str = ""
+    person_age: int = 0
+    address: str = ""
 
     def members_at(self, tier: int) -> list[TreeMember]:
         """Tree members at exactly this tier."""
@@ -86,4 +89,7 @@ def load(path: str | Path) -> Household:
         contacts=tuple(raw.get("contacts", [])),
         persona=str(raw.get("persona", "caregiver_clone")),
         notes=tuple(raw.get("notes", [])),
+        person_full_name=str(raw.get("person_full_name", "")),
+        person_age=int(raw.get("person_age", 0) or 0),
+        address=str(raw.get("address", "")),
     )

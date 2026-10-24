@@ -52,16 +52,20 @@ def style() -> tuple[float, str]:
     return speed, os.environ.get("VOICE_EMOTION", "happy")
 
 
-def select(voice_id: str, speed: float, emotion: str, env_path: str | Path = ".env") -> None:
+def select(
+    voice_id: str, speed: float, emotion: str, env_path: str | Path = ".env", extra: dict[str, str] | None = None
+) -> None:
     """Switch the caregiver voice at runtime and persist it to .env (key stays untouched)."""
     os.environ["CARTESIA_VOICE_ID"] = voice_id
     os.environ["VOICE_SPEED"] = str(speed)
     os.environ["VOICE_EMOTION"] = emotion
+    for k, v in (extra or {}).items():
+        os.environ[k] = v
     path = Path(env_path)
     if not path.exists():
         return
     lines = path.read_text().splitlines()
-    want = {"CARTESIA_VOICE_ID": voice_id, "VOICE_SPEED": str(speed), "VOICE_EMOTION": emotion}
+    want = {"CARTESIA_VOICE_ID": voice_id, "VOICE_SPEED": str(speed), "VOICE_EMOTION": emotion, **(extra or {})}
     seen: set[str] = set()
     for i, ln in enumerate(lines):
         k = ln.split("=", 1)[0].strip()

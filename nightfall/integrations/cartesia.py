@@ -58,3 +58,19 @@ def stt(audio: bytes, filename: str = "reply.wav") -> str:
     )
     r.raise_for_status()
     return str(r.json().get("text", "")).strip()
+
+
+def clone_voice(name: str, wav: bytes, description: str = "Nightfall caregiver voice, consented") -> str:
+    """Create a private cloned voice from one WAV clip. Returns the new voice id; raises on error."""
+    r = httpx.post(
+        f"{BASE}/voices/clone",
+        headers=_headers(),
+        timeout=60.0,
+        files={"clip": ("sample.wav", wav, "audio/wav")},
+        data={"name": name[:40], "language": "en", "description": description[:200], "access": "private"},
+    )
+    r.raise_for_status()
+    vid = str(r.json().get("id", ""))
+    if not vid:
+        raise RuntimeError("clone returned no id")
+    return vid

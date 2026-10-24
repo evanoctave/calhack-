@@ -1,0 +1,123 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nightfall</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="/app.js"></script><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head><body>
+<button class="themebtn" onclick="toggleTheme()">theme</button>
+<div class="phone">
+<div class="status"><span id="clock">2:07</span><span>5G · 100%</span></div>
+
+<section id="s-profile" class="screen">
+  <div class="topline"><span class="muted small">Set up Nightfall</span><span class="tag">1 of 2</span></div>
+  <h1>Who are we caring for?</h1><p class="sub">A few details for your care circle.</p>
+  <div class="label">Full name</div><input id="p-name" placeholder="Robert Miller">
+  <div class="label">Short name they answer to · age</div><div style="display:flex;gap:8px"><input id="p-short" placeholder="Dad"><input id="p-age" type="number" placeholder="74" style="width:110px"></div>
+  <div class="label">Home address</div><input id="p-addr" placeholder="120 Example St, San Francisco">
+  <div class="label">Your name (caregiver)</div><input id="p-care" placeholder="Sarah">
+  <div class="label">Familiar places</div><div class="card" id="p-places"></div>
+  <div class="label">Care circle · Call order</div><div class="card" id="p-tree"></div>
+  <div style="display:flex;gap:8px;margin-top:8px"><input id="p-newname" placeholder="Add a contact name"><button class="btn small" onclick="addMember()">Add</button></div>
+  <p class="cap" id="p-ladder"></p>
+  <button class="btn primary" onclick="saveProfile()">Continue</button>
+</section>
+
+<section id="s-voice" class="screen">
+  <div class="topline"><a class="back" onclick="go('profile')">‹ Set up Nightfall</a><span class="tag">2 of 2</span></div>
+  <h1>A familiar AI voice</h1><p class="sub">Record a few samples of your voice.</p>
+  <div class="topline"><span id="v-owner" style="font-weight:500">Sarah's voice</span><span class="tag" id="v-count">0 samples</span></div>
+  <div class="card mt" id="v-samples"></div>
+  <p class="cap">AI uses your samples to create new sentences and choose a reassuring tone. Only record your own voice.</p>
+  <div id="v-recpanel" class="card mt" style="padding:16px" hidden>
+    <div id="v-line" style="font-size:17px;font-weight:500;margin-bottom:10px"></div>
+    <button id="v-recbtn" class="rec" ontouchstart="recStart(event)" ontouchend="recStop(event)" onmousedown="recStart(event)" onmouseup="recStop(event)">Hold to record</button>
+    <p class="cap" id="v-recstat">Hold, read the line, release.</p>
+  </div>
+  <button class="btn primary" id="v-clone" onclick="cloneVoice()">Create family AI voice</button>
+  <div id="v-ready" class="card mt" style="padding:16px" hidden>
+    <b id="v-readyt">Sarah's AI voice is ready</b><p class="cap">New sentences are generated in this voice. Try one:</p>
+    <input id="v-sit" value="He is at the front door at 2 AM and says he needs to go to work.">
+    <button class="btn mt" onclick="previewVoice()">Generate and play a line</button>
+    <p id="v-preview" class="cap"></p>
+  </div>
+  <button class="btn mt" onclick="go('home')">Done</button>
+</section>
+
+<section id="s-home" class="screen">
+  <h1 id="h-title">Night watch is on</h1><p class="sub" id="h-greet">Good evening, Sarah</p>
+  <div class="card"><div class="row big"><div><span class="k" id="h-watch">Watching over Robert</span><span class="sub2" id="h-cam">Front entrance camera</span></div><span id="h-check" style="color:var(--ok);font-size:20px">✓</span></div></div>
+  <div class="label">Tonight</div>
+  <div class="card"><div class="row"><span class="k">Latest event</span><span class="v" id="h-event">No exit detected</span></div>
+    <div class="row"><span class="k">Camera</span><span class="v ok" id="h-camstat">Connected</span></div>
+    <div class="row"><span class="k">Last check</span><span class="v" id="h-last">Just now</span></div></div>
+  <div class="label">Your care setup</div>
+  <div class="card"><div class="row link" onclick="go('voice')"><div><span class="k">Family AI voice</span><span class="sub2" id="h-voice">Stock voice · Demo profile</span></div></div>
+    <div class="row link" onclick="go('profile')"><div><span class="k">Care circle</span><span class="sub2" id="h-tree">1 Sarah → 2 James</span></div></div></div>
+  <button class="btn" onclick="testAlert()">Run a test alert</button>
+  <p class="demo" id="h-demo">Demo session · Sample data</p>
+</section>
+
+<section id="s-alert" class="screen">
+  <div class="topline"><a class="back" onclick="go('home')">‹ Home</a><span class="tag">Live alert</span></div>
+  <h1 id="a-title">Robert left home</h1><p class="sub" id="a-sub">Front entrance · 2:03 AM</p>
+  <div class="hero" id="a-hero"><div class="door"></div><div class="line"></div></div><p class="cap" id="a-cap">Camera image · Recorded at exit</p>
+  <div class="label">What happened</div>
+  <div class="card" id="a-events"></div>
+  <div id="a-ack" class="ok-card mt" hidden><b id="a-ackt">Sarah is responding</b><span>Your care circle has been notified.</span></div>
+  <button class="btn primary" onclick="openBrief()">Open caregiver brief</button>
+  <button class="btn ok" id="a-answer" onclick="answerCall()">Answer the call</button>
+</section>
+
+<section id="s-brief" class="screen">
+  <div class="topline"><a class="back" onclick="go('alert')">‹ Alert</a><span class="tag">Caregiver brief</span></div>
+  <h1 id="b-name">Robert Miller, 74</h1><p class="sub" id="b-seen">Last seen at home · 2:03 AM</p>
+  <p class="danger-text" id="b-loc">Current location unknown</p>
+  <div class="hero" id="b-hero"><div class="door"></div><div class="line"></div></div><p class="cap">Camera image · Check the clothing below</p>
+  <div class="label">Description</div>
+  <div class="card"><div class="row"><span class="k">Wearing</span><span class="v" id="b-wear">—</span></div>
+    <div class="row"><span class="k">Also wearing</span><span class="v" id="b-wear2">—</span></div>
+    <div class="row"><span class="k">Backup contact</span><span class="v" id="b-backup">—</span></div></div>
+  <p class="cap" id="b-conf">Clothing is AI-described. Verify against the image.</p>
+  <div id="b-respond"><button class="btn primary" onclick="respond()">I'm responding</button></div>
+  <div id="b-responding" class="ok-card mt" hidden><b>You're responding</b><span>Your care circle has been notified.</span></div>
+  <button class="btn" onclick="go('search')">Search details & contacts</button>
+</section>
+
+<section id="s-search" class="screen">
+  <div class="topline"><a class="back" onclick="go('brief')">‹ Caregiver brief</a><span class="tag" id="sr-src">Demo</span></div>
+  <h1>Start with what we know</h1><p class="sub" id="sr-radius">Reference search area · 1.5-mile radius</p>
+  <div id="map"></div><p class="cap">Dashed line is a family-provided familiar route, not a predicted location. Red: hazards. Green: open now.</p>
+  <div class="card mt"><div class="row"><span class="k" id="sr-last">Last confirmed at home · 2:03 AM</span></div></div>
+  <div class="label">Familiar places</div><div class="card" id="sr-fam"></div>
+  <div class="label">Check first · hazards</div><div class="card" id="sr-haz"></div>
+  <div class="label">Call first · open now</div><div class="card" id="sr-call"></div>
+  <div class="label">Care notes</div><div class="card" id="sr-notes"></div>
+  <div class="label">Contacts</div><div class="card" id="sr-contacts"></div>
+  <div id="sr-911" class="banner" hidden>Out of view and not found. <a href="tel:911" style="color:inherit;font-weight:600">Call 911</a>. You decide; Nightfall never dials.</div>
+</section>
+
+<section id="s-respond" class="screen">
+  <div class="topline"><a class="back" onclick="go('alert')">‹ Alert</a><span class="tag">On the line</span></div>
+  <h1>You're on the line</h1><p class="sub" id="r-sub">Nightfall is talking to Robert at the door.</p>
+  <img id="r-feed" class="feed" alt="live door camera"><p class="cap" id="r-feedcap">Live camera at the door</p>
+  <div class="label">Nightfall agent</div>
+  <div class="card" style="padding:14px 18px"><div id="r-say" class="muted">Connecting…</div>
+    <div style="display:flex;gap:8px;margin-top:10px"><button class="btn small primary" id="r-listen" onclick="listenOnce()">Tap, then speak</button><input id="r-ask" placeholder="ask: where should I look?"><button class="btn small" onclick="askTyped()">Ask</button></div></div>
+  <div class="label">Talk to him yourself</div>
+  <div class="card" style="padding:14px 18px"><button class="btn small primary" id="r-tobtn" onclick="toggleTakeover()">Take over the voice</button><span class="muted small" id="r-tostat" style="margin-left:8px">AI is speaking for you.</span>
+    <div id="r-takeover" hidden><div class="chips mt"><span class="chip" onclick="sayText(this.textContent)">Dad, it's me. Come back inside, I'm on my way.</span><span class="chip" onclick="sayText(this.textContent)">Wait right there by the door. I'll be two minutes.</span><span class="chip" onclick="sayText(this.textContent)">Everything's okay. Let's sit down, I'm coming.</span></div>
+      <div style="display:flex;gap:8px;margin-top:10px"><input id="r-text" placeholder="type what to say in your voice"><button class="btn small" onclick="sayTyped()">Say</button></div>
+      <button class="rec mt" id="r-ptt" ontouchstart="pttStart(event)" ontouchend="pttStop(event)" onmousedown="pttStart(event)" onmouseup="pttStop(event)">Hold to talk (your real voice)</button><p class="cap" id="r-pttstat"></p></div></div>
+  <div id="r-911" class="banner" hidden>Out of view for a while and still not found. <a href="tel:911" style="color:inherit;font-weight:600">Call 911</a>. You decide; Nightfall never dials.</div>
+  <button class="btn ok mt" onclick="gotHim()">I've got him</button>
+  <button class="btn" onclick="go('brief')">Open caregiver brief</button>
+</section>
+</div>
+
+<nav class="tabs">
+  <a id="t-home" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</a>
+  <a id="t-alert" onclick="go('alert')"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0"/></svg>Alerts</a>
+  <a id="t-care" onclick="go('profile')"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Care</a>
+</nav>
+<audio id="ring" loop hidden></audio>
+<script src="/app-ui.js"></script><script src="/app-voice.js"></script>
+</body></html>
