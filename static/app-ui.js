@@ -212,6 +212,8 @@ function showArm() {
   const callable = S.household.tree.filter(m => m.phone && m.phone.startsWith("+"));
   $("test-who").innerHTML = callable.map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join("");
   $("test-call").disabled = !callable.length; $("test-status").textContent = callable.length ? "" : "Add a phone number in Call order first.";
+  const who = S.household.person_name || "they";
+  $("arm-text").textContent = `If ${who} leaves and doesn't come back, we call you. Keep this page open with the volume up.`;
   $("arm").hidden = false;
 }
 async function sendTestCall() {
@@ -276,7 +278,7 @@ function renderFigma() {
   $("su-calls").textContent = tree.map((m, i) => (i + 1) + " " + m.name).join(" → ");
   $("su-places").textContent = (h.address || "Home") + " · " + h.radius_mi + " mi";
   const rad = pickRadius ?? h.radius_mi; $("pl-radius").textContent = rad + " mi around home"; renderRadius(rad); $("ar-sub").textContent = (h.address || "Home") + " · " + h.radius_mi + " mi around home";
-  $("cam-person").textContent = `${p} (${first})`; $("arm-who").textContent = me + " · " + (tree[0] && tree[0].id === member ? "First contact" : "Care circle");
+  $("cam-person").textContent = `${p} (${first})`;
   $("pf-avatar").innerHTML = h.photo ? `<img src="${esc(h.photo)}" alt="Profile photo">` : `<img class="profile-camera-icon" src="/assets/figma/camera.svg" alt="Add photo">`;
   // watch
   $("h-watch").textContent = "Watching over " + p; $("h-greet").textContent = greeting() + ", " + h.caregiver_name;
