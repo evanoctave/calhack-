@@ -242,3 +242,4 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
 #h-watch.green { display: flex; align-items: center; gap: 10px; }
 #h-watch.green::before { content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%; background: currentColor; animation: breathe 2.6s var(--ease) infinite; }
 @keyframes breathe { 0% { box-shadow: 0 0 0 0 color-mix(in oklch, currentColor 45%, transparent); } 70%, 100% { box-shadow: 0 0 0 7px color-mix(in oklch, currentColor 0%, transparent); } }
+[data-role="family"] .owner-only { display: none !important; }

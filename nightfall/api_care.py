@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
 from nightfall import api_app
-from nightfall.household import TreeMember
+from nightfall.household import TreeMember, normalize_phone
 from nightfall.integrations import geocode
 from nightfall.memory import Memory
 
@@ -82,15 +82,10 @@ async def call_order(body: CallOrderIn) -> dict:
 
 
 def _e164(raw: str) -> str:
-    """Twilio only dials +country-code numbers: 10 digits or 1 + 10 digits are taken as US, anything else needs a +."""
-    digits = "".join(c for c in raw if c.isdigit())
-    if raw.strip().startswith("+") and 8 <= len(digits) <= 15:
-        return "+" + digits
-    if len(digits) == 10:
-        return "+1" + digits
-    if len(digits) == 11 and digits.startswith("1"):
-        return "+" + digits
-    raise HTTPException(422, "Enter a full phone number. Outside the US, start with + and the country code.")
+    phone = normalize_phone(raw)
+    if phone is None:
+        raise HTTPException(422, "Enter a full phone number. Outside the US, start with + and the country code.")
+    return phone
 
 
 class MemberIn(BaseModel):

@@ -207,3 +207,19 @@ def test_test_call_needs_a_dialable_member_and_twilio(client, monkeypatch):
     assert client.post("/care/test-call", json={"member_id": made["member_id"]}).json()["called"] == "Aunt Bea"
     assert placed[0][0] == "+14155550123" and placed[0][1].endswith("/twiml/test/" + made["member_id"])
     assert "test call" in client.post("/twiml/test/" + made["member_id"]).text.lower()
+
+
+def test_phone_numbers_normalize_and_old_saved_numbers_load_dialable(tmp_path):
+    import json
+
+    from nightfall.household import load, normalize_phone
+
+    assert normalize_phone("(626) 265-9377") == "+16262659377"
+    assert normalize_phone("16262659377") == "+16262659377"
+    assert normalize_phone("+44 20 7946 0958") == "+442079460958"
+    assert normalize_phone("12") is None and normalize_phone("442079460958") is None
+    raw = json.loads((api.ROOT / "data" / "household.json").read_text())
+    raw["tree"][0]["phone"] = "16262659377"
+    path = tmp_path / "h.json"
+    path.write_text(json.dumps(raw))
+    assert load(path).tree[0].phone == "+16262659377"
