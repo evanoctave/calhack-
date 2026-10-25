@@ -52,7 +52,7 @@ Life Alert inside a doorbell camera. The laptop at `/` is the door device: camer
 2. Walk into the frame (simulating stepping out the front door). The detector fires `person_enter`; the door speaks the redirect in the caregiver voice and keeps talking every 8 s while you stay (4 lines max). Type a reply to steer it; Moss notes shape the next line.
 3. Walk out of frame for 3 s: `person_lost`, exit timer starts (5 s in demo). The clothing model reads the last frame with you in it.
 4. Phone rings. Tap Answer: live camera feed, the AI call agent's opening (time, clothing, hazards, open places), and the brief link.
-5. Tap Take over the voice: quick phrases or typed lines play at the door in the caregiver voice; hold to talk sends your real voice.
+5. Tap Talk live: your voice plays at the door and the AI pauses until you stop. Listen brings the door microphone to you; quick phrases play in the caregiver voice.
 6. Still out of view 45 s later: a Call 911 option appears on every phone (you dial, never the system). Walk back into frame: rings cancel, phones show returned.
 7. Address setup: `/app#places` turns any address into hazards (OpenStreetMap) in seconds and open-at-night places (Apify) in a minute.
 

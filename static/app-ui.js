@@ -2,7 +2,7 @@
 let S = null, member = "", incident = null, feedTimer = null, mapObj = null, mapLayer = null, soundOn = false, acked = false;
 function $(id) { return document.getElementById(id); }
 function go(name) { location.hash = "#" + name; }
-const SCREENS = ["setup", "profile", "medical", "report", "missing", "voice", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "takeover", "brief", "search", "responding", "back", "emergency", "help", "record", "review", "creating", "voice-preview", "join"];
+const SCREENS = ["setup", "profile", "medical", "report", "missing", "voice", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "brief", "search", "responding", "back", "emergency", "help", "record", "review", "creating", "voice-preview", "join"];
 const navStack = [];
 // An invitation link (/app?member=ID) opens the family view: alerts, the door and the report, but not the care setup.
 const FAMILY_VIEW = new URLSearchParams(location.search).has("member");
@@ -11,9 +11,9 @@ document.documentElement.dataset.role = FAMILY_VIEW ? "family" : "owner";
 function show(name) {
   if (name === "respond") name = "call";
   if (name !== "call" && typeof stopAgentCall === "function") stopAgentCall();
-  if (!["record","takeover"].includes(name) && typeof Recorder !== "undefined" && Recorder.rec?.state === "recording") { Recorder.rec._discard = true; Recorder.rec.stop(); releaseSampleMic(); }
-  if (!["talk","takeover"].includes(name) && typeof Listen !== "undefined" && Listen.on) listenStop();
-  if (!["talk","takeover"].includes(name) && typeof Live !== "undefined" && Live.on) { liveStop(); $("r-live").classList.remove("on"); $("r-live").textContent = "Talk live"; }
+  if (!name === "record" && typeof Recorder !== "undefined" && Recorder.rec?.state === "recording") { Recorder.rec._discard = true; Recorder.rec.stop(); releaseSampleMic(); }
+  if (!name === "talk" && typeof Listen !== "undefined" && Listen.on) listenStop();
+  if (!name === "talk" && typeof Live !== "undefined" && Live.on) { liveStop(); $("r-live").classList.remove("on"); $("r-live").textContent = "Talk live"; }
   if (!SCREENS.includes(name) || (FAMILY_VIEW && OWNER_ONLY.includes(name))) name = "home";
   if (location.hash.slice(1) !== name && name === "home") history.replaceState(null, "", "#home");
   // direction for the slide: back if this is the screen before the current one, none on first paint
@@ -346,12 +346,12 @@ function autoRoute() {
   const inc = S.incident; const key = inc ? [inc.id, inc.state, inc.acked_by || "", S.call_911 ? 1 : 0].join("|") : "none";
   if (key === routeKey) return; const prev = routeKey; routeKey = key; if (!prev) return;  // first load: stay where the user is
   if (!inc || inc.state === "CLOSED") return;
-  const here = location.hash.slice(1) || "home", busy = (here === "home" && homeIncident === inc.id) || ["talk", "takeover", "call", "brief", "search", "profile", "medical", "record", "review", "creating"].includes(here);
+  const here = location.hash.slice(1) || "home", busy = (here === "home" && homeIncident === inc.id) || ["talk", "call", "brief", "search", "profile", "medical", "record", "review", "creating"].includes(here);
   if (S.call_911 && !prev.endsWith("|1") && !["RETURNED","CLOSED"].includes(inc.state)) { toast("Emergency call option available."); if (!busy && !["RETURNED","CLOSED"].includes(inc.state)) go("emergency"); return; }
   if (inc.state === "CONVERSATION" && !busy) go("door");
   else if (inc.state === "DOOR_OPEN" && !busy) go("wait");
   else if (["ESCALATING", "EXHAUSTED"].includes(inc.state) && !inc.acked_by && !busy && ["door", "wait", "home", "back"].includes(here)) go("alert");
-  else if (inc.state === "RETURNED" && inc.checkin !== "self_other" && !(here === "home" && homeIncident === inc.id) && !["talk", "takeover"].includes(here)) go("back");
+  else if (inc.state === "RETURNED" && inc.checkin !== "self_other" && !(here === "home" && homeIncident === inc.id) && here !== "talk") go("back");
   else if (inc.acked_by && inc.acked_by === member && !busy) go("responding");
   else if (inc.acked_by && inc.acked_by !== member && !busy) go("alert");
 
