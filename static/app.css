@@ -1,68 +1,4 @@
-/* Nightfall caregiver app. Layout and type from Jun's Figma ("Nightfall · Caregiver Experience"), Geist.
-   Scene: an adult child woken by a ring at 2 AM in a dark bedroom, reading Dad's facts at a glance; by day,
-   setting up care and reading the morning report. So the app follows the phone: light by day, dark at night.
-   Solid tinted surfaces (no glass), one blue accent for actions and state, red and green only for meaning.
-   Motion carries state only: where you navigated, what you pressed, data arriving, something live. */
-
-:root {
-  --hue: 258;
-  --bg: oklch(0.968 0.007 var(--hue));
-  --bg-0: oklch(0.968 0.007 var(--hue) / 0);
-  --surface: oklch(0.995 0.003 var(--hue));
-  --surface-2: oklch(0.938 0.011 var(--hue));
-  --press: oklch(0.925 0.014 var(--hue));
-  --ink: oklch(0.235 0.032 262);
-  --muted: oklch(0.49 0.03 258);
-  --faint: oklch(0.63 0.022 258);
-  --line: oklch(0.905 0.012 var(--hue));
-  --blue: oklch(0.515 0.17 263);
-  --blue-wash: oklch(0.935 0.04 263);
-  --btn-blue: oklch(0.515 0.17 263);
-  --green: oklch(0.49 0.11 155);
-  --green-wash: oklch(0.948 0.04 155);
-  --btn-green: oklch(0.5 0.11 155);
-  --red: oklch(0.515 0.175 22);
-  --red-wash: oklch(0.95 0.028 22);
-  --btn-red: oklch(0.53 0.18 22);
-  --on-accent: oklch(0.99 0.004 var(--hue));
-  --media: oklch(0.88 0.018 var(--hue));
-  --shadow: 0 1px 2px oklch(0.3 0.04 262 / 0.05), 0 1px 1px oklch(0.3 0.04 262 / 0.03);
-  --shadow-lift: 0 1px 2px oklch(0.3 0.04 262 / 0.08), 0 4px 12px oklch(0.3 0.04 262 / 0.08);
-  --focus: 0 0 0 3px oklch(0.515 0.17 263 / 0.28);
-  --r-card: 16px; --r-btn: 14px; --r-sm: 10px;
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);      /* ease-out-quint: state changes */
-  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);  /* ease-out-expo: arrivals */
-  --t-press: 110ms; --t-state: 200ms; --t-enter: 240ms;
-  --font: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  color-scheme: light dark;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: oklch(0.165 0.018 264);
-    --bg-0: oklch(0.165 0.018 264 / 0);
-    --surface: oklch(0.212 0.02 264);
-    --surface-2: oklch(0.262 0.022 264);
-    --press: oklch(0.285 0.024 264);
-    --ink: oklch(0.945 0.008 var(--hue));
-    --muted: oklch(0.72 0.02 258);
-    --faint: oklch(0.57 0.02 258);
-    --line: oklch(0.29 0.02 264);
-    --blue: oklch(0.74 0.12 258);
-    --blue-wash: oklch(0.3 0.06 262);
-    --btn-blue: oklch(0.56 0.16 263);
-    --green: oklch(0.76 0.12 155);
-    --green-wash: oklch(0.27 0.045 155);
-    --btn-green: oklch(0.52 0.11 155);
-    --red: oklch(0.72 0.14 22);
-    --red-wash: oklch(0.28 0.06 22);
-    --btn-red: oklch(0.55 0.17 22);
-    --media: oklch(0.26 0.02 264);
-    --shadow: none;
-    --shadow-lift: 0 4px 16px oklch(0.05 0.02 264 / 0.5);
-    --focus: 0 0 0 3px oklch(0.74 0.12 258 / 0.35);
-  }
-}
+@import url("/app-tokens.css");
 
 [hidden] { display: none !important; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -228,7 +164,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
 
 /* ---------- map ---------- */
 #map, #area-map { height: 210px; border-radius: var(--r-card); overflow: hidden; background: var(--media); }
-@media (prefers-color-scheme: dark) { .leaflet-tile-pane { filter: brightness(0.72) contrast(1.08) saturate(0.7); } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .leaflet-tile-pane { filter: brightness(0.72) contrast(1.08) saturate(0.7); } }
 .legend { display: flex; gap: 18px; font: 400 13px/18px var(--font); color: var(--ink); }
 .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
 .pin { width: 22px; height: 22px; border-radius: 11px; display: grid; place-items: center; color: #fff; font: 700 11px/1 var(--font); border: 2px solid #fff; box-shadow: 0 2px 6px oklch(0.2 0.03 262 / 0.3); }

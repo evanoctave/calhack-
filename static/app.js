@@ -7,7 +7,7 @@ function toggleTheme() {
   const next = cur === "dark" ? "light" : "dark";
   applyTheme(next); try { localStorage.setItem("nf-theme", next); } catch (e) {}
 }
-applyTheme(getTheme() || "dark");
+applyTheme(getTheme());
 function fmtTime(iso) { const d = iso ? new Date(iso) : new Date(); return d.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"}); }
 async function post(path, body) { const r = await fetch(path, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body || {})}); return r.json(); }
 function sse(path, onMsg) {

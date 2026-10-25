@@ -1,0 +1,40 @@
+/* Nightfall / Soft Glass. Values from the approved Figma Core demo and its dark library. */
+:root {
+  --bg: #e3ebf2; --bg-0: #e3ebf200; --surface: #ffffff7a; --surface-2: #ffffff70;
+  --press: #d4e2f0; --ink: #182335; --muted: #506078; --faint: #6c7b90;
+  --line: #d8dfe9b8; --edge: #ffffffc2; --blue: #245dd6; --blue-wash: #e2edfc;
+  --btn-blue: #245bd8; --green: #23764a; --green-wash: #def2e6b8; --btn-green: #23764a;
+  --red: #b52b38; --red-wash: #fff0f2; --btn-red: #b52b38; --on-accent: #fff;
+  --media: #cfdae5; --shadow: 0 4px 16px #1d3c6510, inset 0 1px 1px #ffffffb8;
+  --shadow-lift: 0 7px 18px #28528421, inset 0 1px 1.5px #ffffffdb;
+  --focus: 0 0 0 3px #245dd640; --r-card: 20px; --r-btn: 28px; --r-sm: 12px;
+  --ease: cubic-bezier(.22,1,.36,1); --ease-expo: cubic-bezier(.16,1,.3,1);
+  --t-press: 110ms; --t-state: 200ms; --t-enter: 240ms;
+  --font: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, monospace;
+  --backdrop: url('/assets/figma/backdrop-light.svg');
+  --gradient: linear-gradient(113deg, #e8eef4 14%, #e3ebf2 46%, #dde7f0 85%);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1a2b42; --bg-0: #1a2b4200; --surface: #20354c99; --surface-2: #314a6580;
+    --press: #39536e; --ink: #edf3ff; --muted: #b8c8dc; --faint: #95abc3;
+    --line: #8299af40; --edge: #b7c9dc60; --blue: #92b8ff; --blue-wash: #344e70;
+    --green: #7ee0ab; --green-wash: #27544099; --red: #ffa0aa; --red-wash: #61324180;
+    --media: #14243a; --shadow: 0 4px 16px #08142220, inset 0 1px 1px #c7dbf015;
+    --backdrop: url('/assets/figma/backdrop-dark.svg');
+    --gradient: linear-gradient(113deg, #1b2d44 14%, #1a2b42 46%, #182a40 85%);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1a2b42; --bg-0: #1a2b4200; --surface: #20354c99; --surface-2: #314a6580;
+  --press: #39536e; --ink: #edf3ff; --muted: #b8c8dc; --faint: #95abc3;
+  --line: #8299af40; --edge: #b7c9dc60; --blue: #92b8ff; --blue-wash: #344e70;
+  --green: #7ee0ab; --green-wash: #27544099; --red: #ffa0aa; --red-wash: #61324180;
+  --media: #14243a; --shadow: 0 4px 16px #08142220, inset 0 1px 1px #c7dbf015;
+  --backdrop: url('/assets/figma/backdrop-dark.svg');
+  --gradient: linear-gradient(113deg, #1b2d44 14%, #1a2b42 46%, #182a40 85%);
+  color-scheme: dark;
+}

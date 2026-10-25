@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shlex
 from pathlib import Path
 from typing import Any, Final, TypedDict
 
@@ -62,17 +63,15 @@ def select(
     for k, v in (extra or {}).items():
         os.environ[k] = v
     path = Path(env_path)
-    if not path.exists():
-        return
-    lines = path.read_text().splitlines()
+    lines = path.read_text().splitlines() if path.exists() else []
     want = {"CARTESIA_VOICE_ID": voice_id, "VOICE_SPEED": str(speed), "VOICE_EMOTION": emotion, **(extra or {})}
     seen: set[str] = set()
     for i, ln in enumerate(lines):
         k = ln.split("=", 1)[0].strip()
         if k in want:
-            lines[i] = f"{k}={want[k]}"
+            lines[i] = f"{k}={shlex.quote(str(want[k]))}"
             seen.add(k)
-    lines += [f"{k}={v}" for k, v in want.items() if k not in seen]
+    lines += [f"{k}={shlex.quote(str(v))}" for k, v in want.items() if k not in seen]
     path.write_text("\n".join(lines) + "\n")
 
 

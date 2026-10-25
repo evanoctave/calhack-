@@ -22,6 +22,9 @@ Event payload fields the detector may send: `identity` (match/other/unknown), `d
 
 ## Phone app (api_app.py)
 
+The caregiver UI's additional photo, contact-order, invitation, familiar-place, and mock scenario routes are
+documented in [UI-INTEGRATION.md](UI-INTEGRATION.md#api-additions).
+
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/app` | the app page |

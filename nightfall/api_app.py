@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 import time
+import wave
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -65,6 +66,7 @@ async def app_state(member: str = "") -> dict[str, Any]:
             "person_full_name": hh.person_full_name or hh.person_name,
             "person_age": hh.person_age,
             "caregiver_name": hh.caregiver_name,
+            "caregiver_relationship": hh.caregiver_relationship,
             "address": hh.address,
             "photo": hh.person_photo,
             "radius_mi": hh.radius_mi,
@@ -90,6 +92,7 @@ async def app_state(member: str = "") -> dict[str, Any]:
             "acked_by": inc.acked_by,
             "acked_by_name": next((m.name for m in hh.tree if m.id == inc.acked_by), None),
             "lines_spoken": inc.lines_spoken,
+            "last_line": next((text for role, text in reversed(store.history) if role == "system"), ""),
             "person_in_frame": inc.person_in_frame,
             "door_opened_at": inc.door_opened_at.isoformat() if inc.door_opened_at else None,
             "heading": inc.heading,
@@ -117,6 +120,7 @@ async def app_state(member: str = "") -> dict[str, Any]:
         "takeover_by": store.takeover_by,
         "live_by": _live_by(),
         "call_911": store.call_911_sent,
+        "demo_available": os.environ.get("MOCK") == "1",
         "voice": {
             "voice_id": vid,
             "source": store.voice_source,
@@ -140,6 +144,7 @@ def _emergency(store: Any, inc: Any) -> dict[str, Any]:
         "called": False,
         "option_shown": bool(store.call_911_sent),
         "option_after_s": CALL_911_S,
+        "recommendation_due": bool(inc.deadline_at and store.now() >= inc.deadline_at),
         "deadline_hhmm": hhmm(inc.deadline_at) if inc.deadline_at else "",
         "text": (
             "Call 911 option is on your screen. Nightfall has not called."
@@ -173,6 +178,7 @@ class ProfileIn(BaseModel):
     person_name: str | None = None
     person_age: int | None = None
     caregiver_name: str | None = None
+    caregiver_relationship: str | None = None
     address: str | None = None
     description: dict[str, str] | None = None
     diagnosis: str | None = None
@@ -220,6 +226,9 @@ def _persist_household(hh: Any) -> None:
                 "person_full_name": hh.person_full_name,
                 "person_age": hh.person_age,
                 "caregiver_name": hh.caregiver_name,
+                "caregiver_relationship": hh.caregiver_relationship,
+                "person_photo": hh.person_photo,
+                "familiar_places": list(hh.familiar_places),
                 "person_name": hh.person_name,
                 "address": hh.address,
                 "description": dict(hh.description),
@@ -262,6 +271,17 @@ async def voice_sample(kind: str, request: Request) -> dict[str, Any]:
 
 
 def _ffmpeg(src: Path, dst: Path) -> bool:
+    # The caregiver recorder submits normalized PCM WAV, so the browser flow needs no external converter.
+    try:
+        with wave.open(str(src), "rb") as recorded:
+            if (recorded.getnchannels(), recorded.getsampwidth(), recorded.getframerate()) == (1, 2, 16000):
+                frames = recorded.readframes(recorded.getnframes())
+                with wave.open(str(dst), "wb") as out:
+                    out.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+                    out.writeframes(frames)
+                return True
+    except (wave.Error, EOFError, OSError):
+        pass
     try:
         r = subprocess.run(
             ["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-ac", "1", "-ar", "16000", str(dst)],
@@ -329,37 +349,18 @@ async def voice_clone(body: CloneIn) -> dict[str, Any]:
 
 
 def _concat(clips: list[Path], dst: Path) -> bool:
-    lst = dst.with_suffix(".txt")
-    lst.write_text("".join(f"file '{c.resolve()}'\n" for c in clips))
     try:
-        r = subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-loglevel",
-                "error",
-                "-f",
-                "concat",
-                "-safe",
-                "0",
-                "-i",
-                str(lst),
-                "-ac",
-                "1",
-                "-ar",
-                "16000",
-                str(dst),
-            ],
-            capture_output=True,
-            timeout=60,
-            check=False,
-        )
-        return r.returncode == 0
-    except (OSError, subprocess.TimeoutExpired) as e:
-        print(f"ffmpeg concat: {e}")
+        with wave.open(str(dst), "wb") as output:
+            output.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+            for clip in clips:
+                with wave.open(str(clip), "rb") as source:
+                    if (source.getnchannels(), source.getsampwidth(), source.getframerate()) != (1, 2, 16000):
+                        return False
+                    output.writeframes(source.readframes(source.getnframes()))
+        return True
+    except (OSError, wave.Error, EOFError) as error:
+        print(f"sample concat: {error}")
         return False
-    finally:
-        lst.unlink(missing_ok=True)
 
 
 class PreviewIn(BaseModel):

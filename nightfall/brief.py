@@ -79,8 +79,12 @@ def clothing_line(c: dict[str, Any]) -> str:
     """Human line for the brief; 'see photo' under 0.4 confidence."""
     if c["confidence"] < 0.4:
         return "see photo"
-    parts = [f"{c['top_color']} {c['top_type']}", f"{c['bottom_color']} {c['bottom_type']}", c["footwear"]]
-    return ", ".join(p.replace("unknown ", "").strip() for p in parts)
+    parts = [
+        " ".join(value for value in (c["top_color"], c["top_type"]) if value != "unknown"),
+        " ".join(value for value in (c["bottom_color"], c["bottom_type"]) if value != "unknown"),
+        c["footwear"] if c["footwear"] != "unknown" else "",
+    ]
+    return ", ".join(filter(None, parts)) or "see photo"
 
 
 def mock_clothing() -> dict[str, Any]:
