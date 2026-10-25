@@ -184,11 +184,11 @@ function renderMap() {
     const points = [...(b?.hazards || []).slice(0,6), ...(b?.call_first || []).slice(0,6), ...h.familiar_places];
     if (points.length) mapObj.fitBounds(L.latLngBounds([[h.home.lat,h.home.lng], ...points.map(p=>[p.lat,p.lng])]).pad(.18), {maxZoom:15});
     L.circleMarker([h.home.lat,h.home.lng], {radius:5,color:"#fff",weight:2,fillColor:"#506078",fillOpacity:1}).addTo(mapLayer).bindPopup("Last confirmed at home");
-    const hazards = (b?.hazards || []).slice(0,6), calls = (b?.call_first || []).slice(0,6);
-    [...hazards.map((p,i)=>[p,i+1,"#b52b38"]),...calls.map((p,i)=>[p,hazards.length+i+1,"#23764a"])].forEach(([p,n,color]) => {
-      L.marker([p.lat,p.lng], {icon:L.divIcon({className:"",html:`<div class="pin" style="background:${color}">${n}</div>`,iconSize:[24,24]})}).addTo(mapLayer).bindPopup(esc(p.name));
+    // Pin numbers run highest to lowest priority: hazards to check, then familiar places, then open places to call.
+    const hazards = (b?.hazards || []).slice(0,6), calls = (b?.call_first || []).slice(0,6), familiar = h.familiar_places.filter(p => p.lat != null && p.lng != null);
+    [...hazards.map(p=>[p,"#b52b38"]),...familiar.map(p=>[p,"#245dd6"]),...calls.map(p=>[p,"#23764a"])].forEach(([p,color],i) => {
+      L.marker([p.lat,p.lng], {icon:L.divIcon({className:"",html:`<div class="pin" style="background:${color}">${i+1}</div>`,iconSize:[24,24]})}).addTo(mapLayer).bindPopup(`${i+1} · ${esc(p.name)}`);
     });
-    h.familiar_places.forEach(p=>L.circleMarker([p.lat,p.lng],{radius:7,color:"#fff",weight:2,fillColor:"#245dd6",fillOpacity:1}).addTo(mapLayer).bindPopup(esc(p.name)));
     mapObj._nightfallKey = key;
   }
   setTimeout(()=>mapObj.invalidateSize(),100);
