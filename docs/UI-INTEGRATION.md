@@ -47,7 +47,11 @@ Figma decoration and icons are local under `static/assets/figma/`; recorded imag
 The existing Leaflet version and its license are served locally under `static/vendor/leaflet/`.
 Camera images, map markers, and incident facts remain dynamic. Maps are a search reference, not live tracking.
 
-Photos are stored in ignored `out/profile/`. Household persistence saves the photo URL, relationship, contact order, and familiar places. Invitations open `/app?member=<id>`.
+Photos are stored in ignored `out/profile/`. Household persistence saves the person's name, age, appearance, diagnosis,
+doctor, photo URL, caregiver relationship, contact order, and familiar places to ignored `data/household.live.json`.
+The blank template initializes only a missing live file. Each successful **Save care details** replaces the previous
+details, including cleared fields; restarting loads the latest save. A failed save reports an error and keeps the
+previous file intact. `FRESH_START=0` selects the separate tracked demo household. Invitations open `/app?member=<id>`.
 Recordings use the existing ignored samples directory. The browser submits mono 16 kHz WAV, so recording review/save and concatenation work without FFmpeg. Other uploaded audio formats retain the existing FFmpeg conversion path.
 
 ## API additions
@@ -67,6 +71,9 @@ Signed brief responses include incident state, acknowledgment/responder, server 
 
 Run `./run.sh check` for formatting, lint, and Python tests.
 `tests/test_care.py` covers upload round trips and validation, contact order, invitation reuse, atomic place updates, WAV recording without FFmpeg, mock-only controls, persistence, and acknowledgment versus emergency/return states.
+`tests/test_app.py` covers saving, editing, and clearing the monitored person's details across reloads, photo and contact
+retention, and failed writes preserving the previous saved profile. Browser verification also checks these profile
+edits across three full server-process restarts, using an isolated mock server and the real Save care details button.
 
 Browser checks cover light/dark layouts at 390 px and 320 px, polling during edits, a second phone invitation, consent/record/review/save retry, voice creation retry, voice selection, talk/listen/takeover, both return outcomes, a second caregiver's response, maps, and valid/invalid/expired shared briefs.
 Use an isolated mock server with temporary persistence for household details, photos, recordings, medical data, history, and voice settings.

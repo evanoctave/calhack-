@@ -1,9 +1,14 @@
 import io
+from dataclasses import replace
+from datetime import timedelta
+from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
 
-from nightfall import api, escalation
+from nightfall import api, engine, escalation
+from nightfall.integrations import twilio
+from nightfall.notify import TwilioNotifier
 
 
 @pytest.fixture
@@ -60,6 +65,40 @@ def test_exit_frames_route(client: TestClient) -> None:
     assert r.json()["frame_ids"] == ["FR-0", "FR-1"]
     big = io.BytesIO(b"x" * (200 * 1024 + 1))
     assert client.post(f"/frames/{inc}", files={"f0": ("c.jpg", big, "image/jpeg")}).status_code == 413
+
+
+def test_camera_exit_calls_primary_after_exit_wait(client: TestClient, monkeypatch) -> None:
+    primary = replace(api.store.hh.tree[0], phone="+14155550123")
+    monkeypatch.setattr(api.store, "hh", replace(api.store.hh, tree=(primary,)))
+    monkeypatch.setattr(
+        api.store.runner, "_notifier", TwilioNotifier(api.store.hub, api.store.link, api.PUBLIC_URL, api.store.log)
+    )
+    call = Mock(return_value="CA-test")
+    monkeypatch.setattr(twilio, "create_call", call)
+    monkeypatch.setattr(twilio, "send_sms", Mock(return_value="SM-test"))
+
+    client.post("/event", json={"kind": "person_enter", "payload": {"identity": "match", "direction": "exit"}})
+    lost = client.post("/event", json={"kind": "person_lost", "payload": {"heading": "left"}}).json()
+    assert lost["to"] == "DOOR_OPEN"
+    call.assert_not_called()
+    api.store.inc.door_opened_at -= timedelta(seconds=engine.DOOR_WAIT_S + 1)
+    exited = client.post("/event", json={"kind": "tick"}).json()
+    assert exited["to"] == "ESCALATING"
+
+    async def wait_for_call():
+        import asyncio
+
+        for _ in range(100):
+            if call.called:
+                return
+            await asyncio.sleep(0.01)
+        pytest.fail("Camera exit never reached Twilio")
+
+    client.portal.call(wait_for_call)
+    inc_id = exited["incident_id"]
+    call.assert_called_with(primary.phone, f"{api.PUBLIC_URL}/twiml/{inc_id}/{primary.id}")
+    # Twilio can retrieve the call instructions for the newly created incident.
+    assert client.post(f"/twiml/{inc_id}/{primary.id}").status_code == 200
 
 
 def test_phone_cannot_be_the_door(client: TestClient) -> None:

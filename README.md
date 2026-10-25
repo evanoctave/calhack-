@@ -34,6 +34,12 @@ Built at Cal Hacks 13.0 (UC Berkeley), October 2026.
 Caregiver UI: open `/app`. For the Figma scenario demo, open `/app?demo=1` in mock mode.
 UI screen references, new controls, and verification: [docs/UI-INTEGRATION.md](docs/UI-INTEGRATION.md).
 
+The first launch starts with setup. Your profile and care-circle phone numbers are saved in the gitignored
+`data/household.live.json` and kept across restarts. `FRESH_START=0` selects the tracked demo household instead.
+Use **Who are we monitoring → Save care details** to save the person's profile; later saves replace the previous details.
+For real calls, set `MOCK=0`, the `TWILIO_*` credentials and an HTTPS tunnel base URL in `PUBLIC_URL`, then restart.
+Add your number in the care circle and use **Phone alerts → Test call** to check delivery before testing the camera.
+
 Demo knobs: `DOOR_WAIT_S=5 ESCALATION_STEP_S=10 ./run.sh` shortens the waits.
 
 ## Devices

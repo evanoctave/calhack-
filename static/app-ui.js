@@ -190,7 +190,7 @@ async function saveProfile() {
   const description = {}; ["sex", "height", "weight", "hair", "eyes", "build", "marks"].forEach(k => { description[k] = $("p-" + k).value.trim(); });
   $("profile-status").textContent = "Saving…";
   try {
-    await requestJSON("/profile", {person_full_name: $("p-name").value.trim(), person_name: $("p-short").value.trim(), person_age: $("p-age").value === "" ? undefined : Number($("p-age").value), caregiver_name: $("p-care").value.trim(), caregiver_relationship: $("p-relationship").value.trim(), description, diagnosis: $("p-diag").value.trim(), doctor: {name: $("p-docname").value.trim(), phone: $("p-docphone").value.trim()}});
+    await requestJSON("/profile", {person_full_name: $("p-name").value.trim(), person_name: $("p-short").value.trim(), person_age: $("p-age").value === "" ? 0 : Number($("p-age").value), caregiver_name: $("p-care").value.trim(), caregiver_relationship: $("p-relationship").value.trim(), description, diagnosis: $("p-diag").value.trim(), doctor: {name: $("p-docname").value.trim(), phone: $("p-docphone").value.trim()}});
     careDrafts.delete("s-profile"); await refresh(); $("profile-status").textContent = ""; toast("Care details saved."); go("setup");
   } catch (error) { $("profile-status").textContent = error.message; }
 }

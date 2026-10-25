@@ -8,6 +8,7 @@ import asyncio
 import json
 import os
 import subprocess
+import tempfile
 import time
 import wave
 from dataclasses import replace
@@ -219,6 +220,7 @@ async def profile(body: ProfileIn) -> dict[str, Any]:
 
 def _persist_household(hh: Any) -> None:
     path = ROOT / "data" / household_filename()
+    pending: Path | None = None
     try:
         d = json.loads(path.read_text())
         d.update(
@@ -245,9 +247,19 @@ def _persist_household(hh: Any) -> None:
                 ],
             }
         )
-        path.write_text(json.dumps(d, indent=2) + "\n")
-    except OSError as e:
-        print(f"household not persisted: {e}")
+        # Replace the previous save only after the complete new profile is on disk.
+        with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, prefix=".household-", delete=False) as output:
+            pending = Path(output.name)
+            output.write(json.dumps(d, indent=2) + "\n")
+            output.flush()
+            os.fsync(output.fileno())
+        pending.replace(path)
+    except (OSError, ValueError) as error:
+        print(f"household not persisted: {type(error).__name__}")
+        raise HTTPException(500, "Could not save care details. Please try again.") from None
+    finally:
+        if pending is not None:
+            pending.unlink(missing_ok=True)
 
 
 @router.post("/voice/samples/{kind}")
