@@ -115,7 +115,7 @@ def brief_prose(fields: dict[str, Any]) -> str:
     """Two sentences from structured fields; no new facts. The template is the mock and the fallback."""
     tmpl = (
         f"{fields['person_name']} left home at {fields['last_seen_hhmm']} wearing {fields['clothing_line']}. "
-        f"Check {fields['first_hazard']} first, then call {fields['first_call']}."
+        f"Call {fields['first_call']} first."
     )
     if not anthropic_llm.enabled():
         return tmpl

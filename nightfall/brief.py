@@ -198,7 +198,7 @@ def prose(hh: Household, hhmm: str, line: str) -> str:
     """Two template sentences from fields; the model never adds facts here."""
     return (
         f"{hh.person_name} left home at {hhmm} wearing {line}. "
-        f"Most people are found within {hh.radius_mi:g} miles; check the hazards first, then call the open places."
+        f"Most people are found within {hh.radius_mi:g} miles; call the open places first, then check the familiar places."
     )
 
 

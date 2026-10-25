@@ -21,7 +21,6 @@ async function loadSharedBrief() {
     if (photo && byId("brief-photo").dataset.photo !== photo) { byId("brief-photo").innerHTML = `<img ${photo === "/assets/figma/demo-camera.png" ? 'class="demo-camera"' : ""} src="${esc(photo)}" alt="Last confirmed camera image">`; byId("brief-photo").dataset.photo = photo; }
     byId("brief-state").textContent = b.state === "RETURNED" ? "Return confirmed. Pending family calls cancelled." : b.responder ? b.responder + " is responding. Return is not confirmed." : "Current location unknown.";
     byId("brief-radius").textContent = "Within " + b.home.radius_mi + " mi of home";
-    byId("brief-hazards").innerHTML = briefRows(b.hazards,p=>p.category + " · " + p.distance_mi + " mi");
     byId("brief-calls").innerHTML = nearbyCallRows(b.call_first);
     byId("brief-familiar").innerHTML = briefRows(b.familiar,p=>p.note || p.distance_mi+" mi");
     byId("brief-prose").textContent = b.prose;
@@ -63,14 +62,13 @@ function tickSharedBrief() {
 }
 function renderSharedMap(b) {
   if (!window.L) return;
-  const key=JSON.stringify([b.home,b.hazards,b.call_first,b.familiar]);
+  const key=JSON.stringify([b.home,b.call_first,b.familiar]);
   if (!sharedMap) { sharedMap=L.map("map",{zoomControl:false,zoomAnimation:false,fadeAnimation:false,markerZoomAnimation:false}).setView([b.home.lat,b.home.lng],14); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(sharedMap); }
   if (sharedMap._briefKey === key) return;
   if (sharedLayer) sharedLayer.remove(); sharedLayer=L.layerGroup().addTo(sharedMap);
   const ring=L.circle([b.home.lat,b.home.lng],{radius:b.home.radius_mi*1609.34,color:"#245dd6",weight:1,dashArray:"4 4",fillOpacity:.03}).addTo(sharedLayer);
-  const points=[...b.hazards,...b.call_first,...b.familiar];
+  const points=[...b.call_first,...b.familiar];
   if (points.length) sharedMap.fitBounds(L.latLngBounds([[b.home.lat,b.home.lng],...points.map(p=>[p.lat,p.lng])]).pad(.18),{maxZoom:15});
-  b.hazards.forEach((p,i)=>L.marker([p.lat,p.lng],{icon:L.divIcon({className:"",html:`<div class="pin" style="background:#b52b38">${i+1}</div>`,iconSize:[24,24]})}).addTo(sharedLayer).bindPopup(esc(p.name)));
   [...b.call_first.map(p=>[p,"#23764a"]),...b.familiar.map(p=>[p,"#245dd6"])].forEach(([p,color])=>L.circleMarker([p.lat,p.lng],{radius:7,color:"#fff",weight:2,fillColor:color,fillOpacity:1}).addTo(sharedLayer).bindPopup(esc(p.name)));
   sharedMap._briefKey=key;
 }

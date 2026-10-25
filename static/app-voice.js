@@ -1,4 +1,4 @@
-// Voice samples (hold to record), Cartesia clone, cloned-voice preview, call agent + takeover on the respond screen.
+// Voice samples (hold to record), Cartesia clone, cloned-voice preview, call agent + live talk on the respond screen.
 const SAMPLE_LINES = {introduction: ["Introduction", "Hi Dad. It's Sarah. I'm here with you."], reassurance: ["Reassurance", "Take your time. There's no rush."], everyday: ["Everyday speech", "Let's sit down and have some tea."]};
 let recKind = "", rec = null, chunks = [], recStream = null, speaking = false, listening = false;
 function mime() { return MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : ""; }
@@ -121,7 +121,7 @@ async function previewVoice() {
 let refPlayback = null;
 function playRef(audio, text) { return new Promise(done => { speaking = true; const fin = () => { speaking = false; done(); }; if (audio && audio.url) { const a = new Audio(audio.url); refPlayback = a; a.onended = fin; a.onerror = () => speakThen(text, fin); a.play().catch(() => speakThen(text, fin)); } else speakThen(text, fin); }); }
 function speakThen(text, cb) { if (!text || !("speechSynthesis" in window)) { cb(); return; } const u = new SpeechSynthesisUtterance(text); u.rate = .95; u.onend = cb; u.onerror = cb; speechSynthesis.cancel(); speechSynthesis.speak(u); }
-// respond screen: agent call + takeover
+// respond screen: agent call + say lines
 async function openingLine() { if (!incident) return; const r = await (await fetch("/agent/opening/" + incident + "/" + member)).json(); $("r-say").textContent = r.say; await playRef(r.audio, r.say); if (location.hash === "#call") listenOnce(); }
 async function sendTurn(text) { const r = await post("/agent/turn", {incident_id: incident, member_id: member, text}); $("r-say").textContent = r.say; await playRef(r.audio, r.say); if (r.ack) refresh(); else if (!r.done && location.hash === "#call") listenOnce(); }
 let agentRecognition = null;
@@ -129,14 +129,7 @@ function stopAgentCall() { if (refPlayback) { refPlayback.pause(); refPlayback =
 function listenOnce() { const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) { $("r-sub").textContent = "Voice questions unavailable here. Type your question below."; return; } if (listening || speaking) return; const r = new SR(); agentRecognition = r; r.lang = "en-US"; listening = true; $("r-listen").textContent = "Listening…";
   r.onresult = ev => { listening = false; sendTurn(ev.results[0][0].transcript); }; r.onend = () => { listening = false; $("r-listen").textContent = "Tap, then speak"; }; r.onerror = () => { listening = false; }; try { r.start(); } catch (e) { listening = false; } }
 async function askTyped() { const t = $("r-ask").value.trim(); if (t) { $("r-ask").value = ""; sendTurn(t); } }
-async function toggleTakeover() { const on = !(S && S.takeover_by === member); if (!on && Live.on) liveStop(); await post("/takeover", {member_id: member, on}); $("r-tobtn").textContent = on ? "Hand back to Nightfall" : "Take over the voice";
-  if ($("tk-eyebrow")) { $("tk-eyebrow").textContent = meName() + " is speaking"; $("tk-who").textContent = meName() + " took over the voice at the door"; } await refresh(); go(on ? "takeover" : "talk"); }
-async function sayText(t) { try { await requestJSON("/say", {member_id: member, text: t}); $("r-pttstat").textContent = "Message sent to the door."; toast("Message sent to the door."); } catch (error) { toast(error.message); } }
-async function sayTyped() { const t = $("r-text").value.trim(); if (t) { $("r-text").value = ""; sayText(t); } }
-function pttTap(ev) { ev.preventDefault(); recToggle($("r-ptt"), $("r-pttstat"), async (blob, type) => {
-  $("r-pttstat").textContent = "Sending…"; const fd = new FormData(); fd.append("member_id", member); fd.append("clip", blob, type.includes("mp4") ? "clip.mp4" : "clip.webm");
-  const r = await fetch("/say/clip", {method: "POST", body: fd}); const j = await r.json().catch(() => ({}));
-  $("r-pttstat").textContent = r.ok ? "Your voice is playing at the door (" + Math.round(blob.size / 1024) + " KB)." : "Clip failed: " + (j.detail || r.status); }); }
+async function sayText(t) { try { await requestJSON("/say", {member_id: member, text: t}); toast("Message sent to the door."); } catch (error) { toast(error.message); } }
 // Live voice: mic -> 16 kHz Int16 PCM -> WebSocket -> door speaker on the laptop. Tap to go live, tap to stop.
 const Live = {ws: null, ctx: null, src: null, proc: null, on: false, sent: 0};
 async function liveToggle(btnId, statId) {
@@ -145,7 +138,7 @@ async function liveToggle(btnId, statId) {
   btn.dataset.idle = btn.dataset.idle || btn.textContent;
   let stream; try { stream = await micStream(); } catch (e) { stat.textContent = "Microphone blocked. Allow the mic for this site."; return; }
   const proto = location.protocol === "https:" ? "wss" : "ws"; const ws = new WebSocket(`${proto}://${location.host}/ws/talk/${member}`); ws.binaryType = "arraybuffer";
-  ws.onopen = () => { Live.on = true; btn.classList.add("on"); btn.textContent = "Mic on · tap to stop"; stat.textContent = "You are live at the door. Speak normally."; if ($("r-takeover")) { $("r-takeover").hidden = false; $("r-tobtn").textContent = "Hand back to the AI"; } };
+  ws.onopen = () => { Live.on = true; btn.classList.add("on"); btn.textContent = "Mic on · tap to stop"; stat.textContent = "You are live at the door. Speak normally."; };
   ws.onclose = () => { if (Live.on) { liveStop(); btn.classList.remove("on"); btn.textContent = btn.dataset.idle || "Talk through the door"; stat.textContent = "Connection dropped. Tap to talk again."; } };
   ws.onerror = () => { stat.textContent = "Could not open the live channel."; };
   Live.ws = ws; Live.ctx = new (window.AudioContext || window.webkitAudioContext)(); await Live.ctx.resume();
@@ -160,19 +153,6 @@ async function liveToggle(btnId, statId) {
   Live.src.connect(Live.proc); Live.proc.connect(Live.ctx.destination);
 }
 function liveStop() { Live.on = false; try { Live.proc && Live.proc.disconnect(); Live.src && Live.src.disconnect(); } catch (e) {} try { Live.ws && Live.ws.close(); } catch (e) {} Live.ws = null; Live.sent = 0; Live.ctx?.close(); Live.ctx = null; Recorder.stream?.getTracks().forEach(track=>track.stop()); Recorder.stream = null; }
-
-// Listen: door microphone -> this phone (PCM over /ws/listen), scheduled with a small jitter buffer.
-const Listen = {ws: null, ctx: null, t: 0, on: false, btn: null};
-function listenToggle(btnId) {
-  const btn = $(btnId);
-  if (Listen.on) { listenStop(); btn.classList.remove("on"); btn.textContent = "Listen"; return; }
-  Listen.ctx = Listen.ctx || new (window.AudioContext || window.webkitAudioContext)({sampleRate: 16000}); Listen.ctx.resume();
-  const proto = location.protocol === "https:" ? "wss" : "ws"; const ws = new WebSocket(`${proto}://${location.host}/ws/listen/${member}`); ws.binaryType = "arraybuffer"; Listen.ws = ws; Listen.btn = btn;
-  ws.onopen = () => { Listen.on = true; btn.classList.add("on"); btn.textContent = "Listening · tap to stop"; };
-  ws.onmessage = ev => { if (typeof ev.data === "string" || !Listen.on || !Listen.ctx) return; const pcm = new Int16Array(ev.data), buf = Listen.ctx.createBuffer(1, pcm.length, 16000), ch = buf.getChannelData(0); for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768; const src = Listen.ctx.createBufferSource(); src.buffer = buf; src.connect(Listen.ctx.destination); const now = Listen.ctx.currentTime; if (Listen.t < now + 0.05) Listen.t = now + 0.15; src.start(Listen.t); Listen.t += buf.duration; };
-  ws.onclose = () => { if (Listen.on) { Listen.on = false; btn.classList.remove("on"); btn.textContent = "Listen"; } };
-}
-function listenStop() { Listen.on = false; try { Listen.ws && Listen.ws.close(); } catch (e) {} Listen.ws = null; Listen.ctx?.close(); Listen.ctx = null; Listen.t = 0; if (Listen.btn) { Listen.btn.classList.remove("on"); Listen.btn.textContent = "Listen"; } }
 
 // Live video from the door (JPEG frames over /ws/video). Paints into every element with class "feed-live".
 const Feed = {ws: null, on: false, url: null, frames: 0, lastAt: 0, poll: null};

@@ -2,7 +2,7 @@
 let S = null, member = "", incident = null, feedTimer = null, mapObj = null, mapLayer = null, soundOn = false, acked = false;
 function $(id) { return document.getElementById(id); }
 function go(name) { location.hash = "#" + name; }
-const SCREENS = ["setup", "profile", "medical", "report", "missing", "voice", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "takeover", "brief", "search", "responding", "back", "emergency", "help", "record", "review", "creating", "voice-preview", "join"];
+const SCREENS = ["setup", "profile", "medical", "report", "missing", "voice", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "brief", "search", "responding", "back", "help", "record", "review", "creating", "voice-preview", "join"];
 const navStack = [];
 // An invitation link (/app?member=ID) opens the family view: alerts, the door and the report, but not the care setup.
 const FAMILY_VIEW = new URLSearchParams(location.search).has("member");
@@ -11,9 +11,8 @@ document.documentElement.dataset.role = FAMILY_VIEW ? "family" : "owner";
 function show(name) {
   if (name === "respond") name = "call";
   if (name !== "call" && typeof stopAgentCall === "function") stopAgentCall();
-  if (!["record","takeover"].includes(name) && typeof Recorder !== "undefined" && Recorder.rec?.state === "recording") { Recorder.rec._discard = true; Recorder.rec.stop(); releaseSampleMic(); }
-  if (!["talk","takeover"].includes(name) && typeof Listen !== "undefined" && Listen.on) listenStop();
-  if (!["talk","takeover"].includes(name) && typeof Live !== "undefined" && Live.on) { liveStop(); $("r-live").classList.remove("on"); $("r-live").textContent = "Talk live"; }
+  if (name !== "record" && typeof Recorder !== "undefined" && Recorder.rec?.state === "recording") { Recorder.rec._discard = true; Recorder.rec.stop(); releaseSampleMic(); }
+  if (name !== "talk" && typeof Live !== "undefined" && Live.on) { liveStop(); $("r-live").classList.remove("on"); $("r-live").textContent = "Talk live"; }
   if (!SCREENS.includes(name) || (FAMILY_VIEW && OWNER_ONLY.includes(name))) name = "home";
   if (location.hash.slice(1) !== name && name === "home") history.replaceState(null, "", "#home");
   // direction for the slide: back if this is the screen before the current one, none on first paint
@@ -115,7 +114,7 @@ function render() {
   $("b-wear2").textContent = c && !pending && c.confidence >= 0.4 ? [c.bottom_color, c.bottom_type, c.footwear].filter(value=>value && value !== "unknown").join(" ") : "";
   $("b-backup").textContent = (h.tree.find(m => m.id !== member) || h.tree[0] || {}).name || "—";
   $("b-conf").textContent = c && !pending && c.source !== "mock" ? `Clothing is AI-described (${Math.round(c.confidence * 100)}% confidence). Verify against the image.` : c?.source === "mock" ? "Demo description · Check the photo." : "Clothing is AI-described. Verify against the image.";
-  acked = !!(inc && inc.acked_by); $("b-respond").hidden = acked || !inc || inc.state === "RETURNED"; $("b-responding").hidden = !acked; $("b-response-status").hidden = !acked;
+  acked = !!(inc && inc.acked_by); $("b-respond").hidden = acked || !inc || inc.state === "RETURNED"; $("b-responding").hidden = !acked;
   if (acked) $("b-responding").querySelector(".title").textContent = inc.acked_by_name + " is responding";
   // search
   $("sr-radius").textContent = "Reference search area · " + h.radius_mi + "-mile radius"; $("sr-src").textContent = S.places_source === "apify" ? "Live data" : "Demo";
@@ -158,7 +157,7 @@ async function loadEnrolled() { try { const f = (await (await fetch("/enroll")).
 function startHomeFeed() { feedStart(); }
 let visFeed = null;
 function showVisitor(said) { $("vis-said").textContent = said || ""; $("visitor").hidden = false; feedStart(); }
-function hideVisitor() { $("visitor").hidden = true; if (visFeed) { clearInterval(visFeed); visFeed = null; } if (Listen.on) listenStop(); }
+function hideVisitor() { $("visitor").hidden = true; if (visFeed) { clearInterval(visFeed); visFeed = null; } }
 function dismissVisitor() { $("visitor").dataset.dismissed = "1"; hideVisitor(); setTimeout(() => { delete $("visitor").dataset.dismissed; }, 120000); }
 function chime() { try { const c = new (window.AudioContext || window.webkitAudioContext)(); const t = c.currentTime; [[659, 0], [523, 0.35]].forEach(([f, d]) => { const o = c.createOscillator(), g = c.createGain(); o.frequency.value = f; g.gain.setValueAtTime(0.25, t + d); g.gain.exponentialRampToValueAtTime(0.001, t + d + 0.6); o.connect(g); g.connect(c.destination); o.start(t + d); o.stop(t + d + 0.6); }); } catch (e) {} if (navigator.vibrate) navigator.vibrate(200); }
 function cap(s) { s = s.replace(/unknown ?/g, "").trim(); return s ? s[0].toUpperCase() + s.slice(1) : "See photo"; }
@@ -169,7 +168,6 @@ async function loadBrief(link) {
   const r = await fetch("/brief/" + link.split("#")[1]); if (!r.ok) { briefLoaded = ""; return; }
   const b = await r.json(); if (b.incident_id !== incident) return; window.B = b; renderBriefCards();
   $("sr-fam").innerHTML = b.familiar.map(p => `<div class="row"><div><span class="k">${esc(p.name)}</span><span class="sub2">${p.distance_mi} mi · family-provided</span></div></div>`).join("");
-  $("sr-haz").innerHTML = b.hazards.slice(0, 5).map(p => `<div class="row"><span class="k">${esc(p.name)}</span><span class="v danger">${p.distance_mi} mi</span></div>`).join("") || '<div class="row"><span class="muted">none in radius</span></div>';
   $("sr-call").innerHTML = nearbyCallRows(b.call_first);
   if ($("s-search").classList.contains("on")) renderMap();
 }
@@ -178,18 +176,18 @@ function renderMap() {
   if (!window.L || !S) return;
   const h = S.household, b = window.B;
   if (!mapObj) { mapObj = L.map("map", {zoomControl: false, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false}).setView([h.home.lat,h.home.lng],14); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution: '© OpenStreetMap'}).addTo(mapObj); }
-  const key = JSON.stringify([h.home, h.radius_mi, b?.hazards, b?.call_first, h.familiar_places]);
+  const key = JSON.stringify([h.home, h.radius_mi, b?.call_first, h.familiar_places]);
   if (mapObj._nightfallKey !== key) {
     if (mapLayer) mapLayer.remove(); mapLayer = L.layerGroup().addTo(mapObj);
     const ring = L.circle([h.home.lat,h.home.lng], {radius:h.radius_mi*1609.34,color:"#245dd6",weight:1,dashArray:"4 4",fillOpacity:.03}).addTo(mapLayer);
-    const points = [...(b?.hazards || []).slice(0,6), ...(b?.call_first || []).slice(0,6), ...h.familiar_places];
+    const points = [...(b?.call_first || []).slice(0,6), ...h.familiar_places];
     if (points.length) mapObj.fitBounds(L.latLngBounds([[h.home.lat,h.home.lng], ...points.map(p=>[p.lat,p.lng])]).pad(.18), {maxZoom:15});
     L.circleMarker([h.home.lat,h.home.lng], {radius:5,color:"#fff",weight:2,fillColor:"#506078",fillOpacity:1}).addTo(mapLayer).bindPopup("Last confirmed at home");
-    const hazards = (b?.hazards || []).slice(0,6), calls = (b?.call_first || []).slice(0,6);
-    [...hazards.map((p,i)=>[p,i+1,"#b52b38"]),...calls.map((p,i)=>[p,hazards.length+i+1,"#23764a"])].forEach(([p,n,color]) => {
-      L.marker([p.lat,p.lng], {icon:L.divIcon({className:"",html:`<div class="pin" style="background:${color}">${n}</div>`,iconSize:[24,24]})}).addTo(mapLayer).bindPopup(esc(p.name));
+    // Pin numbers run highest to lowest priority: familiar places first, then open places to call.
+    const calls = (b?.call_first || []).slice(0,6), familiar = h.familiar_places.filter(p => p.lat != null && p.lng != null);
+    [...familiar.map(p=>[p,"#245dd6"]),...calls.map(p=>[p,"#23764a"])].forEach(([p,color],i) => {
+      L.marker([p.lat,p.lng], {icon:L.divIcon({className:"",html:`<div class="pin" style="background:${color}">${i+1}</div>`,iconSize:[24,24]})}).addTo(mapLayer).bindPopup(`${i+1} · ${esc(p.name)}`);
     });
-    h.familiar_places.forEach(p=>L.circleMarker([p.lat,p.lng],{radius:7,color:"#fff",weight:2,fillColor:"#245dd6",fillOpacity:1}).addTo(mapLayer).bindPopup(esc(p.name)));
     mapObj._nightfallKey = key;
   }
   setTimeout(()=>mapObj.invalidateSize(),100);
@@ -328,12 +326,11 @@ function renderFigma() {
   // brief + search
   $("b-name").textContent = inc?.exited_at ? p + " left home" : "No active alert"; $("b-seen").textContent = "Last seen " + (inc && inc.exited_at ? hhmm(inc.exited_at) : "—") + " · Front entrance";
   $("b-radius").textContent = "Within " + h.radius_mi + " mi of home"; $("sr-radius").textContent = h.radius_mi + " mi around home";
-  if (window.B && window.B.hazards[0]) $("b-first").textContent = window.B.hazards[0].name;
   const dl = inc && inc.deadline_at ? (new Date(inc.deadline_at).getTime() - (Date.now() + serverOffset)) / 1000 : null;
   $("sr-rec").hidden = dl === null || !!inc?.emergency?.recommendation_due; if (dl !== null) $("sr-rect").textContent = "Emergency recommendation in " + mmss(dl);
   // responding, help, emergency
   const responder = inc?.acked_by_name || me; $("rs-who").textContent = responder + " · Responding"; $("rs-stopped").textContent = "Other care-circle calls stopped.";
-  $("rs-return").textContent = inc && inc.state === "RETURNED" ? p + " is back inside." : p + "'s return is not yet confirmed.";
+  $("rs-return").textContent = $("b-return").textContent = inc && inc.state === "RETURNED" ? p + " is back inside." : p + "'s return is not yet confirmed.";
   $("hp-who").textContent = tree.map(m => m.name).join(" · ");
   if (inc && inc.exited_at) { const since = (Date.now() + serverOffset - new Date(inc.exited_at).getTime()) / 1000, late = !!inc.emergency?.recommendation_due;
     $("em-clock").textContent = mmss(since); $("em-sub").textContent = (since < 120 ? Math.round(since) + " seconds" : Math.round(since / 60) + " minutes") + " since the confirmed exit";
@@ -346,12 +343,12 @@ function autoRoute() {
   const inc = S.incident; const key = inc ? [inc.id, inc.state, inc.acked_by || "", S.call_911 ? 1 : 0].join("|") : "none";
   if (key === routeKey) return; const prev = routeKey; routeKey = key; if (!prev) return;  // first load: stay where the user is
   if (!inc || inc.state === "CLOSED") return;
-  const here = location.hash.slice(1) || "home", busy = (here === "home" && homeIncident === inc.id) || ["talk", "takeover", "call", "brief", "search", "profile", "medical", "record", "review", "creating"].includes(here);
-  if (S.call_911 && !prev.endsWith("|1") && !["RETURNED","CLOSED"].includes(inc.state)) { toast("Emergency call option available."); if (!busy && !["RETURNED","CLOSED"].includes(inc.state)) go("emergency"); return; }
+  const here = location.hash.slice(1) || "home", busy = (here === "home" && homeIncident === inc.id) || ["talk", "call", "brief", "search", "profile", "medical", "record", "review", "creating"].includes(here);
+  if (S.call_911 && !prev.endsWith("|1") && !["RETURNED","CLOSED"].includes(inc.state)) { toast("Emergency call option available."); if (!busy && !["RETURNED","CLOSED"].includes(inc.state)) go("brief"); return; }
   if (inc.state === "CONVERSATION" && !busy) go("door");
   else if (inc.state === "DOOR_OPEN" && !busy) go("wait");
   else if (["ESCALATING", "EXHAUSTED"].includes(inc.state) && !inc.acked_by && !busy && ["door", "wait", "home", "back"].includes(here)) go("alert");
-  else if (inc.state === "RETURNED" && inc.checkin !== "self_other" && !(here === "home" && homeIncident === inc.id) && !["talk", "takeover"].includes(here)) go("back");
+  else if (inc.state === "RETURNED" && inc.checkin !== "self_other" && !(here === "home" && homeIncident === inc.id) && here !== "talk") go("back");
   else if (inc.acked_by && inc.acked_by === member && !busy) go("responding");
   else if (inc.acked_by && inc.acked_by !== member && !busy) go("alert");
 
@@ -359,7 +356,7 @@ function autoRoute() {
 function syncEdge() { const v = $("h-edge").value || "far"; document.querySelectorAll("#cam-edge button").forEach(b => b.classList.toggle("on", b.dataset.e === v)); }
 function endCall() { try { stopAgentCall(); } catch (e) {} go(S && S.incident && S.incident.acked_by === member ? "responding" : "alert"); }
 let areaMap = null, areaLayer = null, areaPoll = null, pickRadius = null, areaSearching = false;
-const RADII = [0.5, 1, 1.5, 2, 3], HAZ_LABEL = {water: "Water", rail: "Rail line", motorway: "Highway", construction: "Construction"};
+const RADII = [0.5, 1, 1.5, 2, 3];
 function renderRadius(cur) {
   const el = $("pl-rad"); if (el.dataset.cur === String(cur)) return; el.dataset.cur = String(cur);
   el.innerHTML = RADII.map(r => `<button type="button" class="${r === cur ? "on" : ""}" onclick="pickRadius = ${r}; render()">${r} mi</button>`).join("");
@@ -374,7 +371,7 @@ async function findPlaces() {
   try {
     await requestJSON("/setup/address",{address,radius_mi:pickRadius ?? S.household.radius_mi,google:true});
     await requestJSON("/profile",{}); pickRadius = null; careDrafts.delete("s-places"); areaSearching = false; await refresh();
-    const update = async()=>{ const status = await requestJSON("/setup/status",undefined,"GET"); await renderArea(status); const mapping = ""; if (status.apify !== "running" && !status.hazards_pending) { clearInterval(areaPoll); $("ar-status").textContent = status.apify === "done" ? "Nearby places are ready." : "Open-late places are unavailable; try again later."; } else if (status.apify === "running") $("ar-status").textContent = "Finding places open late…" + mapping; else $("ar-status").textContent = "Nearby places are ready." + mapping; };
+    const update = async()=>{ const status = await requestJSON("/setup/status",undefined,"GET"); await renderArea(status); const mapping = ""; if (status.apify !== "running") { clearInterval(areaPoll); $("ar-status").textContent = status.apify === "done" ? "Nearby places are ready." : "Open-late places are unavailable; try again later."; } else if (status.apify === "running") $("ar-status").textContent = "Finding places open late…" + mapping; else $("ar-status").textContent = "Nearby places are ready." + mapping; };
     areaPoll = setInterval(()=>update().catch(()=>{ $("ar-status").textContent="Search interrupted. Go back and try again."; clearInterval(areaPoll); }),2000); await update();
   } catch(error) { areaSearching = false; $("ar-status").textContent = "Search unavailable: " + error.message; }
 }
@@ -383,10 +380,8 @@ async function renderArea(st) {
   if (!areaMap) { areaMap = L.map("area-map", {zoomControl: false, attributionControl: true, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false}).setView([home.lat,home.lng],14); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution:"© OpenStreetMap"}).addTo(areaMap); }
   if (areaLayer) areaLayer.remove(); areaLayer = L.layerGroup().addTo(areaMap); const ring = L.circle([home.lat, home.lng], {radius: home.radius_mi * 1609.34, color: "#245dd6", weight: 1, dashArray: "4 4", fillOpacity: .04}).addTo(areaLayer);
   areaMap.setView([home.lat, home.lng], 14); areaMap.fitBounds(ring.getBounds(), {padding: [8, 8]});
-  const hz = st.hazards_ranked || [], open = st.call_first || [];
-  hz.slice(0, 6).forEach((x, i) => L.marker([x.lat, x.lng], {icon: L.divIcon({className: "", html: `<div class="pin" style="background:#b52b38">${i + 1}</div>`, iconSize: [22, 22]})}).addTo(areaLayer));
+  const open = st.call_first || [];
   open.slice(0, 10).forEach(x => L.circleMarker([x.lat, x.lng], {radius: 6, color: "#fff", weight: 2, fillColor: "#23764a", fillOpacity: 1}).addTo(areaLayer));
-  $("ar-hazlist").innerHTML = placeRows(hz.slice(0, 8), st.apify === "running" ? "Still searching with Apify…" : "No water, rail, highways or construction found in this radius", x => HAZ_LABEL[x.category] || x.category);
   $("ar-calllist").innerHTML = placeRows(open.slice(0, 6), st.apify === "running" ? "Still searching with Apify…" : "No late-night places found yet", x => cap(x.category) + (x.hours ? " · " + x.hours : "") + (x.phone ? " · " + x.phone : ""));
-  $("ar-haz").textContent = hz.length; $("ar-call").textContent = st.open || open.length; setTimeout(() => areaMap.invalidateSize(), 100);
+  $("ar-call").textContent = st.open || open.length; setTimeout(() => areaMap.invalidateSize(), 100);
 }

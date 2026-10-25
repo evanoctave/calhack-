@@ -140,10 +140,8 @@
 <section id="s-area" class="screen">
   <header class="head"><a class="back" onclick="go('places')">Home and places</a><h1>Know the area first</h1><p class="sub" id="ar-sub">Your home · 1.5 mi around home</p></header>
   <div id="area-map"></div>
-  <div class="card"><div class="row" hidden><div><span class="k">Places to check first</span><span class="sub2">Water, rail, highways, construction</span></div><span class="v blue" id="ar-haz">0</span></div>
-    <div class="row"><div><span class="k">Places to call</span><span class="sub2">Open late or open now</span></div><span class="v blue" id="ar-call">0</span></div></div>
+  <div class="card"><div class="row"><div><span class="k">Places to call</span><span class="sub2">Open late or open now</span></div><span class="v blue" id="ar-call">0</span></div></div>
   <p class="label" hidden>Dangerous places, nearest first</p>
-  <div class="card" id="ar-hazlist" hidden><div class="row"><span class="muted">Searching…</span></div></div>
   <p class="label">Open late nearby</p>
   <div class="card" id="ar-calllist"><div class="row"><span class="muted">Searching…</span></div></div>
   <p class="cap">Familiar places stay separate from nearby risks. This map is a search reference.</p>
@@ -170,17 +168,16 @@
 <section id="s-home" class="screen">
   <header class="head"><a class="back owner-only" onclick="if (navStack.length > 1) history.back(); else go('setup')">Back</a><p class="eyebrow" id="h-greet">Good evening</p><h1 id="h-title">Night watch is on</h1></header>
   <div id="h-notice" class="card pad ok" hidden><p class="title green" id="h-noticet">Back inside</p><p class="body" id="h-notices"></p></div>
-  <div id="h-active-search" class="card pad alarm" hidden><p class="title">Search still active</p><p class="body" id="h-search-status"></p><button class="btn mt" onclick="openBrief()">Reopen search brief</button><button class="text-btn" data-confirm-return onclick="confirmPersonHome()">Confirm back home</button></div>
+  <div id="h-active-search" class="card pad alarm" hidden><p class="title">Search still active</p><p class="body" id="h-search-status"></p><button class="btn mt" onclick="openBrief()">Search Brief</button></div>
   <div id="h-cd" class="banner" hidden><b id="h-cdt">Out of view</b><div id="h-cds" class="small"></div></div>
   <div class="media"><img id="h-feed" class="feed-live" alt="Front door camera" style="display:none"><div class="ph" id="h-door"></div></div>
   <p class="media-cap"><span id="h-cam">Front entrance</span> · <span id="h-feedcap">Waiting for camera</span></p>
   <div class="card pad"><p class="title green" id="h-watch">Watching over Dad</p><p class="body" id="h-event">No exit detected.</p><span id="h-camstat" hidden></span><span id="h-last" hidden></span><span id="h-voice" hidden></span><span id="h-tree" hidden></span></div>
-  <button class="btn" onclick="go('missing')">Report missing</button>
-  <button class="btn owner-only" onclick="go('setup')">Care settings</button>
+  <button class="btn" id="h-report-missing" onclick="go('missing')">Report missing</button>
   <div class="ready-line" id="h-readiness"></div>
-  <details class="disclosure"><summary>Tonight &amp; morning report</summary><div><button class="btn" onclick="go('report')">Morning report</button><span class="cap" id="h-report">How last night went</span><button class="text-btn" onclick="go('talk')">Open door camera and talk</button></div></details>
+  <details class="disclosure"><summary>Setup &amp; report</summary><div><button class="btn" onclick="go('report')">Morning report</button><button class="btn owner-only mt" onclick="go('setup')">Back to setup</button></div></details>
   <p class="cap demo-only" id="h-demo"></p>
-  <div class="actions"><button class="btn primary demo-only" onclick="testAlert()">Try the night scenario</button><button class="btn demo-only" onclick="document.getElementById('scenarios').showModal()">Other scenarios</button><button class="btn primary" id="home-live-action" onclick="go('talk')">Open door camera</button></div>
+  <div class="actions"><button class="btn primary demo-only" onclick="testAlert()">Try the night scenario</button><button class="btn demo-only" onclick="document.getElementById('scenarios').showModal()">Other scenarios</button><button class="btn primary" id="home-live-action" onclick="go('talk')">Talk to camera</button></div>
 </section>
 
 <section id="s-missing" class="screen">
@@ -261,23 +258,12 @@
   <header class="head"><a class="back" onclick="backToApp()">Back</a><p class="eyebrow caps">Door camera</p><h1>Talk to Dad at the door</h1><p class="sub">See the entrance and speak through its speaker.</p></header>
   <div class="media"><img id="r-feed" class="feed-live" alt="Live door camera" style="display:none"><div class="ph"></div></div>
   <p class="media-cap" id="r-feedcap">Live camera at the door</p>
-  <div class="card pad"><div class="pair"><button class="rec" id="r-live" onclick="liveToggle('r-live','r-livestat')">Talk live</button><button class="rec" id="t-listen" onclick="listenToggle('t-listen')">Listen</button></div>
-    <button class="btn mt" id="r-tobtn" onclick="toggleTakeover()">Take over the voice</button><p class="cap mt" id="r-livestat">Talk plays your voice at the door. Listen brings the door's microphone here.</p></div>
+  <div class="card pad"><button class="rec" id="r-live" onclick="liveToggle('r-live','r-livestat')">Talk live</button>
+    <p class="cap mt" id="r-livestat">Talk plays your voice at the door and pauses Nightfall's automatic speech until you stop.</p></div>
   <div class="card pad"><p class="k" style="font-weight:600;margin:0 0 6px">Say in the family AI voice</p>
     <div class="chips"><span class="chip" onclick="sayText(this.textContent)">Hi Dad, I'm here.</span><span class="chip" onclick="sayText(this.textContent)">Please come back inside.</span><span class="chip" onclick="sayText(this.textContent)">Let's sit down together.</span></div></div>
   <span id="r-tostat" hidden></span>
   <div class="actions"><button class="btn primary" onclick="backToApp()">Back</button></div>
-</section>
-
-<section id="s-takeover" class="screen">
-  <header class="head"><p class="eyebrow caps" id="tk-eyebrow">Sarah is speaking</p><h1>You have the door voice</h1><p class="sub">Nightfall's automatic speech is paused.</p></header>
-  <div id="r-takeover">
-    <div class="card pad"><p class="title" id="tk-who">Sarah took over the voice at the door</p><p class="body">You can type a phrase or send your own voice.</p></div>
-    <div class="card pad mt"><p class="k" style="font-weight:600;margin:0">Say in the family voice</p><input id="r-text" class="mt" value="Dad, I'm here. Please wait by the door."><button class="btn primary mt" onclick="sayTyped()">Speak this phrase</button></div>
-    <button class="rec mt" id="r-ptt" onclick="pttTap(event)">Record a message</button>
-    <p class="cap mt" id="r-pttstat">Tap to record your real voice. Tap again to send it to the door speaker.</p>
-  </div>
-  <div class="actions"><button class="btn" onclick="toggleTakeover()">Hand back to Nightfall</button><button class="btn primary" onclick="go('talk')">Back to the camera</button></div>
 </section>
 
 <section id="s-brief" class="screen">
@@ -286,15 +272,16 @@
   <div class="who"><div class="media" id="b-hero"><div class="ph"></div></div><div><p class="title" style="font:600 18px/25px var(--font);margin:0" id="b-wear">See photo</p><p class="cap" id="b-wear2"></p><p class="cap" id="b-conf">AI-described · Check the photo.</p></div></div>
   <div><p class="title" style="font:600 20px/27px var(--font);margin:0">Where to look first</p><p class="cap" id="b-radius">Within 1.5 mi of home</p></div>
   <div id="map"></div>
-  <div class="legend"><span><img src="/assets/figma/legend-hazard.svg" alt="">Hazards</span><span><img src="/assets/figma/legend-call.svg" alt="">Call first</span><span><img src="/assets/figma/legend-familiar.svg" alt="">Familiar</span></div>
+  <div class="legend"><span><img src="/assets/figma/legend-familiar.svg" alt="">Familiar</span><span><img src="/assets/figma/legend-call.svg" alt="">Call first</span></div><p class="cap">Pins are numbered from highest to lowest priority.</p>
   <p class="credit" id="b-source">Nearby places</p>
   <p class="cap">Nearby places, not Dad's live location.</p>
-  <div class="card brief-check"><div class="row"><div><span class="sub2" style="margin:0">Check first</span><span class="k" id="b-first">Finding nearby hazards…</span><span class="sub2" id="b-first-detail"></span></div></div></div><p class="label">Nearby open places &amp; phone numbers</p><div class="card" id="b-open-places"></div><button class="btn" onclick="go('search')">More places &amp; care notes</button><button class="btn" onclick="go('emergency')">Emergency options</button>
+  <p class="label">Nearby open places &amp; phone numbers</p><div class="card" id="b-open-places"></div><button class="btn" onclick="go('search')">More places &amp; care notes</button>
+  <div class="card pad alarm"><p class="eyebrow red caps"><img class="status-icon" src="/assets/figma/alert.svg" alt=""><span id="em-tag">Emergency option available</span></p><p class="title" id="em-title">Need emergency help?</p><p class="cap" id="em-sub">Since the confirmed exit</p><p class="big-num red" id="em-clock">00:45</p><p class="body" id="em-line">You can choose to call 911 now.</p><p class="body">You decide. Nightfall does not call 911 on its own.</p><a class="btn danger mt" href="tel:911">Call 911</a><button class="btn demo-only mt" onclick="runDemo('deadline')">Demo · 15 minutes pass</button></div>
   <details class="disclosure"><summary>Read this to the dispatcher</summary><div><p class="mt" id="b-police" style="margin-bottom:0"></p>
     <div class="inline mt"><button class="btn small" onclick="copyPolice()">Copy</button><a class="btn small" href="tel:911" style="color:var(--red)">Call 911</a><span class="cap" id="b-copied"></span></div></div></details>
   <p class="cap">Backup contact: <span id="b-backup">Mike</span></p>
-  <div id="b-responding" class="card pad ok" hidden><p class="title green">You're on it</p><p class="body">Other phones stopped ringing.</p></div>
-  <div class="actions"><button class="btn primary" id="b-respond" onclick="acknowledgeIncident()">I’m on it</button><button class="btn" id="b-response-status" onclick="go('responding')" hidden>View response status</button><button class="btn" id="b-confirm-return" data-confirm-return onclick="confirmPersonHome()" hidden>Confirm back home</button><button class="btn" onclick="backToNightWatch()">Back to night watch</button></div>
+  <div id="b-responding" class="card pad ok" hidden><p class="title green">You're on it</p><p class="body">Other phones stopped ringing.</p><p class="body" id="b-return">Return not yet confirmed.</p></div>
+  <div class="actions"><button class="btn primary" id="b-respond" onclick="acknowledgeIncident()">I’m on it</button><button class="btn ok" id="b-confirm-return" data-confirm-return onclick="confirmPersonHome()" hidden>Confirm back home</button></div>
 </section>
 
 <section id="s-search" class="screen">
@@ -302,7 +289,6 @@
   <div class="card pad alarm" id="sr-rec"><p class="title red" style="font-size:16px" id="sr-rect">Emergency recommendation in 12:40</p><p class="body">You can choose to call 911 sooner.</p></div>
   <div id="sr-911" class="banner" hidden>Out of view and not found. <a href="tel:911" style="color:inherit;text-decoration:underline">Call 911</a>. You decide; Nightfall never dials.</div>
   <p class="cap" id="sr-last">Last confirmed at home · 2:03 AM</p>
-  <p class="label">Check first</p><div class="card" id="sr-haz"></div>
   <p class="label">Familiar places</p><div class="card" id="sr-fam"></div>
   <p class="label">Call first · open now</p><div class="card" id="sr-call"></div>
   <p class="label">Wander history</p><div class="card" id="sr-history"></div>
@@ -316,7 +302,7 @@
   <header class="head"><p class="eyebrow caps">Response confirmed</p><h1>You're on it.</h1><p class="sub">Other phones stopped ringing.</p></header>
   <div class="card pad ok"><p class="title green" style="font-size:23px;line-height:32px" id="rs-who">Sarah · Responding</p><p class="body" id="rs-stopped">Calls to Mike and Linda stopped.</p></div>
   <p class="cap" id="rs-return">Dad's return is not yet confirmed.</p>
-  <div class="actions"><button class="btn primary" onclick="openBrief()">Keep search brief open</button><button class="btn" onclick="go('talk')">Open the door camera</button><button class="btn" onclick="backToNightWatch()">Back to night watch</button></div>
+  <div class="actions"><button class="btn primary" onclick="openBrief()">Keep search brief open</button></div>
 </section>
 
 <section id="s-back" class="screen">
@@ -325,12 +311,6 @@
   <p class="media-cap" id="back-camera-caption">Back in view · Live</p>
   <div class="card pad ok"><p class="title green" id="back-call-status">Return confirmed.</p><p class="body">Night watch continues. This check-in is saved in tonight's activity.</p></div>
   <div class="actions"><button class="btn primary" onclick="go('home')">Back to night watch</button></div>
-</section>
-
-<section id="s-emergency" class="screen">
-  <header class="head"><p class="eyebrow red caps"><img class="status-icon" src="/assets/figma/alert.svg" alt=""><span id="em-tag">Emergency option available</span></p><h1 id="em-title">Need emergency help?</h1><p class="sub" id="em-sub">Since the confirmed exit</p></header>
-  <div class="card pad"><p class="big-num red" id="em-clock">00:45</p><p class="title" style="font-size:18px" id="em-line">You can choose to call 911 now.</p><p class="body">You decide. Nightfall does not call 911 on its own.</p></div>
-  <button class="btn demo-only" onclick="runDemo('deadline')">Demo · 15 minutes pass</button><div class="actions"><button class="btn" onclick="openBrief()">Keep the search brief open</button><a class="btn danger" href="tel:911">Call 911</a></div>
 </section>
 
 <section id="s-help" class="screen">
@@ -356,8 +336,8 @@
 <div id="visitor" class="call-screen gate" hidden><div style="max-width:390px;width:100%;margin:0 auto;display:flex;flex-direction:column;flex:1;gap:16px">
   <div><p class="eyebrow caps">Doorbell</p><h1>Someone is at the door</h1><p class="sub" id="vis-said">Nightfall greeted the visitor.</p></div>
   <div class="media"><img id="vis-feed" class="feed-live" alt="Door camera" style="display:none"><div class="ph"></div></div>
-  <div class="pair"><button class="rec" id="vis-talk" onclick="liveToggle('vis-talk','vis-stat')">Talk live</button><button class="rec" id="vis-listen" onclick="listenToggle('vis-listen')">Listen</button></div>
-  <p class="cap" id="vis-stat">Listen to the entrance or speak through its speaker.</p>
+  <button class="rec" id="vis-talk" onclick="liveToggle('vis-talk','vis-stat')">Talk live</button>
+  <p class="cap" id="vis-stat">Speak through the entrance speaker.</p>
   <div class="actions"><button class="btn" onclick="dismissVisitor()">Not now</button></div></div></div>
 
 <!-- Incoming call from Nightfall -->
