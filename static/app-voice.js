@@ -10,13 +10,16 @@ function renderSamples() {
     $("v-samples").dataset.key = key;
     $("v-samples").innerHTML = Object.entries(SAMPLE_LINES).map(([k,[title,line]],i) => {
       const has = v.samples[k];
-      return `<div class="row big"><div><span class="k">${title}</span><span class="sub2">“${esc(line.replace("Sarah",S.household.caregiver_name))}”</span><span class="sub2">Sample ${i+1} · ${has ? "Recorded" : "Not recorded"}</span></div><div>${has ? `<button class="text-btn" onclick="playSample('${k}')">Play</button>` : ""}<button class="text-btn" onclick="pickSample('${k}')">${has ? "Redo" : "Record"}</button></div></div>`;
+      return `<div class="row big"><div><span class="k">${title}</span><span class="sub2">“${esc(line.replace("Sarah",S.household.caregiver_name))}”</span><span class="sub2">Sample ${i+1} · ${has ? "Recorded" : "Not recorded"}</span></div><div>${has ? `<button class="text-btn" onclick="playSample('${k}')">Play</button>` : ""}${has ? `<button class="text-btn" onclick="clearSample('${k}')">Clear</button>` : `<button class="text-btn" onclick="pickSample('${k}')">Record</button>`}</div></div>`;
     }).join("");
   }
   n = Object.values(v.samples).filter(Boolean).length;
   $("v-count").textContent = n + " sample" + (n === 1 ? "" : "s");
   $("v-clone").disabled = n === 0; $("v-clone").hidden = n === 0;
-  $("v-preview-link").hidden = !["clone","mock"].includes(v.source);
+}
+async function clearSample(kind) {
+  try { await requestJSON("/voice/samples/" + kind, undefined, "DELETE"); await refresh(); toast("Recording cleared."); }
+  catch (error) { toast(error.message); }
 }
 function pickSample(kind) {
   recKind = kind; const [title,line] = SAMPLE_LINES[kind];
@@ -44,7 +47,7 @@ function renderVoicePreview() {
 }
 
 const Recorder = {stream: null, rec: null, chunks: [], startedAt: 0, busy: false};
-async function micStream() { if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error("Microphone unavailable. Use typed speech or choose a ready-made voice."); if (Recorder.stream && Recorder.stream.active) return Recorder.stream; Recorder.stream = await navigator.mediaDevices.getUserMedia({audio: true}); return Recorder.stream; }
+async function micStream() { if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error("Microphone unavailable. Use typed speech instead."); if (Recorder.stream && Recorder.stream.active) return Recorder.stream; Recorder.stream = await navigator.mediaDevices.getUserMedia({audio: true}); return Recorder.stream; }
 async function recToggle(btn, statEl, onBlob) {
   if (Recorder.busy) return;
   if (Recorder.rec && Recorder.rec.state === "recording") {
@@ -53,7 +56,7 @@ async function recToggle(btn, statEl, onBlob) {
   }
   let stream; Recorder.busy = true; statEl.textContent = "Waiting for microphone access…";
   try { stream = await micStream(); }
-  catch (error) { statEl.textContent = error.name === "NotAllowedError" ? "Microphone blocked. Allow microphone access for this site, or choose a ready-made voice." : (error.message || "Microphone unavailable. Try again or use typed speech."); return; }
+  catch (error) { statEl.textContent = error.name === "NotAllowedError" ? "Microphone blocked. Allow microphone access for this site." : (error.message || "Microphone unavailable. Try again or use typed speech."); return; }
   finally { Recorder.busy = false; }
   const mt = mime(); const r = new MediaRecorder(stream, mt ? {mimeType: mt} : undefined); Recorder.rec = r; Recorder.chunks = [];
   r.ondataavailable = e => { if (e.data && e.data.size) Recorder.chunks.push(e.data); };
@@ -98,7 +101,14 @@ async function recordingWav(blob) {
   mono.forEach((sample,i)=>view.setInt16(44+i*2, Math.max(-1,Math.min(1,sample)) * (sample < 0 ? 32768 : 32767),true));
   return new Blob([bytes],{type:"audio/wav"});
 }
+async function saveVoiceName() {
+  const name = $("v-name").value.trim(); careDrafts.add("v-name");
+  try { await requestJSON("/profile", {caregiver_name: name}); careDrafts.delete("v-name"); await refresh(); } catch (error) { toast(error.message); }
+}
 async function cloneVoice() {
+  const typed = $("v-name").value.trim();
+  if (!typed && !S.household.caregiver_name) { go("voice"); $("v-name").focus(); toast("Add your name first."); return; }
+  if (typed && typed !== S.household.caregiver_name) await saveVoiceName();
   go("creating"); $("v-retry").hidden = true; $("v-create-status").textContent = "Creating the voice reference…";
   try { await requestJSON("/voice/clone",{name:S.household.caregiver_name}); await refresh(); go("voice-preview"); }
   catch(error) { $("v-create-status").textContent = error.message + " Your saved samples are still here."; $("v-retry").hidden = false; }

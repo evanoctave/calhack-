@@ -80,7 +80,7 @@ Real rows from a run on the default input (49 rows, about 2.5 minutes, under one
   "home": {
     "lat": 37.8045628,
     "lng": -122.4481491,
-    "address": "3601, Lyon Street, Marina District, San ...",
+    "address": "3601, Lyon Street, Harbor District, San ...",
     "radius_mi": 1.5
   },
   "check_first": 21,

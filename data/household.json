@@ -81,11 +81,11 @@
     },
     {
       "kind": "habit",
-      "text": "Goes to the Marina Corner Market for coffee and the newspaper every morning"
+      "text": "Goes to the Harbor Corner Market for coffee and the newspaper every morning"
     },
     {
       "kind": "habit",
-      "text": "Looks for his old dog Buddy on the Marina Green and down the alley"
+      "text": "Looks for his old dog Buddy on the Harbor Green and down the alley"
     },
     {
       "kind": "medical_note",
@@ -98,7 +98,7 @@
   ],
   "person_full_name": "Robert Miller",
   "person_age": 74,
-  "address": "Marina District, San Francisco, CA",
+  "address": "Harbor District, San Francisco, CA",
   "description": {
     "sex": "male",
     "height": "5 ft 10 in",

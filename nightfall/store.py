@@ -41,14 +41,14 @@ def start_fresh() -> None:
 
 
 def places_file() -> Path:
-    """PLACES_FILE wins; else the setup page's live cache; else the live Marina run; else the Marina fixture."""
+    """PLACES_FILE wins; else the setup page's live cache; else the sample live run; else the sample fixture."""
     env = os.environ.get("PLACES_FILE")
     if env:
         return Path(env)
-    for name in ("places.custom.live.json", "places.marina.live.json"):
+    for name in ("places.custom.live.json", "places.sample.live.json"):
         if (ROOT / "data" / name).exists():
             return ROOT / "data" / name
-    return ROOT / "data" / "places.marina.json"
+    return ROOT / "data" / "places.sample.json"
 
 
 class Store:

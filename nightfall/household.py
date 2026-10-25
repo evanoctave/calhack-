@@ -19,6 +19,7 @@ class TreeMember:
     name: str
     phone: str
     tier: int
+    relationship: str = ""
 
 
 @dataclass(frozen=True)
@@ -75,9 +76,13 @@ def phone_env(member_id: str) -> str:
 def load(path: str | Path) -> Household:
     """Load and validate data/household.json."""
     raw: dict[str, Any] = json.loads(Path(path).read_text())
-    tree = tuple(TreeMember(**{**m, "phone": os.environ.get(phone_env(m["id"]), m["phone"])}) for m in raw["tree"])
+    members = [TreeMember(**{**m, "phone": os.environ.get(phone_env(m["id"]), m["phone"])}) for m in raw["tree"]]
+    named = [m for m in members if m.name.strip()]  # an unnamed placeholder is not a care-circle member
+    if len(named) != len(members):
+        named = [replace(m, tier=min(i + 1, 3)) for i, m in enumerate(sorted(named, key=lambda m: m.tier))]
+    tree = tuple(named)
     tiers = sorted({m.tier for m in tree})
-    if not tiers or tiers[0] != 1 or tiers != list(range(1, len(tiers) + 1)):
+    if tiers and (tiers[0] != 1 or tiers != list(range(1, len(tiers) + 1))):
         raise ValueError("tree tiers must be contiguous from 1")
     radius = float(raw.get("radius_mi", 1.5))
     if not 0.25 < radius <= 5:

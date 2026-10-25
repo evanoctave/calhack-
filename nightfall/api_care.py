@@ -81,8 +81,22 @@ async def call_order(body: CallOrderIn) -> dict:
     return {"ok": True, "tree": [m.__dict__ for m in tree]}
 
 
+def _e164(raw: str) -> str:
+    """Twilio only dials +country-code numbers: 10 digits or 1 + 10 digits are taken as US, anything else needs a +."""
+    digits = "".join(c for c in raw if c.isdigit())
+    if raw.strip().startswith("+") and 8 <= len(digits) <= 15:
+        return "+" + digits
+    if len(digits) == 10:
+        return "+1" + digits
+    if len(digits) == 11 and digits.startswith("1"):
+        return "+" + digits
+    raise HTTPException(422, "Enter a full phone number. Outside the US, start with + and the country code.")
+
+
 class MemberIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
+    relationship: str = Field(default="", max_length=60)
+    phone: str = Field(default="", max_length=30)
 
 
 @router.post("/members")
@@ -91,13 +105,75 @@ async def add_member(body: MemberIn, request: Request) -> dict:
     name = body.name.strip()
     if not name:
         raise HTTPException(422, "Enter a name.")
+    relationship, phone = body.relationship.strip(), body.phone.strip()
+    if phone:
+        phone = _e164(phone)
     existing = next((m for m in store.hh.tree if m.name.casefold() == name.casefold()), None)
     if existing is None:
-        existing = TreeMember("TM-" + secrets.token_hex(4), name, "web", min(len(store.hh.tree) + 1, 3))
+        existing = TreeMember(
+            "TM-" + secrets.token_hex(4), name, phone or "web", min(len(store.hh.tree) + 1, 3), relationship
+        )
         store.hh = store.hh.with_member(existing)
+        api_app._persist_household(store.hh)
+    elif relationship or phone:
+        existing = replace(existing, relationship=relationship or existing.relationship, phone=phone or existing.phone)
+        store.hh = replace(store.hh, tree=tuple(existing if m.id == existing.id else m for m in store.hh.tree))
         api_app._persist_household(store.hh)
     url = str(request.base_url).rstrip("/") + "/app?" + urlencode({"member": existing.id})
     return {"ok": True, "member_id": existing.id, "invitation_url": url}
+
+
+@router.delete("/members/{member_id}")
+async def remove_member(member_id: str) -> dict:
+    store = api_app._store()
+    kept = [m for m in store.hh.tree if m.id != member_id]
+    if len(kept) == len(store.hh.tree):
+        raise HTTPException(404, "That person is not in the care circle.")
+    tree = tuple(replace(m, tier=min(i + 1, 3)) for i, m in enumerate(sorted(kept, key=lambda m: m.tier)))
+    store.hh = replace(store.hh, tree=tree)
+    api_app._persist_household(store.hh)
+    return {"ok": True, "tree": [m.__dict__ for m in tree]}
+
+
+@router.get("/address-suggest")
+async def address_suggest(q: str = "") -> dict:
+    """Completions for the home-address box; a lookup failure just means no suggestions."""
+    q = q.strip()
+    if len(q) < 4:
+        return {"suggestions": []}
+    try:
+        return {"suggestions": await asyncio.to_thread(geocode.suggest, q[:200])}
+    except Exception as error:  # noqa: BLE001 — suggestions are optional
+        print(f"address suggest failed: {type(error).__name__}")
+        return {"suggestions": []}
+
+
+class TestCallIn(BaseModel):
+    member_id: str
+
+
+@router.post("/test-call")
+async def test_call(body: TestCallIn) -> dict:
+    """Ring one care-circle member now with a short test message, through the same Twilio path as a real alert."""
+    from nightfall.integrations import twilio
+    from nightfall.store import PUBLIC_URL
+
+    store = api_app._store()
+    member = store.hh.member(body.member_id)
+    if member is None:
+        raise HTTPException(404, "That person is not in the care circle.")
+    if not member.phone.startswith("+"):
+        raise HTTPException(422, f"Add a phone number for {member.name} in the call order first.")
+    if not twilio.enabled():
+        raise HTTPException(409, "Phone calls are off: the app is in mock mode or Twilio is not set up.")
+    try:
+        await asyncio.to_thread(twilio.create_call, member.phone, f"{PUBLIC_URL}/twiml/test/{member.id}")
+    except Exception as error:  # noqa: BLE001 — Twilio/network errors become a readable message
+        print(f"test call failed: {type(error).__name__}: {error}")
+        raise HTTPException(
+            502, "Twilio could not place the call. Check the number, and that the account can call it."
+        ) from None
+    return {"ok": True, "called": member.name}
 
 
 class FamiliarPlaceIn(BaseModel):

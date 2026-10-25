@@ -53,13 +53,19 @@ function renderCallOrder() {
   const key = JSON.stringify(ordered);
   if ($("p-tree").dataset.key === key) return;
   $("p-tree").dataset.key = key;
-  $("p-tree").innerHTML = ordered.map((m, i) => `<div class="row" draggable="true" data-member="${esc(m.id)}"><div class="lead"><span class="badge ${i === 0 ? "on" : ""}">${i + 1}</span><div><span class="k">${esc(m.name)}</span><span class="sub2">${i === 0 ? "Call first" : i === 1 ? "Next if no answer" : "Then everyone in the care circle"}${m.id === member ? " · This phone" : ""}</span></div></div><div class="reorder"><button aria-label="Move ${esc(m.name)} up" onclick="moveContact(${i},-1)" ${i === 0 ? "disabled" : ""}>↑</button><button aria-label="Move ${esc(m.name)} down" onclick="moveContact(${i},1)" ${i === ordered.length - 1 ? "disabled" : ""}>↓</button></div></div>`).join("");
+  $("p-tree").innerHTML = ordered.map((m, i) => `<div class="row" draggable="true" data-member="${esc(m.id)}"><div class="lead"><span class="badge ${i === 0 ? "on" : ""}">${i + 1}</span><div><span class="k">${esc(m.name)}${m.relationship ? " · " + esc(m.relationship) : ""}</span><span class="sub2">${i === 0 ? "Call first" : i === 1 ? "Next if no answer" : "Then everyone in the care circle"}${m.id === member ? " · This phone" : ""}</span></div></div><div class="reorder"><button aria-label="Move ${esc(m.name)} up" onclick="moveContact(${i},-1)" ${i === 0 ? "disabled" : ""}>↑</button><button aria-label="Move ${esc(m.name)} down" onclick="moveContact(${i},1)" ${i === ordered.length - 1 ? "disabled" : ""}>↓</button><button aria-label="Remove ${esc(m.name)}" onclick="removeContact('${esc(m.id)}')">Remove</button></div></div>`).join("") || '<div class="row"><span class="muted">No one yet. Invite a family member to start the call order.</span></div>';
   let dragged;
   $("p-tree").querySelectorAll("[data-member]").forEach(row => {
     row.addEventListener("dragstart", e => { dragged = row.dataset.member; e.dataTransfer.setData("text/plain", dragged); });
     row.addEventListener("dragover", e => e.preventDefault());
     row.addEventListener("drop", e => { e.preventDefault(); const from = ids.indexOf(dragged), to = ids.indexOf(row.dataset.member); if (from < 0 || to < 0) return; callOrderDraft = [...ids]; callOrderDraft.splice(to, 0, callOrderDraft.splice(from, 1)[0]); renderCallOrder(); });
   });
+}
+async function removeContact(id) {
+  const name = (S.household.tree.find(m => m.id === id) || {}).name || "this person";
+  if (!confirm("Remove " + name + " from the care circle?")) return;
+  try { await requestJSON("/care/members/" + encodeURIComponent(id), undefined, "DELETE"); callOrderDraft = null; await refresh(); toast(name + " removed."); }
+  catch (error) { $("calls-status").textContent = error.message; }
 }
 function moveContact(index, direction) {
   callOrderDraft = [...(callOrderDraft || S.household.tree.map(m => m.id))];
@@ -71,14 +77,26 @@ async function saveCallOrder() {
   try { await requestJSON("/care/call-order", {member_ids: callOrderDraft || S.household.tree.map(m => m.id)}, "PUT"); callOrderDraft = null; await refresh(); toast("Call order saved for the next alert."); go("setup"); }
   catch (error) { $("calls-status").textContent = error.message; }
 }
+let addrTimer, addrSeq = 0;
+function suggestAddress() {
+  clearTimeout(addrTimer);
+  const q = $("p-addr").value.trim(); if (q.length < 4) return;
+  addrTimer = setTimeout(async () => {
+    const seq = ++addrSeq;
+    try {
+      const data = await requestJSON("/care/address-suggest?q=" + encodeURIComponent(q), undefined, "GET");
+      if (seq === addrSeq) $("addr-list").innerHTML = data.suggestions.map(s => `<option value="${esc(s)}"></option>`).join("");
+    } catch (error) { /* suggestions are optional */ }
+  }, 350);
+}
 function openInvite() {
-  $("invite-result").hidden = true; $("invite-create").hidden = false; $("invite-name").value = ""; $("invite-status").textContent = "";
+  $("invite-result").hidden = true; $("invite-create").hidden = false; $("invite-name").value = ""; $("invite-rel").value = ""; $("invite-phone").value = ""; $("invite-status").textContent = "";
   $("invite-dialog").showModal();
 }
 async function createInvitation() {
   $("invite-create").disabled = true;
   try {
-    const result = await requestJSON("/care/members", {name: $("invite-name").value.trim()});
+    const result = await requestJSON("/care/members", {name: $("invite-name").value.trim(), relationship: $("invite-rel").value.trim(), phone: $("invite-phone").value.trim()});
     $("invite-url").value = result.invitation_url; $("invite-result").hidden = false; $("invite-create").hidden = true;
     callOrderDraft = null; await refresh();
   } catch (error) { $("invite-status").textContent = error.message; }
@@ -116,7 +134,7 @@ function exitDemo() { const url = new URL(location.href); url.searchParams.delet
 function renderCareStatus() {
   demoMode = demoRequested && S.demo_available;
   document.documentElement.dataset.demo = String(demoMode);
-  $("demo-enable").hidden = !S.demo_available;
+  if ($("demo-enable")) $("demo-enable").hidden = !S.demo_available;
   $("home-live-action").hidden = demoMode;
   $("h-readiness").innerHTML = `<span class="${S.live_frame ? "ready" : demoMode ? "" : "attention"}">${S.live_frame ? "Camera connected" : demoMode ? "Recorded camera demo" : "Camera offline"}</span><button class="text-btn" onclick="showArm()">${soundOn ? "Phone sound enabled" : "Enable phone sound"}</button>`;
   $("h-watch").classList.toggle("green", !!S.live_frame || demoMode);

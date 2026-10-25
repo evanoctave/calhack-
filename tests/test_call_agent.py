@@ -12,7 +12,7 @@ NOW = datetime(2026, 10, 25, 2, 3)
 def make_brief() -> dict:
     inc = Incident("INC-1")
     inc.exited_at = NOW
-    return briefmod.build(hh, inc, briefmod.mock_clothing(), briefmod.load_places("data/places.marina.json"), [], NOW)
+    return briefmod.build(hh, inc, briefmod.mock_clothing(), briefmod.load_places("data/places.sample.json"), [], NOW)
 
 
 def test_opening_has_facts() -> None:

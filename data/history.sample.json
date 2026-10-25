@@ -1,7 +1,7 @@
 [
-  {"night_offset": 0, "time": "02:12", "outcome": "returned", "minutes_out": 4.0, "heading": "toward the Marina Green"},
+  {"night_offset": 0, "time": "02:12", "outcome": "returned", "minutes_out": 4.0, "heading": "toward the Harbor Green"},
   {"night_offset": 1, "time": "01:52", "outcome": "watch_only"},
-  {"night_offset": 1, "time": "02:20", "outcome": "returned", "minutes_out": 3.5, "heading": "toward the Marina Green"},
+  {"night_offset": 1, "time": "02:20", "outcome": "returned", "minutes_out": 3.5, "heading": "toward the Harbor Green"},
   {"night_offset": 3, "time": "02:05", "outcome": "acked", "minutes_out": 9.0, "heading": "toward the Palace of Fine Arts", "acked_by": "TM-PRIMARY"},
   {"night_offset": 4, "time": "02:40", "outcome": "returned", "minutes_out": 2.0},
   {"night_offset": 4, "time": "23:15", "outcome": "watch_only"},

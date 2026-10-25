@@ -26,7 +26,7 @@ def test_example_matches_schema(name):
 
 
 def test_demo_search_plan_fixture_matches_schema():
-    plan = ROOT.parent / "data" / "search_plan.marina.json"
+    plan = ROOT.parent / "data" / "search_plan.sample.json"
     _validator("search_plan").validate(json.loads(plan.read_text()))
 
 
