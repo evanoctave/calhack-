@@ -123,7 +123,10 @@
   <p class="label">How far could he walk?</p>
   <div class="seg" id="pl-rad"></div>
   <div class="card pad"><span class="cap blue" id="pl-radius">1.5 mi around home</span><p class="cap mt">We map water, rail lines, highways and construction inside this circle right away. Apify then finds places open late where someone could have seen him.</p></div>
-  <div class="card"><div class="row"><span class="k">Familiar places</span></div><div id="p-places"></div></div><button class="text-btn" onclick="editFamiliarPlaces()">Edit familiar places</button><div id="familiar-editor" hidden><div class="card" id="familiar-fields"></div><button class="text-btn" onclick="addFamiliarPlace()">Add a familiar place</button><button class="btn" onclick="saveFamiliarPlaces()">Save familiar places</button><p id="places-status" class="form-status" role="status"></p></div>
+  <div class="card"><div class="row"><span class="k">Familiar places</span></div><div id="p-places"></div></div>
+  <button class="text-btn" onclick="$('familiar-editor').hidden = !$('familiar-editor').hidden">Add a familiar place</button>
+  <div id="familiar-editor" hidden><div class="card"><label class="field"><span class="lbl">Place name or address</span><input id="fa-name" placeholder="Corner Cafe, 2 Main St"></label><label class="field"><span class="lbl">Why it is familiar (optional)</span><input id="fa-note" placeholder="Goes there for coffee"></label></div>
+    <button class="btn" onclick="addPlace()">Add place</button><p id="places-status" class="form-status" role="status"></p></div>
   <p class="cap">Each search uses a little Apify credit.</p>
   <div class="actions"><button class="btn primary" onclick="findPlaces()">Find nearby places</button></div>
 </section>

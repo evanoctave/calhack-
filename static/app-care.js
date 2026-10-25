@@ -1,6 +1,6 @@
 // Care forms keep drafts across polling. Requests report failures without claiming a save succeeded.
 const careDrafts = new Set();
-let careHydrated = false, callOrderDraft = null, familiarDraft = null, toastTimer;
+let careHydrated = false, callOrderDraft = null, toastTimer;
 const demoRequested = new URLSearchParams(location.search).get("demo") === "1";
 let demoMode = false;
 
@@ -111,17 +111,21 @@ async function joinCircle() {
   try { const result = await requestJSON("/care/members", {name: $("join-name").value.trim()}); location.assign("/app?member=" + encodeURIComponent(result.member_id)); }
   catch (error) { $("join-status").textContent = error.message; }
 }
-function editFamiliarPlaces() {
-  familiarDraft = S.household.familiar_places.map(p => ({...p})); $("familiar-editor").hidden = false; renderFamiliarEditor();
+async function savePlaces(places) {
+  await requestJSON("/care/places", {places: places.map(p => ({name: p.name, note: p.note || "", lat: p.lat, lng: p.lng}))}, "PUT");
+  await refresh();
 }
-function renderFamiliarEditor() {
-  $("familiar-fields").innerHTML = familiarDraft.map((p, i) => `<div class="place-editor"><label>Place name or address<input value="${esc(p.name)}" oninput="familiarDraft[${i}].name=this.value;delete familiarDraft[${i}].lat;delete familiarDraft[${i}].lng"></label><label>Why it is familiar<input value="${esc(p.note || "")}" oninput="familiarDraft[${i}].note=this.value"></label><button class="text-btn" onclick="familiarDraft.splice(${i},1);renderFamiliarEditor()">Remove place</button></div>`).join("");
+async function deletePlace(i) {
+  try { await savePlaces(S.household.familiar_places.filter((_, k) => k !== i)); toast("Place deleted."); }
+  catch (error) { toast(error.message); }
 }
-function addFamiliarPlace() { familiarDraft.push({name: "", note: ""}); renderFamiliarEditor(); }
-async function saveFamiliarPlaces() {
-  $("places-status").textContent = "Saving places…";
-  try { await requestJSON("/care/places", {places: familiarDraft.map(p => ({name: p.name, note: p.note || "", lat: p.lat, lng: p.lng}))}, "PUT"); $("familiar-editor").hidden = true; await refresh(); toast("Familiar places saved."); }
-  catch (error) { $("places-status").textContent = error.message; }
+async function addPlace() {
+  const name = $("fa-name").value.trim(); if (!name) { $("places-status").textContent = "Enter a place name or address."; return; }
+  $("places-status").textContent = "Adding…";
+  try {
+    await savePlaces([...S.household.familiar_places, {name, note: $("fa-note").value.trim()}]);
+    $("fa-name").value = ""; $("fa-note").value = ""; $("places-status").textContent = ""; $("familiar-editor").hidden = true; toast("Place added.");
+  } catch (error) { $("places-status").textContent = error.message; }
 }
 async function startWatch() { await requestJSON("/arm", {on: true}); await refresh(); go("home"); if (!soundOn) showArm(); }
 async function acknowledgeIncident() {
