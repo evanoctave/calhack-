@@ -32,6 +32,7 @@ class MossIndex:
         self.name = index_name(household_id)
         self._client = MossClient(os.environ["MOSS_PROJECT_ID"], os.environ["MOSS_PROJECT_KEY"])
         self._loaded = False
+        self._empty = False
 
     async def ensure(self, docs: list[dict[str, Any]]) -> int:
         """Create the index if missing, upsert docs otherwise, then load it locally. Returns doc count."""
@@ -45,6 +46,13 @@ class MossIndex:
             )
             for d in docs
         ]
+        if not items:
+            # Moss rejects an empty mutation (HTTP 400 VALIDATION_FAILED). A fresh household has no
+            # notes yet: stay on Moss, index nothing, answer searches with [] until notes arrive.
+            self._empty = True
+            self._loaded = False
+            return 0
+        self._empty = False
         names = {i.name for i in await self._client.list_indexes()}
         if self.name not in names:
             await self._client.create_index(self.name, items, wait=True)
@@ -58,6 +66,8 @@ class MossIndex:
         """Top-k hits as plain dicts {id, text, score, **metadata}."""
         from moss import QueryOptions
 
+        if self._empty:
+            return []
         if not self._loaded:
             await self._client.load_index(self.name)
             self._loaded = True
