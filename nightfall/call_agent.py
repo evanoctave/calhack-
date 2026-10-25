@@ -63,19 +63,16 @@ def _wearing(hh: Household, brief: dict[str, Any]) -> str:
     """Clothing as a spoken clause; never reads the brief's 'see photo' label aloud."""
     line = brief["clothing_line"]
     if not line or line == "see photo":
-        return "What he was wearing is in the photo on the brief."
-    return f"He was wearing {line}."
+        return "What they were wearing is in the photo on the brief."
+    return f"They were wearing {line}."
 
 
 def opening(hh: Household, brief: dict[str, Any], member_name: str) -> str:
-    """The first thing the agent says. Facts only, from the brief, no model."""
+    """The first thing the agent says: short, facts from the brief, no model. Details wait for a question."""
     t = brief["last_seen_hhmm"]
-    for_whom = "" if member_name == hh.caregiver_name else f" for {hh.caregiver_name}"
     return (
-        f"{member_name}, this is Nightfall calling{for_whom}. {hh.person_name} left the house at {t}. "
-        f"{_wearing(hh, brief)} Most people are found within {brief['home']['radius_mi']:g} miles. "
-        f"The nearest hazards are {_names(brief['hazards'], 2)}. Open now nearby: {_names(brief['call_first'], 2)}. "
-        f"Say I'm on my way to stop the other calls, or ask me a question."
+        f"{member_name}, Nightfall alert. {hh.person_name or 'Your family member'} left home at {t}. "
+        f"{_wearing(hh, brief)} Say I'm on my way to stop the other calls, or ask where to look."
     )
 
 
@@ -103,7 +100,7 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
     """One caller turn. Deterministic intents first, then the model, then a safe default."""
     t = text.strip()
     if not t:
-        return Reply("I did not catch that. Say I've got him, or ask me where to look.", "silence")
+        return Reply("I did not catch that. Say on my way, or ask where to look.", "silence")
     if ACK.search(t) and not (RESPONDING.search(t) and not FOUND.search(t)):  # "got it, on my way" = responding
         return Reply(
             f"Thank you. I am telling the rest of the family {hh.person_name} is safe. Goodbye.", "ack", True, True
@@ -115,9 +112,14 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
         rest_text = RESPONDING.sub(" ", t)  # "on my way, what was he wearing?" answers the question too
         if any(p.search(rest_text) for p in (HAZARDS, CLOTHES, MEDS, CALLS)):
             return Reply(f"{say} {handle(hh, brief, member_name, rest_text).say}", "responding", False, True)
-        return Reply(f"{say} Say I've got him when he's safe, or ask me anything.", "responding", False, True)
+        return Reply(f"{say} Say found them when they're safe, or ask me anything.", "responding", False, True)
     if REPEAT.search(t):
         return Reply(opening(hh, brief, member_name), "repeat")
+    if HAZARDS.search(t) and not brief["hazards"]:
+        return Reply(
+            f"Open now nearby: {_names(brief['call_first'], 3)}. Then the familiar places: {_names(brief['familiar'], 3)}.",
+            "hazards",
+        )
     if HAZARDS.search(t):
         habit = brief.get("habits", [{}])[0].get("text", "") if brief.get("habits") else ""
         tail = f" The caregiver noted: {habit}." if habit else ""
@@ -149,5 +151,6 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
         except Exception as e:  # noqa: BLE001
             print(f"anthropic qa fallback: {e}")
     return Reply(
-        "I can tell you what he was wearing, the hazards, or who to call. Everything else is on the brief.", "unknown"
+        "I can tell you what they were wearing, where to look, or who to call. Everything else is on the brief.",
+        "unknown",
     )

@@ -46,7 +46,7 @@ def test_twiml_open_speaks_without_waiting_for_cartesia(client: TestClient, monk
     gather = document.find("Gather")
     assert gather is not None
     opening = gather.find("Say")
-    assert opening is not None and "left the house" in opening.text
+    assert opening is not None and "left home" in opening.text
     assert gather.find("Play") is None
 
 

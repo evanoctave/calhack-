@@ -17,7 +17,7 @@ def make_brief() -> dict:
 
 def test_opening_has_facts() -> None:
     s = call_agent.opening(hh, make_brief(), "Sarah")
-    assert "2:03 AM" in s and "navy hoodie" in s and "Palace of Fine Arts lagoon" in s and "Lombard Gas" in s
+    assert "2:03 AM" in s and "navy hoodie" in s and "on my way" in s and len(s) < 220
 
 
 def test_ack_intent() -> None:
