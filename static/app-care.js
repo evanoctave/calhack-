@@ -133,6 +133,19 @@ async function addPlace() {
     $("fa-name").value = ""; $("fa-note").value = ""; $("places-status").textContent = ""; $("familiar-editor").hidden = true; toast("Place added.");
   } catch (error) { $("places-status").textContent = error.message; }
 }
+function fmtClock(hhmm) { const [h, m] = hhmm.split(":").map(Number); return ((h + 11) % 12 + 1) + ":" + String(m).padStart(2, "0") + " " + (h < 12 ? "AM" : "PM"); }
+function renderSchedule() {
+  const h = S.household, active = [$("sch-start"), $("sch-end")].includes(document.activeElement);
+  $("sch-on").checked = h.watch_enabled;
+  if (!active) { $("sch-start").value = h.night_start; $("sch-end").value = h.night_end; }
+  $("sch-sum").textContent = h.watch_enabled ? "Watching " + fmtClock(h.night_start) + " to " + fmtClock(h.night_end) : "Off. Nothing is monitored.";
+  $("sch-start").disabled = $("sch-end").disabled = !h.watch_enabled;
+}
+async function saveSchedule() {
+  $("sch-status").textContent = "";
+  try { await requestJSON("/care/schedule", {enabled: $("sch-on").checked, start: $("sch-start").value, end: $("sch-end").value}, "PUT"); await refresh(); }
+  catch (error) { $("sch-status").textContent = error.message; await refresh(); }
+}
 async function clearEverything() {
   if (!confirm("Clear all information? This erases the profile, call order, address and places, voice recordings, enrolled faces, medical info and history. It cannot be undone.")) return;
   try { await requestJSON("/care/clear", {}); try { localStorage.clear(); } catch (e) {} location.hash = "#setup"; location.reload(); }

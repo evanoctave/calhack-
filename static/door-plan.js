@@ -73,8 +73,15 @@ function doorPlan(last, nowMs) {
     headline = "Stood down. That was not treated as a wander.";
     next.push({ text: "Goes back to watching the door." });
   } else if (!last.night_mode) {
-    headline = "Night watch is off. People in view are ignored.";
-    next.push({ text: "Nothing will happen until the night window starts." });
+    const sch = last.schedule || {};
+    const clock = (hhmm) => { const [h, m] = hhmm.split(":").map(Number); return ((h + 11) % 12 + 1) + ":" + String(m).padStart(2, "0") + " " + (h < 12 ? "AM" : "PM"); };
+    if (sch.enabled === false) {
+      headline = "Night watch is switched off. People in view are ignored.";
+      next.push({ text: "Turn it on under Active times in the app." });
+    } else {
+      headline = "Outside the active times. People in view are ignored.";
+      next.push({ text: sch.start ? `Starts watching at ${clock(sch.start)}.` : "Waits for the active times." });
+    }
   } else {
     headline = "Watching the front door. No one in view.";
     next.push({ text: "If someone walks into view, the door says hello in the family's voice within a second." });

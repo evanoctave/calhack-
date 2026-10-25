@@ -171,6 +171,29 @@ async def clear_everything() -> dict:
     return {"ok": True}
 
 
+class ScheduleIn(BaseModel):
+    enabled: bool
+    start: str = Field(pattern=r"^\d{2}:\d{2}$")
+    end: str = Field(pattern=r"^\d{2}:\d{2}$")
+
+
+@router.put("/schedule")
+async def set_schedule(body: ScheduleIn) -> dict:
+    """The on/off switch and the daily active times; the window may wrap past midnight (9 PM to 6 AM)."""
+    from datetime import time
+
+    try:
+        start, end = time.fromisoformat(body.start), time.fromisoformat(body.end)
+    except ValueError:
+        raise HTTPException(422, "Enter times like 21:00.") from None
+    if start == end:
+        raise HTTPException(422, "Start and end times must be different.")
+    store = api_app._store()
+    store.hh = replace(store.hh, watch_enabled=body.enabled, night_start=start, night_end=end)
+    api_app._persist_household(store.hh)
+    return {"ok": True, "enabled": body.enabled, "start": body.start, "end": body.end}
+
+
 class TestCallIn(BaseModel):
     member_id: str
 

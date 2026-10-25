@@ -18,6 +18,11 @@
     <button class="setup-link" onclick="go('calls')"><span><b>Call order</b><small id="su-calls">Your care circle</small></span></button>
     <button class="setup-link" onclick="go('places')"><span><b>Home &amp; nearby places</b><small id="su-places">Set your home address</small></span></button>
   </div>
+  <div class="card pad" id="sched">
+    <div class="topline"><div><b>Active times</b><small class="cap" id="sch-sum" style="display:block"></small></div><label class="switch" aria-label="Night watch on or off"><input type="checkbox" id="sch-on" onchange="saveSchedule()"><span></span></label></div>
+    <div class="grid2 mt"><label class="field"><span class="lbl">From</span><input type="time" id="sch-start" onchange="saveSchedule()"></label><label class="field"><span class="lbl">Until</span><input type="time" id="sch-end" onchange="saveSchedule()"></label></div>
+    <p id="sch-status" class="form-status" role="status"></p>
+  </div>
   <div class="pair"><button class="btn" onclick="go('camera')">Camera setup</button><button class="btn" onclick="showArm()">Phone alerts</button></div>
   <div class="actions"><button class="btn primary" onclick="startWatch()">Start night watch</button></div>
   <button class="text-btn" style="color:var(--red)" onclick="clearEverything()">Clear all information</button>

@@ -268,3 +268,20 @@ def test_invitation_link_uses_the_public_url_so_it_works_off_this_laptop(client,
     made = client.post("/care/members", json={"name": "Cousin Dee"}).json()
     assert made["invitation_url"] == "https://family.example.com/app?member=" + made["member_id"]
     assert client.get("/app/state").json()["public_url"] == "https://family.example.com/"
+
+
+def test_schedule_switch_and_times_decide_when_the_door_is_watching(client, monkeypatch):
+    from datetime import datetime
+
+    assert client.put("/care/schedule", json={"enabled": True, "start": "21:00", "end": "21:00"}).status_code == 422
+    assert client.put("/care/schedule", json={"enabled": True, "start": "9pm", "end": "06:00"}).status_code == 422
+    monkeypatch.setattr(api.store, "night_mode", False)  # real clock rules, not the test override
+    at = lambda hhmm: datetime.fromisoformat(f"2026-10-24T{hhmm}:00-07:00")
+    assert client.put("/care/schedule", json={"enabled": True, "start": "21:00", "end": "06:00"}).status_code == 200
+    for when, expected in (("22:00", True), ("02:30", True), ("12:00", False), ("06:00", False)):
+        monkeypatch.setattr(api.store, "now", lambda when=when: at(when))
+        assert api.store.night() is expected, when
+    client.put("/care/schedule", json={"enabled": False, "start": "21:00", "end": "06:00"})
+    monkeypatch.setattr(api.store, "now", lambda: at("22:00"))
+    assert api.store.night() is False and client.get("/app/state").json()["household"]["watch_enabled"] is False
+    client.put("/care/schedule", json={"enabled": True, "start": "21:00", "end": "06:00"})

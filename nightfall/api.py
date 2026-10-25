@@ -11,6 +11,7 @@ import os
 import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from datetime import timedelta
 from typing import Any
 
@@ -215,6 +216,11 @@ async def state() -> dict[str, Any]:
         },
         "now": store.now().isoformat(),
         "night_mode": store.night(),
+        "schedule": {
+            "enabled": store.hh.watch_enabled,
+            "start": store.hh.night_start.strftime("%H:%M"),
+            "end": store.hh.night_end.strftime("%H:%M"),
+        },
         "ladder": LADDER,
         "door_wait_s": engine.DOOR_WAIT_S,
         "incident": None
@@ -247,7 +253,10 @@ async def state() -> dict[str, Any]:
 
 @app.post("/arm")
 async def arm(body: ArmIn) -> dict[str, Any]:
-    store.night_mode = body.on
+    store.hh = replace(store.hh, watch_enabled=body.on)
+    from nightfall import api_app
+
+    api_app._persist_household(store.hh)
     _emit(store, {"type": "arm", "night_mode": store.night()})
     return {"night_mode": store.night()}
 

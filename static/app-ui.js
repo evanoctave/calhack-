@@ -60,7 +60,7 @@ function render() {
   if ((!inc || !inc.visitor) && !$("visitor").hidden) hideVisitor();
   $("clock").textContent = hhmm(S.now);
   // home
-  $("h-title").textContent = S.night_mode ? "Night watch is on" : "Night watch is off";
+  $("h-title").textContent = !S.household.watch_enabled ? "Night watch is off" : S.night_mode ? "Night watch is on" : "Night watch starts at " + fmtClock(S.household.night_start);
   $("h-greet").textContent = "Good evening, " + h.caregiver_name;
   $("h-watch").textContent = "Watching over " + (h.person_full_name.split(" ")[0] || h.person_name);
   $("h-cam").textContent = "Front entrance";
@@ -293,6 +293,7 @@ function renderFigma() {
   const h = S.household, inc = S.incident, p = h.person_name || "Them", first = (h.person_full_name || "").split(" ")[0] || p, me = meName();
   const tree = h.tree, others = tree.filter(m => m.id !== member).map(m => m.name);
   // setup hub
+  renderSchedule();
   $("su-sub").textContent = p + "'s care, in one place.";
   const who = h.person_name || (h.person_full_name || "").split(" ")[0];
   $("su-person").textContent = "Who are we monitoring" + (who ? ` (${who})` : "");
