@@ -25,8 +25,8 @@ PUBLIC_URL = os.environ.get("PUBLIC_URL") or "http://127.0.0.1:8000"
 
 
 def household_filename() -> str:
-    """Use the saved, gitignored household by default; FRESH_START=0 selects the tracked demo household."""
-    return "household.live.json" if os.environ.get("FRESH_START", "1") == "1" else "household.json"
+    """FRESH_START=1 (default) and =keep use the saved, gitignored household; FRESH_START=0 selects the tracked demo household."""
+    return "household.live.json" if os.environ.get("FRESH_START", "1") in ("1", "keep") else "household.json"
 
 
 def household_path() -> Path:
@@ -34,8 +34,9 @@ def household_path() -> Path:
 
 
 def initialize_household() -> None:
-    """Start setup on the first launch; keep saved profiles and phone contacts on subsequent launches."""
-    if os.environ.get("FRESH_START", "1") == "1" and not household_path().exists():
+    """Start setup on the first launch; keep saved profiles and phone contacts on subsequent launches.
+    FRESH_START=keep behaves the same and is accepted for older run scripts."""
+    if os.environ.get("FRESH_START", "1") in ("1", "keep") and not household_path().exists():
         shutil.copyfile(ROOT / "data" / "household.blank.json", household_path())
 
 
@@ -75,7 +76,7 @@ class Store:
         self.call_911_sent: bool = False
         self.voice_source: str = "clone" if os.environ.get("VOICE_IS_CLONE") == "1" else "stock"
         self.voice_name: str = os.environ.get("VOICE_NAME", "")
-        self.night_mode: bool = True
+        self.night_mode: bool = os.environ.get("IGNORE_CLOCK") == "1"  # tests and demos: always inside the active times
         self.last_open_at: Any = None  # when the door last said its opening line
         self.quiet_until: Any = None  # after a family member says he's safe, re-entries don't restart the door
         self.hub = Hub()
@@ -99,4 +100,6 @@ class Store:
         return f"{PUBLIC_URL}/brief.html#{briefmod.mint(incident_id, member_id, self.now())}"
 
     def night(self) -> bool:
+        if not self.hh.watch_enabled:
+            return False
         return self.night_mode or in_window(self.now().time(), self.hh.night_start, self.hh.night_end)

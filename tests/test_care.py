@@ -251,3 +251,81 @@ def test_old_return_confirmation_cannot_close_a_new_search(client):
     response = client.post("/care/confirm-return", json={"incident_id": old_id, "member_id": "TM-PRIMARY"})
     assert response.status_code == 409
     assert api.store.inc.id == new_id and api.store.inc.state.value == "CONVERSATION"
+
+
+def test_phone_numbers_normalize_and_old_saved_numbers_load_dialable(tmp_path):
+    import json
+
+    from nightfall.household import load, normalize_phone
+
+    assert normalize_phone("(626) 265-9377") == "+16262659377"
+    assert normalize_phone("16262659377") == "+16262659377"
+    assert normalize_phone("+44 20 7946 0958") == "+442079460958"
+    assert normalize_phone("12") is None and normalize_phone("442079460958") is None
+    raw = json.loads((api.ROOT / "data" / "household.json").read_text())
+    raw["tree"][0]["phone"] = "16262659377"
+    path = tmp_path / "h.json"
+    path.write_text(json.dumps(raw))
+    assert load(path).tree[0].phone == "+16262659377"
+
+
+def test_clear_everything_refuses_to_overwrite_the_demo_household(client):
+    before = api.store.hh
+    assert client.post("/care/clear").status_code == 409
+    assert api.store.hh == before
+
+
+def test_clear_everything_wipes_entered_data_in_a_scratch_copy(client, monkeypatch, tmp_path):
+    import shutil
+
+    from nightfall import api_app, api_enroll, history
+    from nightfall import store as store_mod
+
+    data = tmp_path / "data"
+    data.mkdir()
+    shutil.copyfile(api.ROOT / "data" / "household.blank.json", data / "household.blank.json")
+    (data / "household.live.json").write_text((data / "household.blank.json").read_text())
+    for name in ("faces", "history"):
+        (data / f"{name}.json").write_text("[1]")
+    medical, photo, samples = data / "medical.json", tmp_path / "photo", tmp_path / "samples"
+    medical.write_text("{}")
+    photo.write_text("x")
+    samples.mkdir()
+    (samples / "everyday.wav").write_bytes(b"x")
+    monkeypatch.setattr(store_mod, "ROOT", tmp_path)
+    monkeypatch.setattr(store_mod, "household_filename", lambda: "household.live.json")
+    monkeypatch.setattr(store_mod, "household_path", lambda: data / "household.live.json")
+    monkeypatch.setattr(api, "household_path", lambda: data / "household.live.json")
+    monkeypatch.setattr(api_enroll, "FACES", data / "faces.json")
+    monkeypatch.setattr(history, "FILE", data / "history.json")
+    monkeypatch.setattr(api_care, "PHOTO", photo)
+    monkeypatch.setattr(api_app, "SAMPLES", samples)
+    monkeypatch.setenv("MEDICAL_FILE", str(medical))
+    assert client.post("/care/clear").json() == {"ok": True}
+    assert not any(p.exists() for p in (data / "faces.json", data / "history.json", medical, photo))
+    assert list(samples.glob("*.wav")) == [] and api.store.places == []
+    assert api.store.hh.tree == () and api.store.hh.caregiver_name == ""
+
+
+def test_invitation_link_uses_the_public_url_so_it_works_off_this_laptop(client, monkeypatch):
+    monkeypatch.setenv("PUBLIC_URL", "https://family.example.com/")
+    made = client.post("/care/members", json={"name": "Cousin Dee"}).json()
+    assert made["invitation_url"] == "https://family.example.com/app?member=" + made["member_id"]
+    assert client.get("/app/state").json()["public_url"] == "https://family.example.com/"
+
+
+def test_schedule_switch_and_times_decide_when_the_door_is_watching(client, monkeypatch):
+    from datetime import datetime
+
+    assert client.put("/care/schedule", json={"enabled": True, "start": "21:00", "end": "21:00"}).status_code == 422
+    assert client.put("/care/schedule", json={"enabled": True, "start": "9pm", "end": "06:00"}).status_code == 422
+    monkeypatch.setattr(api.store, "night_mode", False)  # real clock rules, not the test override
+    at = lambda hhmm: datetime.fromisoformat(f"2026-10-24T{hhmm}:00-07:00")
+    assert client.put("/care/schedule", json={"enabled": True, "start": "21:00", "end": "06:00"}).status_code == 200
+    for when, expected in (("22:00", True), ("02:30", True), ("12:00", False), ("06:00", False)):
+        monkeypatch.setattr(api.store, "now", lambda when=when: at(when))
+        assert api.store.night() is expected, when
+    client.put("/care/schedule", json={"enabled": False, "start": "21:00", "end": "06:00"})
+    monkeypatch.setattr(api.store, "now", lambda: at("22:00"))
+    assert api.store.night() is False and client.get("/app/state").json()["household"]["watch_enabled"] is False
+    client.put("/care/schedule", json={"enabled": True, "start": "21:00", "end": "06:00"})

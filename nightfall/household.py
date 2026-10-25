@@ -47,6 +47,7 @@ class Household:
     diagnosis: str = ""
     doctor: dict[str, str] = field(default_factory=dict)  # name, phone
     caregiver_relationship: str = ""
+    watch_enabled: bool = True  # the on/off switch; the active times only matter while it is on
 
     def members_at(self, tier: int) -> list[TreeMember]:
         """Tree members at exactly this tier."""
@@ -68,6 +69,18 @@ def in_window(t: time, start: time, end: time) -> bool:
     return t >= start or t < end
 
 
+def normalize_phone(raw: str) -> str | None:
+    """+country-code form, which is all Twilio will dial. 10 digits, or 1 plus 10, count as US; otherwise it needs a +."""
+    digits = "".join(c for c in raw if c.isdigit())
+    if raw.strip().startswith("+") and 8 <= len(digits) <= 15:
+        return "+" + digits
+    if len(digits) == 10:
+        return "+1" + digits
+    if len(digits) == 11 and digits.startswith("1"):
+        return "+" + digits
+    return None
+
+
 def phone_env(member_id: str) -> str:
     """Real numbers live in .env (PHONE_TM_PRIMARY=+1...), never in the tracked household file."""
     return "PHONE_" + member_id.replace("-", "_").upper()
@@ -77,6 +90,7 @@ def load(path: str | Path) -> Household:
     """Load and validate data/household.json."""
     raw: dict[str, Any] = json.loads(Path(path).read_text())
     members = [TreeMember(**{**m, "phone": os.environ.get(phone_env(m["id"]), m["phone"])}) for m in raw["tree"]]
+    members = [replace(m, phone=normalize_phone(m.phone) or m.phone) if m.phone != "web" else m for m in members]
     named = [m for m in members if m.name.strip()]  # an unnamed placeholder is not a care-circle member
     if len(named) != len(members):
         named = [replace(m, tier=min(i + 1, 3)) for i, m in enumerate(sorted(named, key=lambda m: m.tier))]
@@ -98,6 +112,7 @@ def load(path: str | Path) -> Household:
         home_lng=float(raw["home_lng"]),
         radius_mi=radius,
         meds_opt_in=bool(raw.get("meds_opt_in", True)),
+        watch_enabled=bool(raw.get("watch_enabled", True)),
         tree=tree,
         medications=tuple(raw.get("medications", [])),
         familiar_places=tuple(raw.get("familiar_places", [])),

@@ -65,8 +65,13 @@ class Runner:
     async def _run(self, incident_id: str, hh: Household, message: str) -> None:
         ack = self._acks[incident_id]
         try:
+            rung: set[str] = (
+                set()
+            )  # nobody is called twice for one incident; the last step is "everyone not yet called"
             for tier, wait in LADDER:
                 members = [m for m in hh.tree if m.tier <= tier] if tier == 3 else hh.members_at(tier)
+                members = [m for m in members if m.id not in rung]
+                rung.update(m.id for m in members)
                 self.rings.append({"incident_id": incident_id, "tier": tier, "members": [m.id for m in members]})
                 await self._notifier.ring(members, message, incident_id, tier)
                 if wait <= 0:

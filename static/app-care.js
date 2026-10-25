@@ -1,6 +1,6 @@
 // Care forms keep drafts across polling. Requests report failures without claiming a save succeeded.
 const careDrafts = new Set();
-let careHydrated = false, callOrderDraft = null, familiarDraft = null, toastTimer;
+let careHydrated = false, callOrderDraft = null, toastTimer;
 const demoRequested = new URLSearchParams(location.search).get("demo") === "1";
 let demoMode = false;
 
@@ -72,13 +72,19 @@ function renderCallOrder() {
   const key = JSON.stringify(ordered);
   if ($("p-tree").dataset.key === key) return;
   $("p-tree").dataset.key = key;
-  $("p-tree").innerHTML = ordered.map((m, i) => `<div class="row" draggable="true" data-member="${esc(m.id)}"><div class="lead"><span class="badge ${i === 0 ? "on" : ""}">${i + 1}</span><div><span class="k">${esc(m.name)}${m.relationship ? " · " + esc(m.relationship) : ""}</span><span class="sub2">${i === 0 ? "Call first" : i === 1 ? "Next if no answer" : "Then everyone in the care circle"}${m.id === member ? " · This phone" : ""}</span></div></div><div class="reorder"><button aria-label="Move ${esc(m.name)} up" onclick="moveContact(${i},-1)" ${i === 0 ? "disabled" : ""}>↑</button><button aria-label="Move ${esc(m.name)} down" onclick="moveContact(${i},1)" ${i === ordered.length - 1 ? "disabled" : ""}>↓</button><button aria-label="Remove ${esc(m.name)}" onclick="removeContact('${esc(m.id)}')">Remove</button></div></div>`).join("") || '<div class="row"><span class="muted">No one yet. Invite a family member to start the call order.</span></div>';
+  $("p-tree").innerHTML = ordered.map((m, i) => `<div class="row" draggable="true" data-member="${esc(m.id)}"><div class="lead"><span class="badge ${i === 0 ? "on" : ""}">${i + 1}</span><div><span class="k">${esc(m.name)}${m.relationship ? " · " + esc(m.relationship) : ""}</span><span class="sub2">${i === 0 ? "Call first" : i === 1 ? "Next if no answer" : "Then everyone in the care circle"}${m.id === member ? " · This phone" : ""}</span></div></div><div class="reorder"><button aria-label="Move ${esc(m.name)} up" onclick="moveContact(${i},-1)" ${i === 0 ? "disabled" : ""}>↑</button><button aria-label="Move ${esc(m.name)} down" onclick="moveContact(${i},1)" ${i === ordered.length - 1 ? "disabled" : ""}>↓</button><button aria-label="Copy link for ${esc(m.name)}" onclick="copyMemberLink('${esc(m.id)}')">Link</button><button aria-label="Remove ${esc(m.name)}" onclick="removeContact('${esc(m.id)}')">Remove</button></div></div>`).join("") || '<div class="row"><span class="muted">No one yet. Invite a family member to start the call order.</span></div>';
   let dragged;
   $("p-tree").querySelectorAll("[data-member]").forEach(row => {
     row.addEventListener("dragstart", e => { dragged = row.dataset.member; e.dataTransfer.setData("text/plain", dragged); });
     row.addEventListener("dragover", e => e.preventDefault());
     row.addEventListener("drop", e => { e.preventDefault(); const from = ids.indexOf(dragged), to = ids.indexOf(row.dataset.member); if (from < 0 || to < 0) return; callOrderDraft = [...ids]; callOrderDraft.splice(to, 0, callOrderDraft.splice(from, 1)[0]); renderCallOrder(); });
   });
+}
+function memberLink(id) { return (S.public_url || location.origin).replace(/\/$/, "") + "/app?member=" + encodeURIComponent(id); }
+async function copyMemberLink(id) {
+  const url = memberLink(id), name = (S.household.tree.find(m => m.id === id) || {}).name || "this person";
+  try { await navigator.clipboard.writeText(url); toast("Link for " + name + " copied."); }
+  catch (error) { toast(url); }
 }
 async function removeContact(id) {
   const name = (S.household.tree.find(m => m.id === id) || {}).name || "this person";
@@ -130,17 +136,39 @@ async function joinCircle() {
   try { const result = await requestJSON("/care/members", {name: $("join-name").value.trim()}); location.assign("/app?member=" + encodeURIComponent(result.member_id)); }
   catch (error) { $("join-status").textContent = error.message; }
 }
-function editFamiliarPlaces() {
-  familiarDraft = S.household.familiar_places.map(p => ({...p})); $("familiar-editor").hidden = false; renderFamiliarEditor();
+async function savePlaces(places) {
+  await requestJSON("/care/places", {places: places.map(p => ({name: p.name, note: p.note || "", lat: p.lat, lng: p.lng}))}, "PUT");
+  await refresh();
 }
-function renderFamiliarEditor() {
-  $("familiar-fields").innerHTML = familiarDraft.map((p, i) => `<div class="place-editor"><label>Place name or address<input value="${esc(p.name)}" oninput="familiarDraft[${i}].name=this.value;delete familiarDraft[${i}].lat;delete familiarDraft[${i}].lng"></label><label>Why it is familiar<input value="${esc(p.note || "")}" oninput="familiarDraft[${i}].note=this.value"></label><button class="text-btn" onclick="familiarDraft.splice(${i},1);renderFamiliarEditor()">Remove place</button></div>`).join("");
+async function deletePlace(i) {
+  try { await savePlaces(S.household.familiar_places.filter((_, k) => k !== i)); toast("Place deleted."); }
+  catch (error) { toast(error.message); }
 }
-function addFamiliarPlace() { familiarDraft.push({name: "", note: ""}); renderFamiliarEditor(); }
-async function saveFamiliarPlaces() {
-  $("places-status").textContent = "Saving places…";
-  try { await requestJSON("/care/places", {places: familiarDraft.map(p => ({name: p.name, note: p.note || "", lat: p.lat, lng: p.lng}))}, "PUT"); $("familiar-editor").hidden = true; await refresh(); toast("Familiar places saved."); }
-  catch (error) { $("places-status").textContent = error.message; }
+async function addPlace() {
+  const name = $("fa-name").value.trim(); if (!name) { $("places-status").textContent = "Enter a place name or address."; return; }
+  $("places-status").textContent = "Adding…";
+  try {
+    await savePlaces([...S.household.familiar_places, {name, note: $("fa-note").value.trim()}]);
+    $("fa-name").value = ""; $("fa-note").value = ""; $("places-status").textContent = ""; $("familiar-editor").hidden = true; toast("Place added.");
+  } catch (error) { $("places-status").textContent = error.message; }
+}
+function fmtClock(hhmm) { const [h, m] = hhmm.split(":").map(Number); return ((h + 11) % 12 + 1) + ":" + String(m).padStart(2, "0") + " " + (h < 12 ? "AM" : "PM"); }
+function renderSchedule() {
+  const h = S.household, active = [$("sch-start"), $("sch-end")].includes(document.activeElement);
+  $("sch-on").checked = h.watch_enabled;
+  if (!active) { $("sch-start").value = h.night_start; $("sch-end").value = h.night_end; }
+  $("sch-sum").textContent = h.watch_enabled ? "Watching " + fmtClock(h.night_start) + " to " + fmtClock(h.night_end) : "Off. Nothing is monitored.";
+  $("sch-start").disabled = $("sch-end").disabled = !h.watch_enabled;
+}
+async function saveSchedule() {
+  $("sch-status").textContent = "";
+  try { await requestJSON("/care/schedule", {enabled: $("sch-on").checked, start: $("sch-start").value, end: $("sch-end").value}, "PUT"); await refresh(); }
+  catch (error) { $("sch-status").textContent = error.message; await refresh(); }
+}
+async function clearEverything() {
+  if (!confirm("Clear all information? This erases the profile, call order, address and places, voice recordings, enrolled faces, medical info and history. It cannot be undone.")) return;
+  try { await requestJSON("/care/clear", {}); try { localStorage.clear(); } catch (e) {} location.hash = "#setup"; location.reload(); }
+  catch (error) { toast(error.message); }
 }
 async function startWatch() { await requestJSON("/arm", {on: true}); await refresh(); go("home"); if (!soundOn) showArm(); }
 async function acknowledgeIncident() {

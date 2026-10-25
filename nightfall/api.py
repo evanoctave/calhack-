@@ -11,6 +11,7 @@ import os
 import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from datetime import timedelta
 from typing import Any
 
@@ -223,6 +224,11 @@ async def state() -> dict[str, Any]:
         },
         "now": store.now().isoformat(),
         "night_mode": store.night(),
+        "schedule": {
+            "enabled": store.hh.watch_enabled,
+            "start": store.hh.night_start.strftime("%H:%M"),
+            "end": store.hh.night_end.strftime("%H:%M"),
+        },
         "ladder": LADDER,
         "door_wait_s": engine.DOOR_WAIT_S,
         "incident": None
@@ -234,6 +240,19 @@ async def state() -> dict[str, Any]:
             "exited_at": inc.exited_at.isoformat() if inc.exited_at else None,
             "deadline_at": inc.deadline_at.isoformat() if inc.deadline_at else None,
             "acked_by": inc.acked_by,
+            "lines_spoken": inc.lines_spoken,
+            "last_line_at": inc.last_line_at.isoformat() if inc.last_line_at else None,
+            "person_in_frame": inc.person_in_frame,
+            "heading": inc.heading,
+            "score": (v := inc.verdict()).score,
+            "verdict": v.action,
+            "reasons": list(v.reasons),
+        },
+        "timing": {
+            "line_gap_s": engine.LINE_GAP_S,
+            "max_lines": engine.MAX_LINES,
+            "visitor_max_s": engine.VISITOR_MAX_S,
+            "deadline_s": engine.DEADLINE_S,
         },
         "log": store.log[-50:],
         "rings": store.runner.rings,
@@ -242,7 +261,10 @@ async def state() -> dict[str, Any]:
 
 @app.post("/arm")
 async def arm(body: ArmIn) -> dict[str, Any]:
-    store.night_mode = body.on
+    store.hh = replace(store.hh, watch_enabled=body.on)
+    from nightfall import api_app
+
+    api_app._persist_household(store.hh)
     _emit(store, {"type": "arm", "night_mode": store.night()})
     return {"night_mode": store.night()}
 
