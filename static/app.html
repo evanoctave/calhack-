@@ -278,7 +278,8 @@
   <div class="legend"><span><img src="/assets/figma/legend-hazard.svg" alt="">Hazards</span><span><img src="/assets/figma/legend-call.svg" alt="">Call first</span><span><img src="/assets/figma/legend-familiar.svg" alt="">Familiar</span></div>
   <p class="credit" id="b-source">Nearby places</p>
   <p class="cap">Nearby places, not Dad's live location.</p>
-  <div class="card brief-check"><div class="row"><div><span class="sub2" style="margin:0">Check first</span><span class="k" id="b-first">Finding nearby hazards…</span><span class="sub2" id="b-first-detail"></span></div></div></div><p class="label">Nearby open places &amp; phone numbers</p><div class="card" id="b-open-places"></div><button class="btn" onclick="go('search')">More places &amp; care notes</button><button class="btn" onclick="go('emergency')">Emergency options</button>
+  <div class="card brief-check"><div class="row"><div><span class="sub2" style="margin:0">Check first</span><span class="k" id="b-first">Finding nearby hazards…</span><span class="sub2" id="b-first-detail"></span></div></div></div><p class="label">Nearby open places &amp; phone numbers</p><div class="card" id="b-open-places"></div><button class="btn" onclick="go('search')">More places &amp; care notes</button>
+  <div class="card pad alarm"><p class="eyebrow red caps"><img class="status-icon" src="/assets/figma/alert.svg" alt=""><span id="em-tag">Emergency option available</span></p><p class="title" id="em-title">Need emergency help?</p><p class="cap" id="em-sub">Since the confirmed exit</p><p class="big-num red" id="em-clock">00:45</p><p class="body" id="em-line">You can choose to call 911 now.</p><p class="body">You decide. Nightfall does not call 911 on its own.</p><a class="btn danger mt" href="tel:911">Call 911</a><button class="btn demo-only mt" onclick="runDemo('deadline')">Demo · 15 minutes pass</button></div>
   <details class="disclosure"><summary>Read this to the dispatcher</summary><div><p class="mt" id="b-police" style="margin-bottom:0"></p>
     <div class="inline mt"><button class="btn small" onclick="copyPolice()">Copy</button><a class="btn small" href="tel:911" style="color:var(--red)">Call 911</a><span class="cap" id="b-copied"></span></div></div></details>
   <p class="cap">Backup contact: <span id="b-backup">Mike</span></p>
@@ -314,12 +315,6 @@
   <p class="media-cap" id="back-camera-caption">Back in view · Live</p>
   <div class="card pad ok"><p class="title green" id="back-call-status">Return confirmed.</p><p class="body">Night watch continues. This check-in is saved in tonight's activity.</p></div>
   <div class="actions"><button class="btn primary" onclick="go('home')">Back to night watch</button></div>
-</section>
-
-<section id="s-emergency" class="screen">
-  <header class="head"><p class="eyebrow red caps"><img class="status-icon" src="/assets/figma/alert.svg" alt=""><span id="em-tag">Emergency option available</span></p><h1 id="em-title">Need emergency help?</h1><p class="sub" id="em-sub">Since the confirmed exit</p></header>
-  <div class="card pad"><p class="big-num red" id="em-clock">00:45</p><p class="title" style="font-size:18px" id="em-line">You can choose to call 911 now.</p><p class="body">You decide. Nightfall does not call 911 on its own.</p></div>
-  <button class="btn demo-only" onclick="runDemo('deadline')">Demo · 15 minutes pass</button><div class="actions"><button class="btn" onclick="openBrief()">Keep the search brief open</button><a class="btn danger" href="tel:911">Call 911</a></div>
 </section>
 
 <section id="s-help" class="screen">

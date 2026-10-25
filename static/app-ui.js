@@ -2,7 +2,7 @@
 let S = null, member = "", incident = null, feedTimer = null, mapObj = null, mapLayer = null, soundOn = false, acked = false;
 function $(id) { return document.getElementById(id); }
 function go(name) { location.hash = "#" + name; }
-const SCREENS = ["setup", "profile", "medical", "report", "missing", "voice", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "brief", "search", "responding", "back", "emergency", "help", "record", "review", "creating", "voice-preview", "join"];
+const SCREENS = ["setup", "profile", "medical", "report", "missing", "voice", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "brief", "search", "responding", "back", "help", "record", "review", "creating", "voice-preview", "join"];
 const navStack = [];
 // An invitation link (/app?member=ID) opens the family view: alerts, the door and the report, but not the care setup.
 const FAMILY_VIEW = new URLSearchParams(location.search).has("member");
@@ -346,7 +346,7 @@ function autoRoute() {
   if (key === routeKey) return; const prev = routeKey; routeKey = key; if (!prev) return;  // first load: stay where the user is
   if (!inc || inc.state === "CLOSED") return;
   const here = location.hash.slice(1) || "home", busy = (here === "home" && homeIncident === inc.id) || ["talk", "call", "brief", "search", "profile", "medical", "record", "review", "creating"].includes(here);
-  if (S.call_911 && !prev.endsWith("|1") && !["RETURNED","CLOSED"].includes(inc.state)) { toast("Emergency call option available."); if (!busy && !["RETURNED","CLOSED"].includes(inc.state)) go("emergency"); return; }
+  if (S.call_911 && !prev.endsWith("|1") && !["RETURNED","CLOSED"].includes(inc.state)) { toast("Emergency call option available."); if (!busy && !["RETURNED","CLOSED"].includes(inc.state)) go("brief"); return; }
   if (inc.state === "CONVERSATION" && !busy) go("door");
   else if (inc.state === "DOOR_OPEN" && !busy) go("wait");
   else if (["ESCALATING", "EXHAUSTED"].includes(inc.state) && !inc.acked_by && !busy && ["door", "wait", "home", "back"].includes(here)) go("alert");
