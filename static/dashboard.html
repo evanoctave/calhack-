@@ -1,11 +1,13 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Nightfall</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>Nightfall</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/vendor/fonts/fonts.css">
 <link rel="stylesheet" href="/app.css"><script src="/app.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4.1646425229/face_detection.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-detection@1.0.3/dist/face-detection.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
+<!-- Detector stack served locally (static/vendor/ml): the venue Wi-Fi must not be able to kill the door.
+     face-api bundles tfjs 4.22.0, so it loads first and provides the global `tf` to coco-ssd and face-detection. -->
+<script src="/vendor/ml/face-api.js"></script>
+<script>window.tf = window.tf || (window.faceapi && faceapi.tf);</script>
+<script src="/vendor/ml/coco-ssd.min.js"></script>
+<script src="/vendor/ml/mediapipe/face_detection.js"></script>
+<script src="/vendor/ml/face-detection.min.js"></script>
 <script src="/cam.js"></script>
 <style>
 body { padding: 16px 0 32px; } .phone { max-width: 1180px; }

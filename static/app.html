@@ -1,7 +1,7 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#e8eef4">
-<title>Nightfall</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>Nightfall</title><link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/vendor/fonts/fonts.css">
 <link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="/app-layout.css"><link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 <script src="/app.js"></script><script src="/vendor/leaflet/leaflet.js"></script>
 </head><body>
@@ -232,7 +232,7 @@
 
 <section id="s-alert" class="screen">
   <header class="head"><a class="back" onclick="go('home')">Home</a></header>
-  <div class="card pad alarm"><p class="eyebrow red" style="margin:0 0 4px">Needs your attention</p><p class="title" style="font-size:23px;line-height:32px" id="a-title">Dad has left home</p><p class="body" id="a-sub">Front entrance · 2:03 AM</p></div>
+  <div class="card pad alarm" id="a-card"><p class="eyebrow red" style="margin:0 0 4px" id="a-eyebrow">Needs your attention</p><p class="title" style="font-size:23px;line-height:32px" id="a-title">Dad has left home</p><p class="body" id="a-sub">Front entrance · 2:03 AM</p></div>
   <div id="a-cd" class="banner" hidden><b id="a-cdt">Out of view</b><div id="a-cds" class="small"></div></div>
   <div class="card"><div class="media" id="a-hero" style="border-radius:0;box-shadow:none"><div class="ph"></div></div>
     <div class="row"><div><span class="k">Last clear camera image</span><span class="sub2" id="a-cap">At the moment he left</span></div></div>

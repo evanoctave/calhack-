@@ -15,7 +15,7 @@ async function startCam() {
   Cam.ctx = Cam.canvas.getContext("2d", {willReadFrequently: true});
   Cam.overlay = document.getElementById("overlay"); Cam.octx = Cam.overlay.getContext("2d");
   Cam.on = true; camStatus("loading detector...");
-  try { Cam.model = await cocoSsd.load({base: "lite_mobilenet_v2"}); camStatus("detector ready. walk into frame = approach; out of frame 1.5 s = exit timer."); camTele("detector_ready", "coco-ssd"); }
+  try { Cam.model = await cocoSsd.load({base: "lite_mobilenet_v2", modelUrl: "/vendor/ml/coco-ssd/model.json"}); camStatus("detector ready. walk into frame = approach; out of frame 1.5 s = exit timer."); camTele("detector_ready", "coco-ssd"); }
   catch (e) { camStatus("detector failed to load (offline?); falling back to motion"); camTele("detector_failed", String(e)); }
   loadFace(); loadFaceApi();
   setInterval(camTick, 250);
@@ -69,7 +69,7 @@ function drawBoxes(boxes, present) {
 // Face detector (MediaPipe via TF.js). No face while a person is in frame for ~1 s = turned away from the door camera.
 async function loadFace() {
   try {
-    const det = await faceDetection.createDetector(faceDetection.SupportedModels.MediaPipeFaceDetector, {runtime: "mediapipe", solutionPath: "https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4.1646425229", modelType: "short"});
+    const det = await faceDetection.createDetector(faceDetection.SupportedModels.MediaPipeFaceDetector, {runtime: "mediapipe", solutionPath: "/vendor/ml/mediapipe", modelType: "short"});
     Cam.face = det; camStatus("detectors ready: person + face. turning away or moving away starts the voice.");
   } catch (e) { console.warn("face detector unavailable", e); }
 }
@@ -128,7 +128,7 @@ const Face = {api: null, ready: false, enrolled: [], lastAt: 0, label: "unknown"
 async function loadFaceApi() {
   try {
     if (!window.faceapi) throw new Error("face-api not loaded");
-    const base = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model";
+    const base = "/vendor/ml/face-api";
     await faceapi.nets.tinyFaceDetector.loadFromUri(base); await faceapi.nets.faceLandmark68TinyNet.loadFromUri(base); await faceapi.nets.faceRecognitionNet.loadFromUri(base);
     Face.api = faceapi; Face.ready = true; await loadEnrolled(); camStatus("face recognition ready · " + Face.enrolled.length + " enrolled");
   } catch (e) { console.warn("face recognition unavailable", e); camStatus("face recognition unavailable; identity stays unknown (rings by default)"); }
