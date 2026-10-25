@@ -48,7 +48,7 @@ Life Alert inside a doorbell camera. The laptop at `/` is the door device: camer
 4. Phone rings. Tap Answer: live camera feed, the AI call agent's opening (time, clothing, hazards, open places), and the brief link.
 5. Tap Take over the voice: quick phrases or typed lines play at the door in the caregiver voice; hold to talk sends your real voice.
 6. Still out of view 45 s later: a Call 911 option appears on every phone (you dial, never the system). Walk back into frame: rings cancel, phones show returned.
-7. Address setup: `/setup.html` turns any address into hazards (OpenStreetMap) in seconds and open-at-night places (Apify) in a minute.
+7. Address setup: `/app#places` turns any address into hazards (OpenStreetMap) in seconds and open-at-night places (Apify) in a minute.
 
 Keys: `m` approach, `l` leave frame, `b` back in frame, `o`/`c` door.
 
@@ -63,7 +63,7 @@ R11 wander score (docs/TRACKS.md): direction from the door zone, voice check-in 
 | Reply hearing (Cartesia Ink) | same | typed reply |
 | Redirect line, clothing fields, call QA (Claude) | `ANTHROPIC_API_KEY` | scripted lines, fixture clothing |
 | Memory (Moss semantic notes) | `MOSS_PROJECT_ID` + `MOSS_PROJECT_KEY` | TF-IDF over the same notes |
-| Places: our Apify Actor [night-search-radius](https://apify.com/evanoctave/night-search-radius) (Overpass hazards + Google Maps open places) | `APIFY_TOKEN` at setup, `/setup.html` or `scripts/run_actor.py` | Marina (SF) fixture |
+| Places: our Apify Actor [night-search-radius](https://apify.com/evanoctave/night-search-radius) (Overpass hazards + Google Maps open places) | `APIFY_TOKEN` at setup, `/app#places` or `scripts/run_actor.py` | Marina (SF) fixture |
 | Family call (Twilio + TwiML agent) | `TWILIO_*` + `PUBLIC_URL` | phone page over SSE |
 
 `MOCK=1` forces every mock. `MOCK=0` with missing keys falls back per row and prints `<name> fallback: <reason>`.

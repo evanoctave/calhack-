@@ -64,7 +64,7 @@ It also has to tell a wander apart from everything else that happens at a front 
 - **Moss** holds a semantic index of the caregiver's notes per household. Hits steer the redirect line, the habits section of the brief and the call agent's facts.
 - **Apify:** we built and published our own Actor, [night-search-radius](https://apify.com/evanoctave/night-search-radius).
   - It takes a home location and returns hazards from OpenStreetMap Overpass, open-all-night places with phones and hours (by calling Apify's Google Maps Scraper), and the person's familiar places, each with its distance.
-  - Nightfall runs it once at setup from `/setup.html` and caches the result, so nothing on the 2 AM path waits on a scraper.
+  - Nightfall runs it once at setup from `/app#places` and caches the result, so nothing on the 2 AM path waits on a scraper.
 - **No keys needed to demo:** every vendor sits behind a mock, so `./run.sh` works with no keys at all, and `/health` shows which pieces are live. 86 tests and a `./run.sh check` gate run before every commit.
 
 ## Challenges we ran into
