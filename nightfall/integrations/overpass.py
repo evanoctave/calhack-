@@ -10,7 +10,9 @@ MIRRORS: Final = ("https://overpass-api.de/api/interpreter", "https://overpass.k
 UA: Final = "nightfall-calhacks/0.1 (hackathon demo)"
 
 
-def hazards(lat: float, lng: float, radius_m: int) -> list[dict[str, Any]]:
+def hazards(
+    lat: float, lng: float, radius_m: int, mirrors: tuple[str, ...] = MIRRORS, timeout_s: float = 40.0
+) -> list[dict[str, Any]]:
     """Ways tagged water, rail, motorway or construction within radius, with center coordinates."""
     q = (
         f'[out:json][timeout:25];(way["waterway"](around:{radius_m},{lat},{lng});'
@@ -20,9 +22,9 @@ def hazards(lat: float, lng: float, radius_m: int) -> list[dict[str, Any]]:
         f'way["landuse"="construction"](around:{radius_m},{lat},{lng}););out center tags 80;'
     )
     last: Exception | None = None
-    for url in MIRRORS:
+    for url in mirrors:
         try:
-            r = httpx.post(url, data={"data": q}, headers={"User-Agent": UA}, timeout=40.0)
+            r = httpx.post(url, data={"data": q}, headers={"User-Agent": UA}, timeout=timeout_s)
             r.raise_for_status()
             return list(r.json().get("elements", []))
         except Exception as e:  # noqa: BLE001

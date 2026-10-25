@@ -1,6 +1,6 @@
 """Fetch live places for the household and write data/places.<slug>.live.json.
 
-Usage: python scripts/run_actor.py [--slug marina] [--day Sunday] [--no-google]
+Usage: python scripts/run_actor.py [--slug sample] [--day Sunday] [--no-google]
 Hazards from Overpass (free); open-at-night places from the Apify Google Maps scraper (APIFY_TOKEN).
 Without a token, hazards still come from Overpass and the call-first rows fall back to the fixture.
 """
@@ -34,7 +34,7 @@ def load_env(path: Path) -> None:
 def main() -> int:
     load_env(ROOT / ".env")
     ap = argparse.ArgumentParser()
-    ap.add_argument("--slug", default="marina")
+    ap.add_argument("--slug", default="sample")
     ap.add_argument("--day", default="Sunday", help="weekday whose opening hours to keep")
     ap.add_argument("--no-google", action="store_true")
     a = ap.parse_args()

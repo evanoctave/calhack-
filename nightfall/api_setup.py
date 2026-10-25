@@ -1,4 +1,4 @@
-"""Caregiver setup: type an address, get the hazards around it now and the open-at-night places soon.
+"""Caregiver setup: type an address, get the open-at-night places around it as the Apify scrapers finish.
 
 Geocode + Overpass run inline (a few seconds). The Apify Google Maps run takes one to two minutes and
 costs a few cents, so it runs as a background task and the page polls /setup/status. The result is
@@ -17,13 +17,25 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from nightfall import places
-from nightfall.integrations import apify, geocode, overpass
+from nightfall.integrations import apify, geocode
 from nightfall.search import rank
 
 router = APIRouter()
 CACHE = Path("data/places.custom.live.json")
 _status: dict[str, Any] = {"apify": "idle", "address": "", "hazards": 0, "open": 0, "error": ""}
 _task: asyncio.Task[None] | None = None
+_open: list[dict[str, Any]] = []
+_where: tuple[float, float, float] | None = None
+# Few terms, few places each, one scraper run per term in parallel: a handful of places in well under a minute.
+# No "24 hour" in the terms: they hid ordinary stores that are open late; rank() puts open-now places first.
+FAST_SEARCHES = ["gas station", "convenience store", "hospital emergency room", "pharmacy"]
+PER_SEARCH = 5
+RUN_MEMORY_MB = 1024
+
+
+def _where_set(lat: float, lng: float, radius_mi: float) -> None:
+    global _where
+    _where = (round(lat, 4), round(lng, 4), radius_mi)
 
 
 def _store() -> Any:
@@ -40,8 +52,9 @@ class AddressIn(BaseModel):
 
 @router.post("/setup/address")
 async def setup_address(body: AddressIn) -> dict[str, Any]:
-    """Geocode, fetch hazards now, start the Apify run, move the household home."""
-    global _task
+    """Geocode and move the household home; with Apify the scrapers run in the background and the
+    places show up in /setup/status as each one finishes."""
+    global _task, _open
     store = _store()
     if not 0.25 < body.radius_mi <= 5:
         raise HTTPException(422, "radius_mi must be in (0.25, 5]")
@@ -49,45 +62,59 @@ async def setup_address(body: AddressIn) -> dict[str, Any]:
         lat, lng, name = await asyncio.to_thread(geocode.geocode, body.address.strip())
     except Exception as e:  # noqa: BLE001
         raise HTTPException(404, f"address not found: {e}") from None
-    radius_m = int(body.radius_mi * 1609.34)
-    try:
-        hz = places.from_overpass(await asyncio.to_thread(overpass.hazards, lat, lng, radius_m), (lat, lng))
-    except Exception as e:  # noqa: BLE001
-        print(f"overpass fallback: {e}")
-        hz = []
-    store.hh = replace(store.hh, home_lat=lat, home_lng=lng, radius_mi=body.radius_mi)
-    keep = [p for p in store.places if p["category"] not in places.HAZARD_CATS]
-    store.places = hz + keep
-    _status.update({"address": name, "hazards": len(hz), "open": len(keep), "error": "", "lat": lat, "lng": lng})
+    store.hh = replace(store.hh, home_lat=lat, home_lng=lng, radius_mi=body.radius_mi, address=body.address.strip())
+    running = _task is not None and not _task.done()
+    same = (round(lat, 4), round(lng, 4), body.radius_mi) == _where
+    _status.update({"address": name, "error": "", "lat": lat, "lng": lng})
     if body.google and apify.enabled():
-        if _task is not None and not _task.done():
-            _task.cancel()
-        _status["apify"] = "running"
-        _task = asyncio.create_task(_run_apify(lat, lng, body.radius_mi))
+        if not (running and same):  # a second press for the same place must not pay for a second run
+            if running and _task is not None:
+                _task.cancel()
+            _open = []
+            _publish()
+            _status["apify"] = "running"
+            _where_set(lat, lng, body.radius_mi)
+            _task = asyncio.create_task(_run_apify(lat, lng, body.radius_mi))
     else:
         _status["apify"] = "skipped" if not body.google else "no token"
+        _open = [p for p in store.places if p["category"] not in places.HAZARD_CATS]
+        _publish()
+    return {"lat": lat, "lng": lng, "display_name": name, "apify": _status["apify"]}
+
+
+def _publish() -> None:
+    """The open-at-night places found so far; saved so a restart keeps them."""
+    store = _store()
+    store.places = list(_open)
+    _status["open"] = len(_open)
     _save(store.places)
-    return {"lat": lat, "lng": lng, "display_name": name, "hazards": hz, "apify": _status["apify"]}
+
+
+async def _search_one(lat: float, lng: float, radius_mi: float, term: str) -> None:
+    """One scraper run for one search term; its places appear as soon as it finishes."""
+    items = await asyncio.to_thread(
+        apify.google_places, lat, lng, radius_mi * 1.609, [term], PER_SEARCH, 150.0, RUN_MEMORY_MB
+    )
+    known = {p["name"].casefold() for p in _open}
+    _open.extend(p for p in places.from_google(items, (lat, lng)) if p["name"].casefold() not in known)
+    _publish()
 
 
 async def _run_apify(lat: float, lng: float, radius_mi: float) -> None:
+    """The search terms run as parallel scraper runs: places appear as each finishes."""
     store = _store()
     try:
-        try:
-            rows = places.from_actor(await asyncio.to_thread(apify.night_search_radius, lat, lng, radius_mi))
-        except Exception as e:  # noqa: BLE001
-            print(f"night-search-radius failed ({type(e).__name__}); calling the Google Maps Scraper directly")
-            items = await asyncio.to_thread(apify.google_places, lat, lng, radius_mi * 1.609, places.SEARCHES)
-            rows = places.from_google(items, (lat, lng))
-        g = [p for p in rows if p["category"] not in places.HAZARD_CATS]
-        hz = [p for p in rows if p["category"] in places.HAZARD_CATS] or [
-            p for p in store.places if p["category"] in places.HAZARD_CATS
-        ]
-        store.places = hz + g
-        _status.update({"apify": "done", "open": len(g)})
-        _save(store.places)
+        jobs = [_search_one(lat, lng, radius_mi, term) for term in FAST_SEARCHES]
+        errors = [r for r in await asyncio.gather(*jobs, return_exceptions=True) if isinstance(r, BaseException)]
+        for r in errors:
+            print(f"apify search failed: {type(r).__name__}: {r}")
+        if len(errors) == len(FAST_SEARCHES):
+            _status.update({"apify": "failed", "error": type(errors[0]).__name__})
+        else:
+            _status["apify"] = "done"
     except asyncio.CancelledError:
-        _status["apify"] = "cancelled"
+        if _task is asyncio.current_task():  # a newer search replaced this one and owns the status
+            _status["apify"] = "cancelled"
         raise
     except Exception as e:  # noqa: BLE001
         _status.update({"apify": "failed", "error": type(e).__name__})

@@ -10,12 +10,16 @@ function renderSamples() {
     $("v-samples").dataset.key = key;
     $("v-samples").innerHTML = Object.entries(SAMPLE_LINES).map(([k,[title,line]],i) => {
       const has = v.samples[k];
-      return `<div class="row big"><div><span class="k">${title}</span><span class="sub2">“${esc(line.replace("Sarah",S.household.caregiver_name))}”</span><span class="sub2">Sample ${i+1} · ${has ? "Recorded" : "Not recorded"}</span></div><div>${has ? `<button class="text-btn" onclick="playSample('${k}')">Play</button>` : ""}<button class="text-btn" onclick="pickSample('${k}')">${has ? "Redo" : "Record"}</button></div></div>`;
+      return `<div class="row big"><div><span class="k">${title}</span><span class="sub2">“${esc(line.replace("Sarah",S.household.caregiver_name))}”</span><span class="sub2">Sample ${i+1} · ${has ? "Recorded" : "Not recorded"}</span></div><div>${has ? `<button class="text-btn" onclick="playSample('${k}')">Play</button>` : ""}${has ? `<button class="text-btn" onclick="clearSample('${k}')">Clear</button>` : `<button class="text-btn" onclick="pickSample('${k}')">Record</button>`}</div></div>`;
     }).join("");
   }
   n = Object.values(v.samples).filter(Boolean).length;
   $("v-count").textContent = n + " sample" + (n === 1 ? "" : "s");
   $("v-clone").disabled = n === 0; $("v-clone").hidden = n === 0;
+}
+async function clearSample(kind) {
+  try { await requestJSON("/voice/samples/" + kind, undefined, "DELETE"); await refresh(); toast("Recording cleared."); }
+  catch (error) { toast(error.message); }
 }
 function pickSample(kind) {
   recKind = kind; const [title,line] = SAMPLE_LINES[kind];

@@ -54,7 +54,7 @@ def test_police_report_has_what_dispatch_asks() -> None:
         hh,
         inc,
         brief.mock_clothing(),
-        brief.load_places("data/places.marina.json"),
+        brief.load_places("data/places.sample.json"),
         [],
         inc.exited_at,
         history={"count": 0, "last": [], "typical_minutes": 0, "headings": []},

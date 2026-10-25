@@ -55,7 +55,7 @@ Modules (`nightfall/`):
 | Cartesia Sonic / Ink | Every spoken line at the door (caregiver clone or stock voice), the call agent (neutral voice), voice clone from the caregiver's samples, STT path | Lines pre-synthesized at boot and cached by hash; clone at setup | browser SpeechSynthesis |
 | Claude (Anthropic) | (a) next redirect line inside a template, validated; (b) clothing from the exit frame into enums; (c) call-agent answers from a fact sheet | (a) per reply, (b) once per exit in the background, (c) per caller question | scripted lines, fixture clothing, intent answers |
 | Moss | Semantic index of the caregiver's notes; hits steer the redirect line, the brief's habits, the call agent | Index built in the background at boot; queried per reply | TF-IDF over the same notes |
-| Apify Google Maps scraper | Open-all-night places with phone and hours around the home | Setup only, background task, cached to `data/places.*.live.json` | Marina fixture |
+| Apify Google Maps scraper | Open-all-night places with phone and hours around the home | Setup only, background task, cached to `data/places.*.live.json` | sample fixture |
 | OpenStreetMap Overpass | Hazards: water, rail, motorway, construction | Setup, seconds | fixture |
 | Nominatim | Address → coordinates | Setup | none needed |
 | Twilio | Outbound call driven by the TwiML agent, SMS link | On ring, if configured | SSE phone page |

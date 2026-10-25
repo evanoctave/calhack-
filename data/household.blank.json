@@ -9,7 +9,5 @@
   "home_lng": 0,
   "radius_mi": 1.5,
   "meds_opt_in": false,
-  "tree": [
-    { "id": "TM-PRIMARY", "name": "", "phone": "", "tier": 1 }
-  ]
+  "tree": []
 }

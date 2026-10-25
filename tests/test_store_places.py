@@ -1,4 +1,4 @@
-"""Store picks its places file: PLACES_FILE, else the live Marina file, else the fixture."""
+"""Store picks its places file: PLACES_FILE, else the sample live file, else the fixture."""
 
 import json
 import os
@@ -20,7 +20,7 @@ def _place(name: str) -> list[dict]:
 def root(tmp_path, monkeypatch):
     (tmp_path / "data").mkdir()
     shutil.copy(REPO / "data" / "household.json", tmp_path / "data" / "household.json")
-    (tmp_path / "data" / "places.marina.json").write_text(json.dumps(_place("Fixture")))
+    (tmp_path / "data" / "places.sample.json").write_text(json.dumps(_place("Fixture")))
     monkeypatch.setattr(store, "ROOT", tmp_path)
     monkeypatch.delenv("PLACES_FILE", raising=False)
     return tmp_path
@@ -31,12 +31,12 @@ def test_fixture_used_when_no_live_file(root) -> None:
 
 
 def test_live_file_wins_over_fixture(root) -> None:
-    (root / "data" / "places.marina.live.json").write_text(json.dumps(_place("Live")))
+    (root / "data" / "places.sample.live.json").write_text(json.dumps(_place("Live")))
     assert [p["name"] for p in store.Store().places] == ["Live"]
 
 
 def test_places_file_env_wins_over_live(root, monkeypatch) -> None:
-    (root / "data" / "places.marina.live.json").write_text(json.dumps(_place("Live")))
+    (root / "data" / "places.sample.live.json").write_text(json.dumps(_place("Live")))
     custom = root / "custom.json"
     custom.write_text(json.dumps(_place("Custom")))
     monkeypatch.setitem(os.environ, "PLACES_FILE", str(custom))
@@ -47,7 +47,7 @@ def test_committed_live_file_is_what_the_app_ships_with(monkeypatch) -> None:
     monkeypatch.delenv("PLACES_FILE", raising=False)  # conftest pins the fixture for every other test
     monkeypatch.setattr(store, "ROOT", REPO)
     if (REPO / "data" / "places.custom.live.json").exists():
-        pytest.skip("a setup-page cache on this machine takes precedence over the committed Marina file")
+        pytest.skip("a setup-page cache on this machine takes precedence over the committed sample file")
     s = store.Store()
     assert len(s.places) > 20 and {p["source"] for p in s.places} == {"apify"}
 

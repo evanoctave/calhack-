@@ -83,6 +83,8 @@ async def call_order(body: CallOrderIn) -> dict:
 
 class MemberIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
+    relationship: str = Field(default="", max_length=60)
+    phone: str = Field(default="", max_length=30)
 
 
 @router.post("/members")
@@ -91,13 +93,47 @@ async def add_member(body: MemberIn, request: Request) -> dict:
     name = body.name.strip()
     if not name:
         raise HTTPException(422, "Enter a name.")
+    relationship, phone = body.relationship.strip(), body.phone.strip()
+    if phone and not 7 <= sum(c.isdigit() for c in phone) <= 15:
+        raise HTTPException(422, "Enter a valid phone number.")
     existing = next((m for m in store.hh.tree if m.name.casefold() == name.casefold()), None)
     if existing is None:
-        existing = TreeMember("TM-" + secrets.token_hex(4), name, "web", min(len(store.hh.tree) + 1, 3))
+        existing = TreeMember(
+            "TM-" + secrets.token_hex(4), name, phone or "web", min(len(store.hh.tree) + 1, 3), relationship
+        )
         store.hh = store.hh.with_member(existing)
+        api_app._persist_household(store.hh)
+    elif relationship or phone:
+        existing = replace(existing, relationship=relationship or existing.relationship, phone=phone or existing.phone)
+        store.hh = replace(store.hh, tree=tuple(existing if m.id == existing.id else m for m in store.hh.tree))
         api_app._persist_household(store.hh)
     url = str(request.base_url).rstrip("/") + "/app?" + urlencode({"member": existing.id})
     return {"ok": True, "member_id": existing.id, "invitation_url": url}
+
+
+@router.delete("/members/{member_id}")
+async def remove_member(member_id: str) -> dict:
+    store = api_app._store()
+    kept = [m for m in store.hh.tree if m.id != member_id]
+    if len(kept) == len(store.hh.tree):
+        raise HTTPException(404, "That person is not in the care circle.")
+    tree = tuple(replace(m, tier=min(i + 1, 3)) for i, m in enumerate(sorted(kept, key=lambda m: m.tier)))
+    store.hh = replace(store.hh, tree=tree)
+    api_app._persist_household(store.hh)
+    return {"ok": True, "tree": [m.__dict__ for m in tree]}
+
+
+@router.get("/address-suggest")
+async def address_suggest(q: str = "") -> dict:
+    """Completions for the home-address box; a lookup failure just means no suggestions."""
+    q = q.strip()
+    if len(q) < 4:
+        return {"suggestions": []}
+    try:
+        return {"suggestions": await asyncio.to_thread(geocode.suggest, q[:200])}
+    except Exception as error:  # noqa: BLE001 — suggestions are optional
+        print(f"address suggest failed: {type(error).__name__}")
+        return {"suggestions": []}
 
 
 class FamiliarPlaceIn(BaseModel):

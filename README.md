@@ -63,7 +63,7 @@ R11 wander score (docs/TRACKS.md): direction from the door zone, voice check-in 
 | Reply hearing (Cartesia Ink) | same | typed reply |
 | Redirect line, clothing fields, call QA (Claude) | `ANTHROPIC_API_KEY` | scripted lines, fixture clothing |
 | Memory (Moss semantic notes) | `MOSS_PROJECT_ID` + `MOSS_PROJECT_KEY` | TF-IDF over the same notes |
-| Places: our Apify Actor [night-search-radius](https://apify.com/evanoctave/night-search-radius) (Overpass hazards + Google Maps open places) | `APIFY_TOKEN` at setup, `/app#places` or `scripts/run_actor.py` | Marina (SF) fixture |
+| Places: our Apify Actor [night-search-radius](https://apify.com/evanoctave/night-search-radius) (Overpass hazards + Google Maps open places) | `APIFY_TOKEN` at setup, `/app#places` or `scripts/run_actor.py` | Sample fixture |
 | Family call (Twilio + TwiML agent) | `TWILIO_*` + `PUBLIC_URL` | phone page over SSE |
 
 `MOCK=1` forces every mock. `MOCK=0` with missing keys falls back per row and prints `<name> fallback: <reason>`.
@@ -76,7 +76,7 @@ nightfall/   engine (pure state machine), escalation, notify, brief, search, scr
              voice, llm, call_agent, memory, places, api_voice, integrations/ (cartesia, anthropic, twilio, moss, apify, overpass)
 scripts/     run_actor.py (Apify + Overpass -> data/places.<slug>.live.json)
 static/      dashboard.html, phone.html, brief.html, tokens.css (light + dark), app.js
-data/        household.json, places.marina.json
+data/        household.json, places.sample.json
 tests/       engine, escalation, brief, api
 docs/        API.md (the contract between lanes)
 ```

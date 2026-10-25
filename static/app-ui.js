@@ -1,7 +1,6 @@
 // Caregiver app: hash router, state polling + SSE, screen renderers. Voice/recording lives in app-voice.js.
 let S = null, member = "", incident = null, feedTimer = null, mapObj = null, mapLayer = null, soundOn = false, acked = false;
 function $(id) { return document.getElementById(id); }
-function pickPersonRelation() { const rel = $("p-prel").value, short = $("p-short"); if (rel && rel !== "Other" && (!short.value.trim() || short.dataset.auto === "1")) { short.value = rel; short.dataset.auto = "1"; } careDrafts.add("s-profile"); }
 function go(name) { location.hash = "#" + name; }
 const SCREENS = ["setup", "profile", "medical", "report", "voice", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "takeover", "brief", "search", "responding", "back", "emergency", "help", "record", "review", "creating", "voice-preview", "join"];
 const navStack = [];
@@ -191,7 +190,7 @@ async function saveProfile() {
   const description = {}; ["sex", "height", "weight", "hair", "eyes", "build", "marks"].forEach(k => { description[k] = $("p-" + k).value.trim(); });
   $("profile-status").textContent = "Saving…";
   try {
-    await requestJSON("/profile", {person_full_name: $("p-name").value.trim(), person_name: $("p-short").value.trim(), person_age: $("p-age").value === "" ? undefined : Number($("p-age").value), caregiver_name: $("p-care").value.trim(), caregiver_relationship: $("p-relationship").value.trim(), person_relationship: $("p-prel").value, description, diagnosis: $("p-diag").value.trim(), doctor: {name: $("p-docname").value.trim(), phone: $("p-docphone").value.trim()}});
+    await requestJSON("/profile", {person_full_name: $("p-name").value.trim(), person_name: $("p-short").value.trim(), person_age: $("p-age").value === "" ? undefined : Number($("p-age").value), caregiver_name: $("p-care").value.trim(), caregiver_relationship: $("p-relationship").value.trim(), description, diagnosis: $("p-diag").value.trim(), doctor: {name: $("p-docname").value.trim(), phone: $("p-docphone").value.trim()}});
     careDrafts.delete("s-profile"); await refresh(); $("profile-status").textContent = ""; toast("Care details saved."); go("setup");
   } catch (error) { $("profile-status").textContent = error.message; }
 }
@@ -206,7 +205,7 @@ function enableSound() { if (soundOn) return; soundOn = true; try { const a = $(
 function armPhone() { enableSound(); $("arm").hidden = true; renderCareStatus(); try { localStorage.setItem("nf-armed", "1"); } catch (e) {} }
 function showArm() { $("arm").hidden = false; }
 let rungFor = ""; let lastRingMsg = "";
-function showIncoming(msg) { const who = (S && (S.household.person_name || S.household.person_relationship)) || "They"; $("inc-title").textContent = /help button/i.test(msg || "") ? "Help requested at the door" : who + " has left home"; $("inc-ctx").textContent = who + "'s care circle"; $("inc-msg").textContent = msg || ""; $("incoming").hidden = false; }
+function showIncoming(msg) { const who = (S && S.household.person_name) || "They"; $("inc-title").textContent = /help button/i.test(msg || "") ? "Help requested at the door" : who + " has left home"; $("inc-ctx").textContent = who + "'s care circle"; $("inc-msg").textContent = msg || ""; $("incoming").hidden = false; }
 function answerFromOverlay() { $("incoming").hidden = true; answerCall(); }
 function dismissOverlay() { $("incoming").hidden = true; stopRing(); go("alert"); }
 function ringNow(incId, msg) { if (rungFor === incId) return; rungFor = incId; incident = incId; lastRingMsg = msg; startRing(); showIncoming(msg); fillIncoming(); }
@@ -248,19 +247,21 @@ function onEvent(e) {
 function meName() { const m = S.household.tree.find(t => t.id === member); return m ? m.name : S.household.caregiver_name; }
 function mmss(sec) { sec = Math.max(0, Math.round(sec)); return String(Math.floor(sec / 60)).padStart(2, "0") + ":" + String(sec % 60).padStart(2, "0"); }
 function renderFigma() {
-  const h = S.household, inc = S.incident, p = h.person_name || h.person_relationship || "Them", first = (h.person_full_name || "").split(" ")[0] || p, me = meName();
+  const h = S.household, inc = S.incident, p = h.person_name || "Them", first = (h.person_full_name || "").split(" ")[0] || p, me = meName();
   const tree = h.tree, others = tree.filter(m => m.id !== member).map(m => m.name);
   // setup hub
   $("su-sub").textContent = p + "'s care, in one place.";
-  $("su-person").textContent = `${p} (${first})` + (h.person_age ? ", " + h.person_age : "");
+  const who = h.person_name || (h.person_full_name || "").split(" ")[0];
+  $("su-person").textContent = "Who are we monitoring" + (who ? ` (${who})` : "");
   $("su-person2").textContent = [h.caregiver_name, h.caregiver_relationship, "Care details"].filter(Boolean).join(" · ");
-  $("su-voice").textContent = S.voice.source === "clone" ? (S.voice.name || h.caregiver_name) + "'s cloned voice" : S.voice.name ? S.voice.name + (S.voice.source === "mock" ? " · Demo voice" : " · Voice") : "Record or choose a familiar voice";
+  const voiceWho = S.voice.source === "clone" ? (S.voice.name || h.caregiver_name) : "";
+  $("su-voice-title").textContent = "Whose voice are we using" + (voiceWho ? ` (${voiceWho})` : "");
+  $("su-voice").textContent = S.voice.source === "clone" ? "Cloned voice" : S.voice.name ? S.voice.name + (S.voice.source === "mock" ? " · Demo voice" : " · Voice") : "Record your voice";
   $("su-calls").textContent = tree.map((m, i) => (i + 1) + " " + m.name).join(" → ");
   $("su-places").textContent = (h.address || "Home") + " · " + h.radius_mi + " mi";
   const rad = pickRadius ?? h.radius_mi; $("pl-radius").textContent = rad + " mi around home"; renderRadius(rad); $("ar-sub").textContent = (h.address || "Home") + " · " + h.radius_mi + " mi around home";
   $("cam-person").textContent = `${p} (${first})`; $("arm-who").textContent = me + " · " + (tree[0] && tree[0].id === member ? "First contact" : "Care circle");
   $("pf-avatar").innerHTML = h.photo ? `<img src="${esc(h.photo)}" alt="Profile photo">` : `<img class="profile-camera-icon" src="/assets/figma/camera.svg" alt="Add photo">`;
-  $("pf-meds").innerHTML = h.medications.map(m => `<div class="row"><span>${esc(m.name)}</span><span class="v">${esc((m.dose + " · " + (m.note || "")).replace(/ · $/, ""))}</span></div>`).join("") || '<div class="row"><span class="muted">None added</span></div>';
   // watch
   $("h-watch").textContent = "Watching over " + p; $("h-greet").textContent = greeting() + ", " + h.caregiver_name;
   // at the door
@@ -324,10 +325,9 @@ async function findPlaces() {
   if (!address) { toast("Enter your home address first."); return; }
   clearInterval(areaPoll); areaSearching = true; go("area"); $("ar-status").textContent = "Finding nearby places…";
   try {
-    if (address !== S.household.address) await requestJSON("/profile",{address});
     await requestJSON("/setup/address",{address,radius_mi:pickRadius ?? S.household.radius_mi,google:true});
     await requestJSON("/profile",{}); pickRadius = null; careDrafts.delete("s-places"); areaSearching = false; await refresh();
-    const update = async()=>{ const status = await requestJSON("/setup/status",undefined,"GET"); await renderArea(status); if (status.apify !== "running") { clearInterval(areaPoll); $("ar-status").textContent = status.apify === "done" ? "Nearby places are ready." : "Hazards are ready. Open-late places are unavailable; try again later."; } else $("ar-status").textContent = "Hazards are ready. Finding places open late…"; };
+    const update = async()=>{ const status = await requestJSON("/setup/status",undefined,"GET"); await renderArea(status); const mapping = ""; if (status.apify !== "running" && !status.hazards_pending) { clearInterval(areaPoll); $("ar-status").textContent = status.apify === "done" ? "Nearby places are ready." : "Open-late places are unavailable; try again later."; } else if (status.apify === "running") $("ar-status").textContent = "Finding places open late…" + mapping; else $("ar-status").textContent = "Nearby places are ready." + mapping; };
     areaPoll = setInterval(()=>update().catch(()=>{ $("ar-status").textContent="Search interrupted. Go back and try again."; clearInterval(areaPoll); }),2000); await update();
   } catch(error) { areaSearching = false; $("ar-status").textContent = "Search unavailable: " + error.message; }
 }

@@ -13,23 +13,21 @@
 <section id="s-setup" class="screen">
   <header class="head"><p class="eyebrow">NIGHTFALL</p><h1>Ready for tonight</h1><p class="sub" id="su-sub">Care, in one place.</p></header>
   <div class="setup-links">
-    <button class="setup-link" onclick="go('profile')"><span><b id="su-person">Dad (Robert), 78</b><small id="su-person2">Care details</small></span></button>
-    <button class="setup-link" onclick="go('voice')"><span><b>Family voice</b><small id="su-voice">Record or choose a familiar voice</small></span></button>
+    <button class="setup-link" onclick="go('profile')"><span><b id="su-person">Who are we monitoring</b><small id="su-person2">Care details</small></span></button>
+    <button class="setup-link" onclick="go('voice')"><span><b id="su-voice-title">Whose voice are we using</b><small id="su-voice">Record or choose a familiar voice</small></span></button>
     <button class="setup-link" onclick="go('calls')"><span><b>Call order</b><small id="su-calls">Your care circle</small></span></button>
     <button class="setup-link" onclick="go('places')"><span><b>Home &amp; nearby places</b><small id="su-places">Set your home address</small></span></button>
   </div>
   <div class="pair"><button class="btn" onclick="go('camera')">Door camera</button><button class="btn" onclick="showArm()">Phone alerts</button></div>
-  <details class="disclosure"><summary>More care settings</summary><div><button class="setup-link" onclick="go('medical')"><span><b>Medical information</b><small id="su-medical">Blood type, allergies, conditions</small></span></button><button class="text-btn" onclick="toggleTheme()">Switch light / dark appearance</button><button class="text-btn" id="demo-enable" onclick="enterDemo()" hidden>Open demo mode</button></div></details>
   <div class="actions"><button class="btn primary" onclick="startWatch()">Start night watch</button></div>
 </section>
 
 <section id="s-profile" class="screen">
   <header class="head"><a class="back" onclick="go('setup')">Setup</a><h1>Who are we caring for?</h1><p class="sub">Start with their details and your relationship.</p></header>
   <div class="card pad"><p class="cap">Person you care for</p>
-    <div class="lead mt"><button class="photo-picker" type="button" onclick="document.getElementById('p-photo').click()" aria-label="Add or change profile photo"><span class="avatar" id="pf-avatar"><img src="/assets/figma/camera.svg" alt=""></span></button><input id="p-photo" type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="uploadPhoto(this)"><div class="profile-fields" style="flex:1"><input aria-label="Full name" id="p-name" placeholder="Robert Miller" style="font-weight:600"><select aria-label="Their relationship to you" id="p-prel" class="mt" onchange="pickPersonRelation()"><option value="">Their relationship to you</option><option>Dad</option><option>Mom</option><option>Grandpa</option><option>Grandma</option><option>Husband</option><option>Wife</option><option>Brother</option><option>Sister</option><option>Friend</option><option>Other</option></select><div class="inline mt"><input aria-label="Preferred name" id="p-short" placeholder="What you call them"><input aria-label="Age" id="p-age" type="number" inputmode="numeric" placeholder="78" style="width:84px"></div></div></div>
+    <div class="lead mt"><button class="photo-picker" type="button" onclick="document.getElementById('p-photo').click()" aria-label="Add or change profile photo"><span class="avatar" id="pf-avatar"><img src="/assets/figma/camera.svg" alt=""></span></button><input id="p-photo" type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="uploadPhoto(this)"><div class="profile-fields" style="flex:1"><input aria-label="Full name" id="p-name" placeholder="Robert Miller" style="font-weight:600"><div class="inline mt"><input aria-label="Preferred name" id="p-short" placeholder="What you call them"><input aria-label="Age" id="p-age" type="number" inputmode="numeric" placeholder="78" style="width:84px"></div></div></div>
     <p class="cap mt">Use a clear, recent photo to help your family recognize them.</p></div>
   <div class="card"><label class="field"><span class="lbl">Your name</span><input id="p-care" placeholder="Sarah Miller"></label><label class="field"><span class="lbl">Your relationship</span><input id="p-relationship" placeholder="Daughter, son, neighbor…"></label></div>
-  <div class="card"><div class="row"><span class="k">Medications</span></div><div id="pf-meds"></div></div>
   <p class="label">What police ask for</p>
   <div class="card"><div class="grid2"><label class="field"><span class="lbl">Sex</span><input id="p-sex"></label><label class="field"><span class="lbl">Height</span><input id="p-height"></label>
     <label class="field"><span class="lbl">Weight</span><input id="p-weight"></label><label class="field"><span class="lbl">Hair</span><input id="p-hair"></label>
@@ -37,11 +35,12 @@
     <label class="field"><span class="lbl">Marks, gait, glasses</span><input id="p-marks"></label>
     <label class="field"><span class="lbl">Diagnosis, as you'd tell a dispatcher</span><input id="p-diag"></label>
     <div class="grid2"><label class="field"><span class="lbl">Doctor</span><input id="p-docname"></label><label class="field"><span class="lbl">Doctor's phone</span><input id="p-docphone" inputmode="tel"></label></div></div>
+  <div class="setup-links"><button class="setup-link" onclick="go('medical')"><span><b>Medical information</b><small id="su-medical">Blood type, allergies, conditions</small></span></button></div>
   <p id="profile-status" class="form-status" role="status"></p><div class="actions"><button class="btn primary" onclick="saveProfile()">Save care details</button></div>
 </section>
 
 <section id="s-medical" class="screen">
-  <header class="head"><a class="back" onclick="go('setup')">Setup</a><p class="eyebrow">Care settings</p><h1>Medical info</h1><p class="sub" id="md-sub">What paramedics and the ER will ask for.</p></header>
+  <header class="head"><a class="back" onclick="go('profile')">Care details</a><p class="eyebrow">Care settings</p><h1>Medical info</h1><p class="sub" id="md-sub">What paramedics and the ER will ask for.</p></header>
   <div id="md-sample" class="card pad" hidden><p class="title">Sample details</p><p class="body">This is demo data. Edit anything and save to make it yours.</p></div>
   <p class="label">Person</p>
   <div class="card"><label class="field"><span class="lbl">Full name</span><input id="md-name" autocomplete="off"></label>
@@ -120,7 +119,7 @@
 
 <section id="s-places" class="screen">
   <header class="head"><a class="back" onclick="go('setup')">Setup</a><p class="eyebrow">Care settings</p><h1>Home &amp; familiar places</h1><p class="sub">Help your family know where to look.</p></header>
-  <div class="card"><label class="field"><span class="lbl">Home address</span><input id="p-addr" placeholder="3245 Fillmore St, San Francisco, CA" autocomplete="street-address" enterkeyhint="search"></label></div>
+  <div class="card"><label class="field"><span class="lbl">Home address</span><input id="p-addr" list="addr-list" placeholder="Start typing your address" autocomplete="off" enterkeyhint="search" oninput="suggestAddress()"><datalist id="addr-list"></datalist></label></div>
   <p class="label">How far could he walk?</p>
   <div class="seg" id="pl-rad"></div>
   <div class="card pad"><span class="cap blue" id="pl-radius">1.5 mi around home</span><p class="cap mt">We map water, rail lines, highways and construction inside this circle right away. Apify then finds places open late where someone could have seen him.</p></div>
@@ -130,12 +129,12 @@
 </section>
 
 <section id="s-area" class="screen">
-  <header class="head"><a class="back" onclick="go('places')">Home and places</a><h1>Know the area first</h1><p class="sub" id="ar-sub">San Francisco Marina · 1.5 mi around home</p></header>
+  <header class="head"><a class="back" onclick="go('places')">Home and places</a><h1>Know the area first</h1><p class="sub" id="ar-sub">Your home · 1.5 mi around home</p></header>
   <div id="area-map"></div>
-  <div class="card"><div class="row"><div><span class="k">Places to check first</span><span class="sub2">Water, rail, highways, construction</span></div><span class="v blue" id="ar-haz">0</span></div>
+  <div class="card"><div class="row" hidden><div><span class="k">Places to check first</span><span class="sub2">Water, rail, highways, construction</span></div><span class="v blue" id="ar-haz">0</span></div>
     <div class="row"><div><span class="k">Places to call</span><span class="sub2">Open late or open now</span></div><span class="v blue" id="ar-call">0</span></div></div>
-  <p class="label">Dangerous places, nearest first</p>
-  <div class="card" id="ar-hazlist"><div class="row"><span class="muted">Searching…</span></div></div>
+  <p class="label" hidden>Dangerous places, nearest first</p>
+  <div class="card" id="ar-hazlist" hidden><div class="row"><span class="muted">Searching…</span></div></div>
   <p class="label">Open late nearby</p>
   <div class="card" id="ar-calllist"><div class="row"><span class="muted">Searching…</span></div></div>
   <p class="cap">Familiar places stay separate from nearby risks. This map is a search reference.</p>
@@ -347,7 +346,7 @@
   </div>
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
-<dialog id="invite-dialog" aria-labelledby="invite-title"><h2 id="invite-title">Invite your family</h2><p>Add someone to the care circle, then share their phone link.</p><label>Name<input id="invite-name" autocomplete="name"></label><p class="cap">They can enable sound after opening the invitation.</p><p id="invite-status" class="form-status" role="status"></p><button class="btn primary" id="invite-create" onclick="createInvitation()">Create invitation link</button><div id="invite-result" hidden><label>Invitation link<input id="invite-url" readonly></label><button class="btn primary" onclick="shareInvitation()">Share invitation</button></div><button class="btn" onclick="document.getElementById('invite-dialog').close()">Done</button></dialog>
+<dialog id="invite-dialog" aria-labelledby="invite-title"><h2 id="invite-title">Invite your family</h2><p>Add someone to the care circle, then share their phone link.</p><label>Name<input id="invite-name" autocomplete="name"></label><label>Relationship<input id="invite-rel" placeholder="Daughter, son, neighbor…"></label><label>Phone number<input id="invite-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(415) 555-0123"></label><p class="cap">We call this number if they are next in the care circle.</p><p id="invite-status" class="form-status" role="status"></p><button class="btn primary" id="invite-create" onclick="createInvitation()">Create invitation link</button><div id="invite-result" hidden><label>Invitation link<input id="invite-url" readonly></label><button class="btn primary" onclick="shareInvitation()">Share invitation</button></div><button class="btn" onclick="document.getElementById('invite-dialog').close()">Done</button></dialog>
 <dialog id="scenarios" aria-labelledby="scenarios-title"><h2 id="scenarios-title">Other scenarios</h2><p>These controls simulate events in mock mode.</p><button class="btn" onclick="runDemo('start')">Dad approaches the door</button><button class="btn" onclick="runDemo('visitor')">Visitor at the door</button><button class="btn" onclick="runDemo('help')">Help button pressed</button><button class="btn" onclick="runDemo('home')">Known person comes home</button><button class="btn" onclick="runDemo('other-response')">Another family member responds</button><button class="btn" onclick="runDemo('return')">Dad returns during calls</button><button class="btn" onclick="document.getElementById('scenarios').close()">Close</button></dialog>
 <section id="s-join" class="screen phone" hidden><header class="head"><p class="eyebrow">Family invitation</p><h1>Join the care circle</h1><p class="sub">Add your name and enable sound on this phone.</p></header><label class="card field"><span class="lbl">Your name</span><input id="join-name" autocomplete="name"></label><p id="join-status" class="form-status" role="status"></p><div class="actions"><button class="btn primary" onclick="joinCircle()">Join the care circle</button></div></section>
 <script src="/app-care.js"></script><script src="/app-ui.js"></script><script src="/app-voice.js"></script><script src="/app-medical.js"></script><script src="/app-report.js"></script>
