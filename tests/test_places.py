@@ -94,6 +94,7 @@ def test_from_overpass_labels_and_skips_non_channels() -> None:
     ]
     out = places.from_overpass(els, HOME)
     assert sorted(p["name"] for p in out) == ["Lagoon", "Stream"]
+    assert {p["source"] for p in out} == {"overpass"}
 
 
 def test_from_overpass_dedupes() -> None:

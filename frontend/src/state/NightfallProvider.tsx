@@ -35,6 +35,7 @@ export interface NightfallContextValue {
   setScenario: (scenario: string) => void;
   soundEnabled: boolean;
   enableSound: () => Promise<void>;
+  testSound: () => Promise<void>;
   stopRinging: () => void;
   silenceRing: () => void;
   ringSuppressed: boolean;
@@ -115,6 +116,9 @@ function NightfallSession({ children }: { children: ReactNode }) {
   const [soundEnabled, setSoundEnabled] = useState(false);
   const soundRef = useRef(false);
   const audioRef = useRef<AudioContext | null>(null);
+  const audioAlive = useRef(true);
+  const soundUnlocked = useRef(false);
+  const soundTestCleanup = useRef<(() => void) | null>(null);
   const ringRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const answeredLocally = useRef(new Set<string>());
   const [suppressionRevision, setSuppressionRevision] = useState(0);
@@ -218,7 +222,12 @@ function NightfallSession({ children }: { children: ReactNode }) {
     const incidentId = query.data?.incident?.id;
     const answered =
       incidentId && answeredLocally.current.has(`${memberId}:${incidentId}`);
-    if (!memberValid || !isMemberRinging(query.data, memberId) || answered)
+    if (
+      !memberValid ||
+      !isMemberRinging(query.data, memberId) ||
+      answered ||
+      !soundEnabled
+    )
       stopRing();
     else if (soundEnabled) {
       ringIncident.current = incidentId || null;
@@ -361,19 +370,80 @@ function NightfallSession({ children }: { children: ReactNode }) {
       (window as Window & { webkitAudioContext?: typeof AudioContext })
         .webkitAudioContext;
     if (!Audio) throw new Error("Sound is not supported in this browser.");
-    const ctx = audioRef.current || new Audio();
+    const ctx =
+      audioRef.current?.state !== "closed" && audioRef.current
+        ? audioRef.current
+        : new Audio();
     audioRef.current = ctx;
-    await ctx.resume();
-    if (ctx.state !== "running")
+    ctx.onstatechange = () => {
+      if (!audioAlive.current || audioRef.current !== ctx) return;
+      const running = soundUnlocked.current && ctx.state === "running";
+      soundRef.current = running;
+      setSoundEnabled(running);
+      if (!running) {
+        stopRing();
+        soundTestCleanup.current?.();
+      }
+    };
+    try {
+      await ctx.resume();
+    } catch (cause) {
+      if (audioAlive.current && audioRef.current === ctx) {
+        soundRef.current = false;
+        setSoundEnabled(false);
+      }
+      throw cause;
+    }
+    if (!audioAlive.current || audioRef.current !== ctx)
+      throw new Error("Sound setup was cancelled.");
+    if (ctx.state !== "running") {
+      soundRef.current = false;
+      setSoundEnabled(false);
       throw new Error("Tap Enable sound again to allow audio.");
+    }
     const source = ctx.createBufferSource();
     source.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
     source.connect(ctx.destination);
-    source.start();
     source.onended = () => source.disconnect();
+    source.start();
+    soundUnlocked.current = true;
     soundRef.current = true;
     setSoundEnabled(true);
-  }, []);
+  }, [stopRing]);
+
+  const testSound = useCallback(async () => {
+    await enableSound();
+    const ctx = audioRef.current;
+    if (!audioAlive.current || !ctx || ctx.state !== "running")
+      throw new Error("Tap Test phone sound again to allow audio.");
+    soundTestCleanup.current?.();
+    const gain = ctx.createGain();
+    const tone = ctx.createOscillator();
+    tone.frequency.value = 660;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.07, ctx.currentTime + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+    tone.connect(gain);
+    gain.connect(ctx.destination);
+    let stopped = false;
+    const cleanup = () => {
+      if (stopped) return;
+      stopped = true;
+      tone.onended = null;
+      try {
+        tone.stop();
+      } catch {
+        /* Already ended. */
+      }
+      tone.disconnect();
+      gain.disconnect();
+      if (soundTestCleanup.current === cleanup) soundTestCleanup.current = null;
+    };
+    soundTestCleanup.current = cleanup;
+    tone.onended = cleanup;
+    tone.start();
+    tone.stop(ctx.currentTime + 0.55);
+  }, [enableSound]);
 
   const mutate = useCallback(
     async <T,>(path: string, body?: unknown): Promise<T> => {
@@ -419,14 +489,20 @@ function NightfallSession({ children }: { children: ReactNode }) {
     [preview, queryClient, stopRing, clearSuppression],
   );
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    audioAlive.current = true;
+    return () => {
+      audioAlive.current = false;
       stopRing();
-      void audioRef.current?.close();
+      soundTestCleanup.current?.();
+      if (audioRef.current) audioRef.current.onstatechange = null;
+      if (audioRef.current && audioRef.current.state !== "closed")
+        void audioRef.current.close().catch(() => {});
       audioRef.current = null;
-    },
-    [stopRing],
-  );
+      soundUnlocked.current = false;
+      soundRef.current = false;
+    };
+  }, [stopRing]);
 
   const ringSuppressed = useMemo(
     () =>
@@ -482,6 +558,7 @@ function NightfallSession({ children }: { children: ReactNode }) {
       setScenario,
       soundEnabled,
       enableSound,
+      testSound,
       stopRinging,
       silenceRing: stopRinging,
       ringSuppressed,
@@ -505,6 +582,7 @@ function NightfallSession({ children }: { children: ReactNode }) {
       setScenario,
       soundEnabled,
       enableSound,
+      testSound,
       stopRinging,
       ringSuppressed,
       shouldRing,

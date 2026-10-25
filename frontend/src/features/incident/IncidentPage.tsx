@@ -369,8 +369,7 @@ export function ResponsePage() {
     returned = confirmedReturned(incident),
     help = isHelpIncident(incident),
     resolved = isResolvedIncident(incident);
-  const checkinResolved =
-    incident?.state === "RETURNED" && incident.checkin === "self_other";
+  const checkinResolved = incident?.state === "RETURNED" && !returned;
   const mine = incident?.acked_by === memberId,
     acknowledged = Boolean(incident?.acked_by) && !resolved;
   const by = incident?.acked_by_name || "A family member",

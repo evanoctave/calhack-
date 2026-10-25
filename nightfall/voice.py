@@ -8,7 +8,11 @@ SpeechSynthesis. Rejected: streaming WebSocket TTS (more moving parts; lines are
 from __future__ import annotations
 
 import hashlib
+import io
 import os
+import struct
+import tempfile
+import wave
 from pathlib import Path
 from typing import Any, Final, TypedDict
 
@@ -38,9 +42,82 @@ def cached_path(text: str, voice_id: str) -> Path:
 
 
 def _prune() -> None:
-    files = sorted(OUT.glob("*.wav"), key=lambda p: p.stat().st_mtime)
+    files = sorted((p for p in OUT.glob("*.wav") if not p.name.endswith(".tel.wav")), key=lambda p: p.stat().st_mtime)
     for p in files[:-LRU]:
         p.unlink(missing_ok=True)
+        p.with_suffix(".tel.wav").unlink(missing_ok=True)
+
+
+def _mulaw(sample: int) -> int:
+    """Encode one signed 16-bit PCM sample as G.711 mu-law."""
+    sign = 0x80 if sample < 0 else 0
+    magnitude = min(abs(sample), 32635) + 0x84
+    exponent = magnitude.bit_length() - 8
+    return ~(sign | (exponent << 4) | ((magnitude >> (exponent + 3)) & 0x0F)) & 0xFF
+
+
+def _telephone_wav(raw: bytes) -> bytes:
+    # wave locates real RIFF chunks, including odd-length metadata padding. A
+    # byte search for "data" can instead match an unrelated metadata value.
+    with wave.open(io.BytesIO(raw), "rb") as clip:
+        rate, frames = clip.getframerate(), clip.getnframes()
+        if clip.getnchannels() != 1 or clip.getsampwidth() != 2 or clip.getcomptype() != "NONE":
+            raise ValueError("telephone conversion needs mono 16-bit PCM")
+        if rate < 8000 or rate % 8000 or not frames:
+            raise ValueError("unsupported or empty PCM rate")
+        pcm = clip.readframes(frames)
+        if len(pcm) != frames * 2:
+            raise ValueError("truncated PCM data")
+    step = rate // 8000
+    samples = [sample for (sample,) in struct.iter_unpack("<h", pcm)]
+    encoded = bytes(_mulaw(sum(samples[i : i + step]) // step) for i in range(0, len(samples) - step + 1, step))
+    if not encoded:
+        raise ValueError("PCM clip is too short")
+
+    def chunk(name: bytes, body: bytes) -> bytes:
+        return name + struct.pack("<I", len(body)) + body + (b"\0" if len(body) % 2 else b"")
+
+    body = (
+        b"WAVE"
+        + chunk(b"fmt ", struct.pack("<HHIIHHH", 7, 1, 8000, 8000, 1, 8, 0))
+        + chunk(b"fact", struct.pack("<I", len(encoded)))
+        + chunk(b"data", encoded)
+    )
+    return b"RIFF" + struct.pack("<I", len(body)) + body
+
+
+def telephone_url(url: str) -> str:
+    """Return a compact 8 kHz mu-law cache URL for Twilio, or the original on failure.
+
+    Browser/door playback keeps its original PCM URL. Conversion never changes
+    the selected voice and never invokes a speech provider.
+    """
+    if not url.startswith("/voice/"):
+        return url
+    name = url.removeprefix("/voice/")
+    if not name.endswith(".wav") or name.endswith(".tel.wav") or "/" in name or "\\" in name or ".." in name:
+        return url
+    src, dst = OUT / name, (OUT / name).with_suffix(".tel.wav")
+    temporary: Path | None = None
+    try:
+        encoded = _telephone_wav(src.read_bytes())
+        if dst.is_file() and dst.read_bytes() == encoded:
+            return f"/voice/{dst.name}"
+        # Calls may request the same line concurrently. Publish only a complete
+        # WAV so a second caller cannot fetch a partially written cache entry.
+        with tempfile.NamedTemporaryFile(dir=OUT, prefix=".telephone-", suffix=".tmp", delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(encoded)
+        os.replace(temporary, dst)
+        return f"/voice/{dst.name}"
+    except (OSError, EOFError, ValueError, wave.Error, struct.error):
+        return url
+    finally:
+        if temporary is not None:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def style() -> tuple[float, str]:

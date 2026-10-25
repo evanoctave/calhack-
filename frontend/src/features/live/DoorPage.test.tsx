@@ -142,13 +142,146 @@ describe("independent door Talk and Listen controls", () => {
       screen.getByRole("button", { name: "▷ Please come back inside." }),
     );
     await screen.findByText(
-      "Mock mode: phrase prepared, but generated audio is unavailable.",
+      "Phrase sent using a browser/device voice fallback. Your selected AI voice was unavailable.",
     );
     expect(mocks.mutate).toHaveBeenCalledWith("/say", {
       member_id: "TM-SARAH",
       text: "Please come back inside.",
     });
     expectOnlyTalkStopped();
+  });
+
+  it.each([
+    { mode: "browser_tts", source: "mock", url: "" },
+    { mode: "cartesia", source: "mock", url: "" },
+  ])("labels the backend voice fallback accurately: %j", async (audio) => {
+    mocks.mutate.mockResolvedValue({ ok: true, audio });
+    renderDoor();
+    fireEvent.click(
+      screen.getByRole("button", { name: "▷ Please come back inside." }),
+    );
+    await screen.findByText(/browser\/device voice fallback/);
+    expect(
+      screen.queryByText("Phrase sent to the door speaker."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("reports real Cartesia delivery separately", async () => {
+    mocks.mutate.mockResolvedValue({
+      ok: true,
+      audio: { mode: "cartesia", source: "cartesia", url: "/voice/real.wav" },
+    });
+    renderDoor();
+    fireEvent.click(
+      screen.getByRole("button", { name: "▷ Please come back inside." }),
+    );
+    await screen.findByText("Phrase sent to the door speaker.");
+    expect(
+      screen.queryByText(/browser\/device voice fallback/),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])(
+    "ignores an old member's phrase %s result and keeps the new text",
+    async (reject) => {
+      let finish!: (value: unknown) => void;
+      let fail!: (reason: unknown) => void;
+      mocks.mutate.mockReturnValue(
+        new Promise((resolve, rejectRequest) => {
+          finish = resolve;
+          fail = rejectRequest;
+        }),
+      );
+      const view = renderDoor();
+      fireEvent.click(
+        screen.getByRole("button", { name: "More voice controls" }),
+      );
+      fireEvent.change(screen.getByLabelText("Say in the family voice"), {
+        target: { value: "Old phrase" },
+      });
+      fireEvent.click(
+        screen.getByRole("button", { name: "Speak this phrase" }),
+      );
+      const context = mocks.provider.getMockImplementation()!();
+      mocks.provider.mockReturnValue({ ...context, memberId: "TM-MIKE" });
+      view.rerender(
+        <MemoryRouter initialEntries={["/door"]}>
+          <DoorPage />
+        </MemoryRouter>,
+      );
+      fireEvent.change(screen.getByLabelText("Say in the family voice"), {
+        target: { value: "New member draft" },
+      });
+      await act(async () => {
+        if (reject) fail(new Error("Old request failed"));
+        else
+          finish({
+            ok: true,
+            audio: {
+              mode: "cartesia",
+              source: "cartesia",
+              url: "/voice/old.wav",
+            },
+          });
+      });
+      expect(screen.getByLabelText("Say in the family voice")).toHaveValue(
+        "New member draft",
+      );
+      expect(
+        screen.queryByText("Phrase sent to the door speaker."),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Old request failed")).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Speak this phrase" }),
+      ).toBeEnabled();
+    },
+  );
+
+  it("does not open takeover controls from a previous member's late response", async () => {
+    let finish!: (value: unknown) => void;
+    mocks.mutate.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const view = renderDoor();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Take over the voice" }),
+    );
+    const context = mocks.provider.getMockImplementation()!();
+    mocks.provider.mockReturnValue({ ...context, memberId: "TM-MIKE" });
+    view.rerender(
+      <MemoryRouter initialEntries={["/door"]}>
+        <DoorPage />
+      </MemoryRouter>,
+    );
+    await act(async () => finish({ ok: true }));
+    expect(
+      screen.queryByText(/You have the door voice. Automatic speech/),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Take over the voice" }),
+    ).toBeEnabled();
+  });
+
+  it("keeps typed text when the door does not confirm acceptance", async () => {
+    mocks.mutate.mockResolvedValue({ ok: false });
+    renderDoor();
+    fireEvent.click(
+      screen.getByRole("button", { name: "More voice controls" }),
+    );
+    fireEvent.change(screen.getByLabelText("Say in the family voice"), {
+      target: { value: "Please wait here" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Speak this phrase" }));
+    await screen.findAllByText(/The door did not accept this phrase/);
+    expect(screen.getByLabelText("Say in the family voice")).toHaveValue(
+      "Please wait here",
+    );
+    expect(
+      screen.queryByText("Phrase sent to the door speaker."),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps Listen on when sending a typed AI phrase", async () => {
@@ -195,7 +328,9 @@ describe("independent door Talk and Listen controls", () => {
   it("starts Talk without stopping Listen", async () => {
     channels.talking = "off";
     renderDoor();
-    fireEvent.click(screen.getByRole("button", { name: "Talk" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Talk through the door" }),
+    );
     await waitFor(() => expect(mocks.start).toHaveBeenCalledWith("talking"));
     expect(mocks.stop).not.toHaveBeenCalled();
     expect(channels).toEqual({ talking: "on", listening: "on" });

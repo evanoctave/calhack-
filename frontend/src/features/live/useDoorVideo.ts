@@ -53,23 +53,34 @@ export function useDoorVideo(memberId: string, preview: boolean) {
     };
     const connect = () => {
       if (!active) return;
-      socket = new WebSocket(
+      const currentSocket = new WebSocket(
         socketUrl(`/ws/video/${encodeURIComponent(memberId)}`),
       );
-      socket.binaryType = "blob";
-      socket.onmessage = (event) => {
-        if (!(event.data instanceof Blob)) return;
+      socket = currentSocket;
+      currentSocket.binaryType = "blob";
+      currentSocket.onmessage = (event) => {
+        if (
+          !active ||
+          !authorized ||
+          socket !== currentSocket ||
+          currentSocket.readyState !== WebSocket.OPEN ||
+          !(event.data instanceof Blob) ||
+          !event.data.size
+        )
+          return;
         lastFrame = Date.now();
         show(event.data, "Live · Front door camera", true);
+        // New servers cap unacknowledged frames. Older servers ignore this text message.
+        currentSocket.send("a");
       };
-      socket.onerror = () => {
-        if (active) {
+      currentSocket.onerror = () => {
+        if (active && socket === currentSocket) {
           if (source === "stream") clearFrame();
           setStatus("Reconnecting to the door…");
         }
       };
-      socket.onclose = (event) => {
-        if (!active) return;
+      currentSocket.onclose = (event) => {
+        if (!active || socket !== currentSocket) return;
         if (source === "stream") clearFrame();
         if (event.code === 4403) {
           authorized = false;

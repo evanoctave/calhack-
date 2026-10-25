@@ -71,7 +71,7 @@ function playRef(audio, text) {
 }
 function speakThen(text, cb) {
   if (!("speechSynthesis" in window)) { cb(); return; }
-  const u = new SpeechSynthesisUtterance(text); u.rate = 0.95; u.onend = cb; u.onerror = cb; speechSynthesis.cancel(); speechSynthesis.speak(u);
+  const u = new SpeechSynthesisUtterance(text); u.lang = "en-US"; u.rate = 0.95; u.onend = cb; u.onerror = cb; speechSynthesis.cancel(); speechSynthesis.speak(u);
 }
 async function main() {
   await resolveMember(); $("who").textContent = "caregiver phone: " + member;

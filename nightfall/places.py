@@ -37,6 +37,20 @@ _RANGE: Final = re.compile(
 )
 
 
+def source_summary(rows: list[dict[str, Any]]) -> str:
+    """Summarize all rows without presenting retained sample data as an entirely live result."""
+    if not rows:
+        return "none"
+    sources = {str(row.get("source") or "fixture") for row in rows}
+    if sources <= {"apify", "overpass"}:
+        return "apify" if "apify" in sources else "overpass"
+    # Keep the existing sample labels so consumers continue to disclose fixture/mock data.
+    for sample_source in ("fixture", "mock", "preview"):
+        if sample_source in sources:
+            return sample_source
+    return "unknown"
+
+
 def _cat(category: str) -> str | None:
     """Place category from the Google category name; None when nothing fits (the row is skipped)."""
     return next((c for pat, c in _CAT if pat.search(category)), None)
@@ -150,7 +164,7 @@ def from_overpass(elements: list[dict[str, Any]], home: tuple[float, float]) -> 
                 "lng": lng,
                 "hours": "",
                 "phone": "",
-                "source": "apify",
+                "source": "overpass",
                 "distance_mi": round(haversine_mi(home[0], home[1], lat, lng), 2),
             }
         )

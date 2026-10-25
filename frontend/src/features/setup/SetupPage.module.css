@@ -54,6 +54,54 @@
   height: 68px;
   object-fit: cover;
 }
+.profilePhoto {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 20px;
+  background: none;
+  color: var(--ink, #182335);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.profilePhoto:focus-visible {
+  outline: 2px solid var(--accent, #245dd6);
+  outline-offset: 4px;
+}
+.profilePhotoHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.profilePhotoHeading > span {
+  color: var(--accent, #245dd6);
+  font-size: 14px;
+}
+.profilePhotoImage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: clamp(180px, 60vw, 240px);
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--soft, rgba(217, 232, 252, 0.65));
+}
+.profilePhotoImage > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.profilePhotoImage > .profilePhotoPlaceholder {
+  width: 36px;
+  height: 36px;
+}
 .dividerNote {
   border-top: 1px solid var(--line, rgba(216, 223, 233, 0.72));
   padding-top: 14px;

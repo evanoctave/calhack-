@@ -55,6 +55,7 @@ export function useDoorAudio(
     current.source?.disconnect();
     current.gain?.disconnect();
     current.stream?.getTracks().forEach((track) => track.stop());
+    if (current.context) current.context.onstatechange = null;
     if (current.context && current.context.state !== "closed")
       void current.context.close().catch(() => undefined);
     if (alive.current)
@@ -93,6 +94,19 @@ export function useDoorAudio(
         owned.context = context;
         await context.resume();
         if (!isCurrent()) return;
+        const paused = () => {
+          if (!isCurrent() || context.state === "running") return;
+          stop(direction);
+          setError(
+            `${direction === "talking" ? "Talk" : "Listen"} audio is paused. Tap to reconnect.`,
+          );
+          stoppedRef.current?.();
+        };
+        if (context.state !== "running") {
+          paused();
+          return;
+        }
+        context.onstatechange = paused;
         let stream: MediaStream | undefined;
         if (direction === "talking") {
           stream = await getMicrophone();
@@ -111,8 +125,12 @@ export function useDoorAudio(
         owned.socket = socket;
         let nextTime = 0;
         socket.onopen = () => {
-          if (isCurrent())
-            setChannels((value) => ({ ...value, [direction]: "on" }));
+          if (!isCurrent()) return;
+          if (context.state !== "running") {
+            paused();
+            return;
+          }
+          setChannels((value) => ({ ...value, [direction]: "on" }));
         };
         socket.onerror = () => {
           if (isCurrent()) {

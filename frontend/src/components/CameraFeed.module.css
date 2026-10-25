@@ -15,6 +15,150 @@
 .square {
   aspect-ratio: 350/220;
 }
+.monitor {
+  aspect-ratio: 4/3;
+}
+.native {
+  aspect-ratio: auto;
+}
+.monitor,
+.native {
+  display: grid;
+  place-items: center;
+  background: #182335;
+}
+.cameraPicture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  object-fit: contain;
+}
+.monitor .cameraPicture {
+  position: absolute;
+  inset: 0;
+}
+.native .cameraPicture {
+  height: auto;
+}
+.unavailable {
+  background: #d3dfe9;
+}
+.native.unavailable {
+  aspect-ratio: 4/3;
+}
+.expand {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+.expand[aria-disabled="true"] {
+  cursor: default;
+}
+.expand:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: -5px;
+}
+.expandLabel {
+  padding: 8px 12px;
+  border: 1px solid #ffffff60;
+  border-radius: 18px;
+  background: #182335d9;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+.fullscreen {
+  --viewer-bg: #111a25;
+  --viewer-ink: #f5f8fc;
+  --viewer-muted: #bdccda;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  padding: max(12px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  background: var(--viewer-bg);
+  color: var(--viewer-ink);
+  overflow: hidden;
+}
+.fullscreen[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.fullscreen::backdrop {
+  background: #111a25;
+}
+.viewerHeader {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.viewerHeader h2 {
+  font-size: 18px;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+.viewerHeader p,
+.viewerCaption {
+  color: var(--viewer-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.viewerHeader p {
+  margin-top: 4px;
+}
+.close {
+  min-height: 44px;
+  padding: 8px 14px;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #ffffff60;
+  border-radius: 24px;
+  background: #ffffff18;
+  color: var(--viewer-ink);
+  cursor: pointer;
+}
+.close span {
+  font-size: 24px;
+  line-height: 1;
+}
+.fullscreenImage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+.fullscreenImage .cameraPicture {
+  position: absolute;
+  inset: 0;
+}
+.fullscreenImage .empty {
+  color: var(--viewer-muted);
+}
+.viewerCaption {
+  flex-shrink: 0;
+}
 .viewport .live {
   width: 100%;
   height: 100%;

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from nightfall import brief as briefmod
-from nightfall import engine
+from nightfall import engine, places
 from nightfall.escalation import Runner
 from nightfall.household import Household, load
 from nightfall.integrations import twilio
@@ -75,7 +75,7 @@ class Store:
         self.memory_task: asyncio.Task[None] | None = None
 
     def places_source(self) -> str:
-        return str(self.places[0].get("source", "fixture")) if self.places else "none"
+        return places.source_summary(self.places)
 
     def now(self) -> datetime:
         return datetime.now().astimezone()

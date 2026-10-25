@@ -79,7 +79,7 @@ def test_live_run_writes_google_places_and_overpass_hazards(ra, monkeypatch) -> 
     rows = _out(ra)
     assert seen["called"]
     assert sorted(r["name"] for r in rows) == ["Test Chevron", "Test Creek"]
-    assert all(r["source"] == "apify" for r in rows)
+    assert {r["name"]: r["source"] for r in rows} == {"Test Chevron": "apify", "Test Creek": "overpass"}
 
 
 def test_day_flag_reaches_the_hours_parser(ra, monkeypatch) -> None:

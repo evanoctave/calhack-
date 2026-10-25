@@ -18,9 +18,9 @@ export function incidentTitle(incident: Incident | null, name: string): string {
     case "VISITOR":
       return "Someone is at the door";
     case "RETURNED":
-      return incident.checkin === "self_other"
-        ? `${incident.checkin_who || "A family member"} checked in`
-        : `${name} is back inside`;
+      return confirmedReturned(incident)
+        ? `${name} is back inside`
+        : `${incident.checkin_who || "A family member"} checked in`;
     case "ACKED":
       return `${incident.acked_by_name || "A family member"} is on it`;
     case "ESCALATING":
@@ -72,5 +72,9 @@ export function canShowEmergency(
 
 export function confirmedReturned(incident: Incident | null): boolean {
   // The backend also uses RETURNED for stand-down after another household member checks in.
-  return incident?.state === "RETURNED" && incident.checkin !== "self_other";
+  return (
+    incident?.state === "RETURNED" &&
+    incident.checkin !== "self_other" &&
+    incident.identity !== "other"
+  );
 }

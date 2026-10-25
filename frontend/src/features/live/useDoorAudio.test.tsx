@@ -65,6 +65,54 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("door audio resource ownership", () => {
+  it.each(["talking", "listening"] as const)(
+    "does not open %s when audio resume leaves the context suspended",
+    async (direction) => {
+      makeContext.mockImplementationOnce(() => ({
+        state: "suspended",
+        resume: vi.fn().mockResolvedValue(undefined),
+        close: closeContext,
+      }));
+      const stopped = vi.fn();
+      const hook = renderHook(() => useDoorAudio("TM-SARAH", false, stopped));
+      await act(() => hook.result.current.start(direction));
+      expect(hook.result.current.channels[direction]).toBe("off");
+      expect(hook.result.current.error).toContain("audio is paused");
+      expect(getMicrophone).not.toHaveBeenCalled();
+      expect(FakeSocket.all).toHaveLength(0);
+      expect(closeContext).toHaveBeenCalledOnce();
+      expect(stopped).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("stops an interrupted audio channel without closing the other direction", async () => {
+    const stopped = vi.fn();
+    const hook = renderHook(() => useDoorAudio("TM-SARAH", false, stopped));
+    await act(() => hook.result.current.start("listening"));
+    const listen = FakeSocket.all[0];
+    act(() => listen.onopen?.());
+    await act(() => hook.result.current.start("talking"));
+    const talk = FakeSocket.all[1];
+    const lateOpen = talk.onopen;
+    act(() => talk.onopen?.());
+    const context = makeContext.mock.results[1].value;
+    act(() => {
+      context.state = "interrupted";
+      context.onstatechange?.();
+    });
+    expect(hook.result.current.channels).toEqual({
+      talking: "off",
+      listening: "on",
+    });
+    expect(talk.close).toHaveBeenCalledOnce();
+    expect(listen.close).not.toHaveBeenCalled();
+    expect(stopTrack).toHaveBeenCalledOnce();
+    expect(context.onstatechange).toBeNull();
+    expect(stopped).toHaveBeenCalledOnce();
+    act(() => lateOpen?.());
+    expect(hook.result.current.channels.talking).toBe("off");
+  });
+
   it("closes microphone, socket and AudioContext when the page unmounts", async () => {
     const hook = renderHook(() => useDoorAudio("TM-SARAH", false));
     await act(() => hook.result.current.start("talking"));

@@ -76,6 +76,7 @@ function tick() {
 }
 setInterval(tick, 200);
 function showSpeak(who, text) { $("speakwho").textContent = who; $("speaktxt").textContent = text; $("speak").classList.add("on"); clearTimeout(showSpeak.t); showSpeak.t = setTimeout(() => $("speak").classList.remove("on"), 9000); }
+document.addEventListener("visibilitychange", () => tele(document.hidden ? "door_hidden" : "door_visible", document.hidden ? "Keep the door tab visible: background tabs may slow the camera." : ""));
 function tele(event, detail) { fetch("/door/telemetry", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({event, detail: String(detail || "")})}).catch(() => {}); }
 const Cur = {audio: null, src: null, live: false};
 const Out = {ctx: null, started: false, line: ""};
@@ -90,8 +91,8 @@ async function playAtDoor(e) {
   try {
     const r = await fetch(e.url, {cache: "no-store"}); if (!r.ok) throw new Error("audio " + r.status);
     const blob = await r.blob(); cutAudio("new line");
-    if (Out.ctx) {
-      if (Out.ctx.state !== "running") await Out.ctx.resume();
+    if (Out.ctx && Out.ctx.state !== "running") await Promise.race([Out.ctx.resume().catch(() => {}), new Promise(r => setTimeout(r, 300))]);
+    if (Out.ctx && Out.ctx.state === "running") {
       const buf = await Out.ctx.decodeAudioData(await blob.arrayBuffer());
       const src = Out.ctx.createBufferSource(); src.buffer = buf; src.connect(Out.ctx.destination); Cur.src = src;
       src.onended = () => { if (Cur.src === src) Cur.src = null; tele("audio_ended", e.url); };
@@ -148,7 +149,19 @@ function earStart() {
   r.onend = () => { Ear.on = false; if (Out.started) setTimeout(earStart, 300); };  // Chrome ends sessions; keep listening
   try { r.start(); tele("ear_on", ""); } catch (e) { Ear.on = false; }
 }
-async function startDoor() { if (Out.started) return; $("start").classList.add("hidden"); try { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); } catch (e) {} Out.started = true; Cam.armAt = Date.now() + ARM_DELAY_MS; earStart(); try { const c = new (window.AudioContext || window.webkitAudioContext)(); await c.resume(); Out.ctx = c; const a = new Audio("/voice/silence.wav"); a.volume = 0.01; await a.play().catch(() => {}); } catch (e) {} tele("door_started", navigator.userAgent.slice(0, 60)); startCam(); doorConnect(); micConnect(); videoConnect(); }
+async function startDoor() {
+  if (Out.started) return;
+  $("start").classList.add("hidden"); Out.started = true; Cam.armAt = Date.now() + ARM_DELAY_MS;
+  // Start the camera even if the browser leaves audio permission pending.
+  try {
+    const c = new (window.AudioContext || window.webkitAudioContext)(); Out.ctx = c;
+    c.resume().catch(() => {});
+    const a = new Audio("/voice/silence.wav"); a.volume = 0.01; a.play().catch(() => {});
+  } catch (e) {}
+  tele("door_started", navigator.userAgent.slice(0, 60));
+  startCam(); doorConnect(); micConnect(); videoConnect(); earStart();
+  // Automatic fullscreen can consume the tap and hide camera/microphone prompts.
+}
 // Live voice from the phone (PCM over /ws/door)
 const Spk = {ws: null, ctx: null, t: 0};
 function doorConnect() {

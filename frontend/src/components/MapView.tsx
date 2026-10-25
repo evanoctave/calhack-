@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 import type { Place } from "../data/types";
+import {
+  googleMapsDirections,
+  googleMapsKey,
+  googleMapsMapId,
+  loadGoogleMaps,
+  onGoogleMapsAuthFailure,
+  validMapPosition,
+  type GoogleMapLibraries,
+} from "./googleMaps";
 import styles from "./MapView.module.css";
 
 const emptyPlaces: Place[] = [];
+type MapSession = { map: google.maps.Map; libraries: GoogleMapLibraries };
 
 export default function MapView({
   home,
@@ -20,95 +28,216 @@ export default function MapView({
   preview?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [tilesFailed, setTilesFailed] = useState(false);
+  const focusArea = useRef<(() => void) | null>(null);
+  const lastArea = useRef("");
+  const [session, setSession] = useState<MapSession | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
+  const [attempt, setAttempt] = useState(0);
+  const configured = !!googleMapsKey();
+  const validHome = validMapPosition(home);
+  const radiusMi =
+    Number.isFinite(home.radius_mi) && home.radius_mi! > 0
+      ? home.radius_mi!
+      : 1.5;
+
   useEffect(() => {
-    if (
-      preview ||
-      !ref.current ||
-      !Number.isFinite(home.lat) ||
-      !Number.isFinite(home.lng)
-    )
-      return;
-    const map = L.map(ref.current, { scrollWheelZoom: false }).setView(
-      [home.lat, home.lng],
-      14,
-    );
-    const tiles = L.tileLayer(
-      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      {
-        attribution:
-          '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      },
-    ).addTo(map);
-    tiles.on("tileerror", () => setTilesFailed(true));
-    const radius = L.circle([home.lat, home.lng], {
-      radius: (home.radius_mi || 1.5) * 1609.34,
-      color: "#245dd6",
-      weight: 1.5,
-      fillOpacity: 0.06,
-    }).addTo(map);
-    const homeLabel = document.createElement("span");
-    homeLabel.textContent = "Home";
-    L.circleMarker([home.lat, home.lng], {
-      color: "#182335",
-      radius: 5,
-      fillOpacity: 1,
-    })
-      .addTo(map)
-      .bindPopup(homeLabel);
-    for (const [places, color] of [
-      [hazards, "#be263b"],
-      [callFirst, "#23764a"],
-      [familiar, "#245dd6"],
-    ] as const) {
-      for (const place of places) {
-        if (!Number.isFinite(place.lat) || !Number.isFinite(place.lng))
-          continue;
-        const label = document.createElement("span");
-        label.textContent = place.name;
-        L.circleMarker([place.lat, place.lng], {
-          color,
-          fillColor: color,
-          radius: 7,
-          fillOpacity: 0.85,
-          weight: 2,
-        })
-          .addTo(map)
-          .bindPopup(label);
-      }
-    }
-    map.fitBounds(radius.getBounds(), { padding: [12, 12] });
-    const resize = new ResizeObserver(() => map.invalidateSize());
-    resize.observe(ref.current);
+    if (!configured || !validHome || !ref.current) return;
+    const container = ref.current;
+    let active = true;
+    let failed = false;
+    let created: MapSession | null = null;
+    setStatus("loading");
+    setSession(null);
+    lastArea.current = "";
+    const fail = () => {
+      failed = true;
+      if (active) setStatus("error");
+    };
+    const unsubscribe = onGoogleMapsAuthFailure(fail);
+    const timeout = window.setTimeout(fail, 15_000);
+    void loadGoogleMaps()
+      .then((libraries) => {
+        if (!active || failed) return;
+        const map = new libraries.maps.Map(container, {
+          center: { lat: home.lat, lng: home.lng },
+          zoom: 14,
+          mapId: googleMapsMapId(),
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: true,
+          gestureHandling: "cooperative",
+          clickableIcons: false,
+        });
+        created = { map, libraries };
+        window.clearTimeout(timeout);
+        setSession(created);
+        setStatus("ready");
+      })
+      .catch(fail);
     return () => {
-      resize.disconnect();
-      map.remove();
+      active = false;
+      window.clearTimeout(timeout);
+      unsubscribe();
+      if (created)
+        created.libraries.core.event.clearInstanceListeners(created.map);
+      container.replaceChildren();
+      focusArea.current = null;
+    };
+  }, [configured, validHome, home.lat, home.lng, attempt]);
+
+  // Refresh pins without recreating the map or resetting the user's pan/zoom.
+  useEffect(() => {
+    if (!session || !validHome) return;
+    const {
+      map,
+      libraries: { maps, marker, core },
+    } = session;
+    const listeners: google.maps.MapsEventListener[] = [];
+    const pins: google.maps.marker.AdvancedMarkerElement[] = [];
+    const info = new maps.InfoWindow();
+    const circle = new maps.Circle({
+      map,
+      center: { lat: home.lat, lng: home.lng },
+      radius: radiusMi * 1609.344,
+      strokeColor: "#245dd6",
+      strokeWeight: 1.5,
+      strokeOpacity: 0.7,
+      fillColor: "#245dd6",
+      fillOpacity: 0.06,
+      clickable: false,
+    });
+    const fit = () => {
+      const bounds = circle.getBounds();
+      if (bounds) map.fitBounds(bounds, 24);
+    };
+    focusArea.current = fit;
+    const areaKey = [home.lat, home.lng, radiusMi].join(",");
+    if (lastArea.current !== areaKey) {
+      fit();
+      lastArea.current = areaKey;
+    }
+    const addPin = (
+      place: Place,
+      category: string,
+      color: string,
+      glyph?: string,
+    ) => {
+      if (!validMapPosition(place)) return;
+      const pin = new marker.PinElement({
+        background: color,
+        borderColor: "#ffffff",
+        glyphColor: "#ffffff",
+        scale: category === "Home" ? 1 : 0.85,
+        ...(glyph ? { glyphText: glyph } : {}),
+      });
+      const point = new marker.AdvancedMarkerElement({
+        map,
+        position: { lat: place.lat, lng: place.lng },
+        title: category + " · " + place.name,
+        content: pin.element,
+        zIndex: category === "Home" ? 10 : 1,
+      });
+      pins.push(point);
+      listeners.push(
+        point.addListener("click", () => {
+          const content = document.createElement("div");
+          content.className = styles.popup;
+          const title = document.createElement("strong");
+          title.textContent = place.name;
+          const detail = document.createElement("p");
+          detail.textContent = [
+            category,
+            place.distance_mi != null
+              ? place.distance_mi + " mi from home"
+              : "",
+            preview ? "Sample place" : "",
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          const directions = document.createElement("a");
+          directions.href = googleMapsDirections(place);
+          directions.textContent = "Directions in Google Maps";
+          directions.target = "_blank";
+          directions.rel = "noopener noreferrer";
+          content.append(title, detail, directions);
+          info.setContent(content);
+          info.open({ map, anchor: point, shouldFocus: false });
+        }),
+      );
+    };
+    addPin(
+      { name: "Home", lat: home.lat, lng: home.lng },
+      "Home",
+      "#182335",
+      "H",
+    );
+    hazards.forEach((place) => addPin(place, "Hazard", "#be263b"));
+    callFirst.forEach((place) => addPin(place, "Call first", "#23764a"));
+    familiar.forEach((place) => addPin(place, "Familiar place", "#245dd6"));
+    return () => {
+      listeners.forEach((listener) => listener.remove());
+      pins.forEach((pin) => {
+        pin.map = null;
+      });
+      circle.setMap(null);
+      info.close();
+      core.event.clearInstanceListeners(info);
+      focusArea.current = null;
     };
   }, [
+    session,
+    validHome,
     home.lat,
     home.lng,
-    home.radius_mi,
+    radiusMi,
     hazards,
     callFirst,
     familiar,
     preview,
   ]);
+
+  const ready = configured && validHome && status === "ready";
   return (
     <div className="stack gap-sm">
-      {preview ? (
-        <img
-          className={styles.preview}
-          src={`${import.meta.env.BASE_URL}assets/map-preview.png`}
-          alt="Recorded sample map of the Marina search area"
-        />
-      ) : (
+      <div className={styles.frame}>
         <div
           className={styles.map}
           ref={ref}
-          aria-label="Nearby places and hazards map"
+          role="region"
+          aria-label="Google Maps search area"
+          aria-hidden={!ready}
         />
-      )}
-      <div className={styles.legend}>
+        {!ready && (
+          <div className={styles.placeholder} role="status">
+            <strong>
+              {!validHome
+                ? "Home location is unavailable"
+                : !configured
+                  ? "Google Maps is not connected yet"
+                  : status === "error"
+                    ? "Google Maps couldn’t load"
+                    : "Loading Google Maps…"}
+            </strong>
+            <p className="caption muted">
+              {configured && validHome && status === "loading"
+                ? "Opening the search area."
+                : "You can still use the place details below."}
+            </p>
+            {configured && validHome && status === "error" && (
+              <button
+                type="button"
+                className={styles.mapButton}
+                onClick={() => setAttempt((value) => value + 1)}
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      <div className={styles.legend} aria-label="Map legend">
         <span>
           <i className={styles.hazard} /> Hazards
         </span>
@@ -119,15 +248,22 @@ export default function MapView({
           <i className={styles.familiar} /> Familiar
         </span>
       </div>
+      <div className={styles.mapFooter}>
+        <p className="caption muted">{radiusMi} mi around home</p>
+        {ready && (
+          <button
+            type="button"
+            className={styles.mapButton}
+            onClick={() => focusArea.current?.()}
+          >
+            Show search area
+          </button>
+        )}
+      </div>
       <p className="caption muted">
-        {preview ? "Sample search area. " : "Search reference. "}This is not
-        Dad’s live location.
+        {preview ? "Sample places. " : "Search reference. "}This is not Dad’s
+        live location.
       </p>
-      {tilesFailed && (
-        <p role="status" className="caption muted">
-          Map tiles could not load. The places below are still available.
-        </p>
-      )}
     </div>
   );
 }

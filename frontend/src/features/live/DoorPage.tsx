@@ -49,6 +49,10 @@ export function DoorPage() {
   const startingRecording = useRef(false),
     recordStarted = useRef(0),
     clipGeneration = useRef(0);
+  const actionGeneration = useRef(0);
+  const contextIdentity = `${preview}:${memberId}`;
+  const currentIdentity = useRef(contextIdentity);
+  currentIdentity.current = contextIdentity;
 
   const cancelClip = () => {
     clipGeneration.current++;
@@ -66,6 +70,7 @@ export function DoorPage() {
   };
   useEffect(() => {
     alive.current = true;
+    actionGeneration.current++;
     setRecording(false);
     setBusy("");
     setError("");
@@ -79,12 +84,19 @@ export function DoorPage() {
     document.addEventListener("visibilitychange", hidden);
     return () => {
       alive.current = false;
+      actionGeneration.current++;
       cancelClip();
       document.removeEventListener("visibilitychange", hidden);
     };
   }, [memberId, preview]);
 
   const setTakeover = async (on: boolean) => {
+    if (busy) return;
+    const run = ++actionGeneration.current;
+    const isCurrent = () =>
+      alive.current &&
+      run === actionGeneration.current &&
+      currentIdentity.current === contextIdentity;
     setBusy("takeover");
     setError("");
     setMessage("");
@@ -93,6 +105,7 @@ export function DoorPage() {
     setRecording(false);
     try {
       await mutate("/takeover", { member_id: memberId, on });
+      if (!isCurrent()) return;
       setMessage(
         on
           ? "You have the door voice. Automatic speech is paused until you hand it back."
@@ -100,17 +113,23 @@ export function DoorPage() {
       );
       if (on) setMore(true);
     } catch (cause) {
+      if (!isCurrent()) return;
       setError(
         cause instanceof Error
           ? cause.message
           : "Could not change the door voice.",
       );
     } finally {
-      setBusy("");
+      if (isCurrent()) setBusy("");
     }
   };
   const say = async (phrase: string) => {
     if (!phrase.trim() || busy) return;
+    const run = ++actionGeneration.current;
+    const isCurrent = () =>
+      alive.current &&
+      run === actionGeneration.current &&
+      currentIdentity.current === contextIdentity;
     audio.stop("talking");
     setBusy("say");
     setError("");
@@ -120,20 +139,26 @@ export function DoorPage() {
         member_id: memberId,
         text: phrase.trim(),
       });
+      if (!isCurrent()) return;
+      if (response.ok !== true)
+        throw new Error("The door did not accept this phrase. Try again.");
       setMessage(
         preview
           ? "Preview only. The phrase was not played at a door."
-          : response.audio?.mode === "mock"
-            ? "Mock mode: phrase prepared, but generated audio is unavailable."
+          : response.audio?.mode === "browser_tts" ||
+              response.audio?.mode === "mock" ||
+              response.audio?.source === "mock"
+            ? "Phrase sent using a browser/device voice fallback. Your selected AI voice was unavailable."
             : "Phrase sent to the door speaker.",
       );
       setText("");
     } catch (cause) {
+      if (!isCurrent()) return;
       setError(
         cause instanceof Error ? cause.message : "Could not send this phrase.",
       );
     } finally {
-      setBusy("");
+      if (isCurrent()) setBusy("");
     }
   };
   const toggleAudio = async (direction: "talking" | "listening") => {
@@ -275,21 +300,19 @@ export function DoorPage() {
       <PageHeader
         back={state.incident ? "/incident" : "/"}
         eyebrow="Door camera"
-        title={
-          state.incident?.state === "VISITOR"
-            ? "Talk at the door"
-            : `Talk to ${name} at the door`
-        }
+        title="Talk through the door"
         description="See the entrance and speak through its speaker."
       />
       <CameraFeed
+        aspect="native"
+        expandable
         src={
           preview
             ? `${import.meta.env.BASE_URL}assets/camera-demo.png`
             : video.src
         }
         live={video.live}
-        caption={video.status}
+        caption={preview ? "Recorded camera image" : video.status}
       />
       {doorSpeech?.text &&
         (!doorSpeech.incident_id ||

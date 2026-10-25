@@ -34,6 +34,8 @@ class TestEventSource {
 
 class TestAudioContext {
   static starts = 0;
+  static instances: TestAudioContext[] = [];
+  onstatechange: (() => void) | null = null;
   state = "running";
   sampleRate = 44100;
   currentTime = 0;
@@ -63,6 +65,9 @@ class TestAudioContext {
     stop: vi.fn(),
     onended: null,
   }));
+  constructor() {
+    TestAudioContext.instances.push(this);
+  }
 }
 
 function Probe() {
@@ -126,6 +131,7 @@ beforeEach(() => {
   window.localStorage.clear();
   TestEventSource.instances = [];
   TestAudioContext.starts = 0;
+  TestAudioContext.instances = [];
   vi.stubGlobal("EventSource", TestEventSource);
   vi.stubGlobal("AudioContext", TestAudioContext);
   resetPreview();
@@ -636,4 +642,97 @@ it("replaces an older stream subtitle with a newer reconnect snapshot", async ()
       "Newer line during disconnect",
     ),
   );
+});
+
+describe("live phone audio checks", () => {
+  beforeEach(() => {
+    const state = createPreviewState("watching");
+    state.incident = null;
+    vi.spyOn(api, "get").mockResolvedValue(state);
+  });
+  it("plays an audible local test tone and cleans its audio resources on unmount", async () => {
+    const { result, unmount } = renderHook(() => useNightfall(), {
+      wrapper: NightfallProvider,
+    });
+    await waitFor(() => expect(result.current.state).not.toBeNull());
+    expect(result.current.soundEnabled).toBe(false);
+    await act(async () => result.current.testSound());
+    expect(result.current.soundEnabled).toBe(true);
+    const ctx = TestAudioContext.instances[0];
+    expect(ctx.resume).toHaveBeenCalledOnce();
+    expect(TestAudioContext.starts).toBe(1);
+    const tone = ctx.createOscillator.mock.results[0].value;
+    const gain = ctx.createGain.mock.results[0].value;
+    expect(gain.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(
+      0.07,
+      0.03,
+    );
+    unmount();
+    expect(tone.disconnect).toHaveBeenCalledOnce();
+    expect(gain.disconnect).toHaveBeenCalledOnce();
+    expect(ctx.onstatechange).toBeNull();
+    expect(ctx.close).toHaveBeenCalledOnce();
+  });
+  it("marks suspended and closed audio unavailable instead of retaining a previous enabled flag", async () => {
+    const { result } = renderHook(() => useNightfall(), {
+      wrapper: NightfallProvider,
+    });
+    await waitFor(() => expect(result.current.state).not.toBeNull());
+    await act(async () => result.current.testSound());
+    const ctx = TestAudioContext.instances[0];
+    act(() => {
+      ctx.state = "suspended";
+      ctx.onstatechange?.();
+    });
+    expect(result.current.soundEnabled).toBe(false);
+    expect(
+      ctx.createOscillator.mock.results[0].value.disconnect,
+    ).toHaveBeenCalledOnce();
+    await act(async () => {
+      await expect(result.current.testSound()).rejects.toThrow(
+        "Tap Enable sound again",
+      );
+    });
+    expect(result.current.soundEnabled).toBe(false);
+    expect(TestAudioContext.starts).toBe(1);
+    act(() => {
+      ctx.state = "running";
+      ctx.onstatechange?.();
+    });
+    expect(result.current.soundEnabled).toBe(true);
+    act(() => {
+      ctx.state = "closed";
+      ctx.onstatechange?.();
+    });
+    expect(result.current.soundEnabled).toBe(false);
+  });
+  it("does not play a deferred resume after the provider unmounts", async () => {
+    let resume!: () => void;
+    class DelayedAudioContext extends TestAudioContext {
+      override resume = vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            resume = resolve;
+          }),
+      );
+    }
+    vi.stubGlobal("AudioContext", DelayedAudioContext);
+    const { result, unmount } = renderHook(() => useNightfall(), {
+      wrapper: NightfallProvider,
+    });
+    await waitFor(() => expect(result.current.state).not.toBeNull());
+    const operation = result.current.testSound();
+    const rejected = expect(operation).rejects.toThrow(
+      "Sound setup was cancelled",
+    );
+    const ctx = TestAudioContext.instances[0];
+    unmount();
+    await act(async () => {
+      resume();
+      await rejected;
+    });
+    expect(ctx.close).toHaveBeenCalledOnce();
+    expect(ctx.createOscillator).not.toHaveBeenCalled();
+    expect(TestAudioContext.starts).toBe(0);
+  });
 });

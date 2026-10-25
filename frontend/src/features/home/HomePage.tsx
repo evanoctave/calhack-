@@ -1,30 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Badge,
-  Button,
-  Card,
-  Notice,
-  PageHeader,
-  Row,
-} from "../../components/ui";
+import { Button, Card, Notice, PageHeader, Row } from "../../components/ui";
 import { CameraFeed } from "../../components/CameraFeed";
 import { useNightfall } from "../../state/NightfallProvider";
-import { canShowEmergency, isHelpIncident } from "../incident/incidentView";
+import { canShowEmergency } from "../incident/incidentView";
 import { useDoorVideo } from "../live/useDoorVideo";
 import { useDoorAudio } from "../live/useDoorAudio";
 import { DoorAudioControls } from "../live/DoorAudioControls";
+import { NearbySearchSummary } from "../../components/NearbySearchProgress";
+import {
+  doorDecisionFacts,
+  getHomeStatus,
+  hasConfirmedReturn,
+} from "./homeStatus";
 
 export function HomePage() {
   const {
     state,
     memberId,
     preview,
-    setScenario,
     soundEnabled,
     enableSound,
     mutate,
     refresh,
+    doorSpeech,
+    loading,
+    error,
   } = useNightfall();
   const navigate = useNavigate();
   const video = useDoorVideo(memberId, preview);
@@ -43,10 +44,13 @@ export function HomePage() {
   if (!state)
     return (
       <div className="empty-state">
-        <h1>Your night, connected</h1>
+        <h1>
+          {loading ? "Connecting to Nightfall…" : "Nightfall is unavailable"}
+        </h1>
         <p className="muted">
-          Connect to the Nightfall server or open Preview to explore the app.
+          {error || "Waiting for the current household and door status."}
         </p>
+        {!loading && <Button onClick={() => void refresh()}>Try again</Button>}
       </div>
     );
   const h = state.household,
@@ -61,8 +65,15 @@ export function HomePage() {
     .sort(([a], [b]) => a - b)
     .map(([tier, names]) => `${tier} · ${names.join(" + ")}`)
     .join(" → ");
-  const returned = inc?.state === "RETURNED" && inc.checkin !== "self_other";
-  const active = inc && !["CLOSED", "ARMED_IDLE"].includes(inc.state);
+  const returned = hasConfirmedReturn(inc);
+  const status = getHomeStatus(state, soundEnabled, preview);
+  const speech =
+    inc?.id && doorSpeech?.incident_id === inc.id ? doorSpeech : null;
+  const speechTime = speech?.ts ? new Date(speech.ts) : null;
+  const operatorId = state.live_by || state.takeover_by;
+  const operatorName =
+    h.tree.find((member) => member.id === operatorId)?.name ||
+    "A family member";
   const countdown = inc?.door_opened_at
     ? Math.max(
         0,
@@ -72,30 +83,6 @@ export function HomePage() {
         ),
       )
     : 0;
-  const title =
-    inc?.state === "CONVERSATION"
-      ? `Talking to ${h.person_name}`
-      : inc?.state === "DOOR_OPEN"
-        ? `${h.person_name} is out of view`
-        : inc?.state === "RETURNED"
-          ? returned
-            ? `${h.person_name} is back inside`
-            : `${inc.checkin_who || "Family"} checked in`
-          : inc?.acked_by && active
-            ? `${inc.acked_by_name || "Family"} is on it`
-            : inc?.state === "VISITOR"
-              ? "Someone is at the door"
-              : inc?.state === "WATCHING"
-                ? "Watching the entrance"
-                : isHelpIncident(inc) &&
-                    inc &&
-                    ["ESCALATING", "EXHAUSTED"].includes(inc.state)
-                  ? "Help requested at the door"
-                  : inc?.exited_at && inc.state !== "CLOSED"
-                    ? `${h.person_name} left home`
-                    : state.night_mode
-                      ? "Night watch is on"
-                      : "Night watch is off";
   const changeWatch = async () => {
     setBusy(true);
     setMessage("");
@@ -117,37 +104,83 @@ export function HomePage() {
   };
   return (
     <div className="screen">
-      <PageHeader
-        title={title}
-        description={`Good evening, ${h.tree.find((m) => m.id === memberId)?.name || h.caregiver_name}`}
-      />
-      <Badge
-        tone={
-          canShowEmergency(inc) && !inc?.acked_by
-            ? "danger"
-            : inc?.state === "DOOR_OPEN"
-              ? "warning"
-              : "success"
-        }
-      >
-        {active
-          ? inc?.state === "RETURNED"
-            ? returned
-              ? "Return confirmed"
-              : "Check-in complete"
-            : inc?.acked_by
-              ? "Family is responding · Return not confirmed"
-              : inc?.state === "VISITOR"
-                ? "Visitor check-in"
-                : "Checking the door"
-          : `Watching over ${h.person_name}`}
-      </Badge>
-      <button
-        className="camera-link"
-        onClick={() => navigate("/door")}
-        aria-label="Open the front entrance camera"
-      >
+      <PageHeader title={status.title} description={status.reason} />
+      {error && (
+        <Notice tone="warning">Status may be out of date. {error}</Notice>
+      )}
+      {operatorId && (
+        <Notice>
+          {state.live_by
+            ? `${operatorName}’s microphone is connected to the door speaker. Automatic voice is paused.`
+            : `${operatorName} has taken over the door voice. Automatic voice is paused.`}
+        </Notice>
+      )}
+      {speech?.text && (
+        <Card>
+          <div className="inline spread">
+            <h2>Voice at the door</h2>
+            {speechTime && !Number.isNaN(speechTime.getTime()) && (
+              <time className="caption muted" dateTime={speech.ts}>
+                {speechTime.toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </time>
+            )}
+          </div>
+          <p style={{ marginTop: 12 }}>“{speech.text}”</p>
+          <p className="caption muted" style={{ marginTop: 8 }}>
+            {preview
+              ? "Sample transcript"
+              : state.voice.mock
+                ? "Latest transcript · Mock voice mode"
+                : "Latest line sent to the door"}
+            {!speechTime || Number.isNaN(speechTime.getTime())
+              ? " · Time unavailable"
+              : ""}
+          </p>
+        </Card>
+      )}
+      {inc?.state === "DOOR_OPEN" && (
+        <p className="caption muted tabular" role="status">
+          {countdown > 0
+            ? `${countdown}s remaining before the family call check`
+            : "Waiting for the server’s next update…"}
+        </p>
+      )}
+      <Button onClick={() => navigate(status.action.path)}>
+        {status.action.label}
+      </Button>
+      {canShowEmergency(inc) && (
+        <Button variant="secondary" onClick={() => navigate("/incident")}>
+          View current alert
+        </Button>
+      )}
+      <details>
+        <summary>Why is Nightfall speaking?</summary>
+        <div className="stack gap-sm caption muted">
+          {inc && !["ARMED_IDLE", "ARMED_OFF", "CLOSED"].includes(inc.state) ? (
+            doorDecisionFacts(inc, h.person_name).map((fact) => (
+              <p key={fact}>{fact}</p>
+            ))
+          ) : (
+            <p>
+              When night watch is enabled, a person entering the door camera’s
+              view can start a voice check-in. Camera identity, movement
+              direction, and replies determine whether Nightfall contacts
+              family.
+            </p>
+          )}
+          <p>
+            These signals do not tell Nightfall whether someone is asleep or
+            what they intend to do.
+          </p>
+        </div>
+      </details>
+      <div className="stack gap-sm">
         <CameraFeed
+          aspect="monitor"
+          expandable
           src={
             preview
               ? `/ui/assets/${returned ? "camera-returned.png" : "camera-demo.png"}`
@@ -156,115 +189,51 @@ export function HomePage() {
           live={video.live}
           caption={
             preview
-              ? "Recorded demo · Tap for Talk / Listen"
+              ? "Recorded camera image"
               : video.live
-                ? "Front entrance · Tap for Talk / Listen"
+                ? "Front entrance"
                 : video.status
           }
         />
-      </button>
-      <DoorAudioControls
-        audio={audio}
-        onToggle={(direction) => {
-          if (audio.channels[direction] !== "off") {
-            audio.stop(direction);
-            void refresh();
-          } else void audio.start(direction);
-        }}
-      />
-      {inc?.state === "CONVERSATION" && (
-        <Card>
-          <p className="eyebrow">A familiar voice at the door</p>
-          <h2 style={{ marginTop: 8 }}>
-            Helping {h.person_name} head back inside
-          </h2>
-          <p className="caption muted" style={{ marginTop: 8 }}>
-            {inc.lines_spoken} lines spoken. Return is not yet confirmed.
-          </p>
-          <p className="sponsor" style={{ marginTop: 12 }}>
-            Voice · Cartesia / Dialogue · Claude
-          </p>
-        </Card>
-      )}
-      {inc?.state === "DOOR_OPEN" && (
-        <Notice tone="warning">
-          <strong className="tabular">
-            {countdown > 0
-              ? `${countdown}s return check`
-              : "Checking for an update…"}
-          </strong>
-          <p>Nightfall checks for a return before calling your care circle.</p>
-        </Notice>
-      )}
-      {inc?.state === "VISITOR" && (
-        <Notice>
-          Nightfall is checking who is at the door. Open the camera to listen or
-          speak.
-        </Notice>
-      )}
-      <Card>
-        <Row
-          title="Latest check"
-          detail={
-            inc?.state === "RETURNED"
-              ? returned
-                ? "Back inside · Calls cancelled"
-                : "Check-in resolved · Calls stopped"
-              : inc?.state === "WATCHING"
-                ? "Observation only · Family calls are not active"
-                : inc?.state === "CLOSED"
-                  ? "Check-in complete"
-                  : isHelpIncident(inc)
-                    ? "Help button pressed · Check the door"
-                    : inc?.exited_at
-                      ? `Exit at ${new Date(inc.exited_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
-                      : inc?.state === "CONVERSATION"
-                        ? "Voice check-in in progress"
-                        : "No exit detected"
-          }
-          trailing={
-            <span className="caption muted">
-              {new Date(state.now).toLocaleTimeString("en-US", {
-                hour: "numeric",
-                minute: "2-digit",
-              })}
-            </span>
-          }
-        />
-      </Card>
-      {active && (
-        <Button
-          onClick={() =>
-            navigate(
-              inc?.state === "RETURNED" || inc?.acked_by
-                ? "/incident/respond"
-                : "/incident",
-            )
-          }
-        >
-          {inc?.state === "RETURNED"
-            ? "View return details"
-            : inc?.acked_by
-              ? "View response"
-              : "Open current alert"}
+        <Button variant="secondary" onClick={() => navigate("/door")}>
+          Open door controls
         </Button>
-      )}
+      </div>
+      <div className="stack gap-sm">
+        <DoorAudioControls
+          audio={audio}
+          onToggle={(direction) => {
+            if (audio.channels[direction] !== "off") {
+              audio.stop(direction);
+              void refresh();
+            } else void audio.start(direction);
+          }}
+        />
+      </div>
       <Card>
         <Row
-          title="Family AI voice"
+          title="Voice at the door"
           detail={
-            state.voice.mock
-              ? "Demo voice · Provider not connected"
-              : `${state.voice.name || "Selected voice"} · Ready`
+            preview
+              ? state.voice.name || "Family voice"
+              : state.voice.mock
+                ? "Mock voice mode"
+                : state.voice.name || "Choose a voice"
           }
-          onClick={() => navigate("/voice")}
+          onClick={() => navigate("/voice?returnTo=/home")}
         />
         <Row
           title="Care circle"
           detail={callOrder || "No family contacts yet"}
-          onClick={() => navigate("/setup/contacts")}
+          onClick={() => navigate("/setup/contacts?mode=edit&returnTo=/home")}
+        />
+        <Row
+          title="Care profile"
+          detail={`${h.person_full_name || h.person_name} · Care details`}
+          onClick={() => navigate("/setup/profile?mode=edit&returnTo=/home")}
         />
       </Card>
+      <NearbySearchSummary />
       {!soundEnabled && (
         <Button
           variant="secondary"
@@ -275,7 +244,7 @@ export function HomePage() {
       )}
       {message && <Notice tone="warning">{message}</Notice>}
       <div className="actions">
-        <Button variant="secondary" onClick={() => navigate("/setup/profile")}>
+        <Button variant="secondary" onClick={() => navigate("/setup")}>
           Review care setup
         </Button>
         <Button
@@ -290,52 +259,6 @@ export function HomePage() {
               : "Turn night watch on"}
         </Button>
       </div>
-      {preview && (
-        <Card>
-          <p className="eyebrow">Continue this preview</p>
-          <div className="stack gap-sm" style={{ marginTop: 12 }}>
-            {!inc && (
-              <Button onClick={() => setScenario("approach")}>
-                Dad approaches the door
-              </Button>
-            )}
-            {inc?.state === "CONVERSATION" && (
-              <>
-                <Button onClick={() => setScenario("returned")}>
-                  He heads back inside
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => setScenario("countdown")}
-                >
-                  He leaves the camera view
-                </Button>
-              </>
-            )}
-            {inc?.state === "DOOR_OPEN" && (
-              <>
-                <Button onClick={() => setScenario("ringing")}>
-                  He stays outside · Call family
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => setScenario("returned")}
-                >
-                  He returns during the check
-                </Button>
-              </>
-            )}
-            {inc && !["CONVERSATION", "DOOR_OPEN"].includes(inc.state) && (
-              <Button
-                variant="secondary"
-                onClick={() => setScenario("watching")}
-              >
-                Reset preview
-              </Button>
-            )}
-          </div>
-        </Card>
-      )}
     </div>
   );
 }

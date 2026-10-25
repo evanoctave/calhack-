@@ -16,9 +16,46 @@ npm ci
 npm run dev
 ```
 
-Open **http://127.0.0.1:5173/ui/index.html?preview=1#/setup/profile** for the isolated preview. Preview uses sample data, sends no backend requests, and does not place calls or generate audio. Use the “Preview · Scenarios” menu to choose outcomes. Recording, where explicitly enabled, records only the consenting user's local microphone sample.
+Open **http://127.0.0.1:5173/ui/index.html?preview=1#/setup/profile** for the isolated preview. Preview uses sample data, sends no backend requests, and does not place calls or generate audio. The app hides global preview controls and banners. For development, select a fixture with the `scenario` query parameter before the hash, such as `?preview=1&scenario=ringing#/incident`. Recording, where explicitly enabled, records only the consenting user's local microphone sample.
 
 Open **http://127.0.0.1:5173/ui/index.html#/home** for the connected app. The Vite proxy expects a backend at `http://127.0.0.1:8000`. To change it, copy `.env.example` to `.env.local` and set `NIGHTFALL_BACKEND_URL`; restart Vite. This setting is a server URL, never an API secret.
+
+Setup now follows four screens: **You & home → Care circle → Voice at the door → Connect & start**. Address-based nearby search runs in the background. Voice setup offers two paths: record samples and create a family AI voice, or browse ready-made voices. Medical details remain optional; edits opened from Home or Care return to that screen.
+
+The computer's **`/door`** page supplies the real camera and entrance speaker. Keep it open and start the camera before testing the connected phone app. Preview uses recorded examples. The Git branch includes source and integration fixes; local API keys, generated voices, personal household settings and live search caches are not shared through Git.
+
+## Google Maps in the brief
+
+The brief and nearby-results screen use the Maps JavaScript API with the existing
+home coordinates, search radius, and hazard/call-first/familiar place arrays. A
+pin opens its name and walking directions. Changing the map does not change the
+Apify search, backend contracts, or stored family places.
+
+In the ignored `frontend/.env.local`, add a **browser** Maps JavaScript API key:
+
+```dotenv
+VITE_GOOGLE_MAPS_API_KEY=your_restricted_browser_key
+VITE_GOOGLE_MAPS_MAP_ID=DEMO_MAP_ID
+```
+
+The Google Cloud project needs Maps JavaScript API enabled and billing configured.
+Restrict this key to Maps JavaScript API and the actual app websites (for example
+`http://127.0.0.1:5173/*` and `http://localhost:5173/*`; add a shared HTTPS origin
+only when that deployment should use it). This browser key is visible in requests
+by design; do not use a server key or commit its value. Restart **Vite only** after
+changing its environment. Use your own JavaScript map ID for a deployed app;
+`DEMO_MAP_ID` is for local testing. No Google account, billing, or key restrictions
+are changed by this code.
+
+With a key, Preview loads real Google map tiles but keeps sample places and sends
+no requests to the Nightfall backend. Without a key, it clearly says Google Maps
+is not connected and keeps the place lists available. It never presents the old
+map screenshot as a working Google map. Tests mock the SDK; real tiles and Google
+authorization still require checking with a configured key.
+
+Sources: [Google Maps loader](https://developers.google.com/maps/documentation/javascript/load-maps-js-api),
+[advanced marker setup](https://developers.google.com/maps/documentation/javascript/advanced-markers/start),
+[key restrictions](https://developers.google.com/maps/api-security-best-practices).
 
 ## Local backend without external calls
 
@@ -37,7 +74,7 @@ npm run mock
 
 This helper clears external provider credentials and keeps the 20-second door wait, 60-second escalation interval and 45-second emergency option. It does not read `.env`. Backend timers remain authoritative. The mock requirements include a local FFmpeg binary for sample conversion when system FFmpeg is missing. `/door` is still the computer's camera/speaker surface; the React app is the family phone surface.
 
-The full backend requirements include `anthropic>=1.0`; live voice verification used SDK 2.3.0. The minimal mock environment above omits that SDK and provider credentials. For live voice work, configure `MOCK=0`, Anthropic and Cartesia keys, and valid voice IDs on the backend, then point `NIGHTFALL_BACKEND_URL` at it. Keep all provider keys out of Vite configuration. Verify returned provider sources: configuration flags alone do not prove a successful live call.
+The full backend requirements include `anthropic>=1.0`; live voice verification used SDK 2.3.0. The minimal mock environment above omits that SDK and provider credentials. For live voice work, configure `MOCK=0`, Anthropic and Cartesia keys, and valid voice IDs on the backend, then point `NIGHTFALL_BACKEND_URL` at it. Keep private provider credentials out of Vite configuration. Verify returned provider sources: configuration flags alone do not prove a successful live call.
 
 ## Production build on the existing backend
 
@@ -74,8 +111,8 @@ On October 24, a consenting tester saved a 6.12-second recording from a real pho
 - `src/features/`: setup, voice, home, incident, live door/call, brief.
 - `src/state/NightfallProvider.tsx`: shared snapshot, SSE, member session and sound.
 - `src/data/`: typed API contracts and explicit preview fixtures.
-- `src/components/`: shared glass surfaces, controls, camera crops and Leaflet map.
+- `src/components/`: shared glass surfaces, controls, camera crops and Google Maps.
 - [IMPLEMENTATION.md](IMPLEMENTATION.md): route/API mapping and state behavior.
 - [BACKEND-GAPS.md](BACKEND-GAPS.md): concrete changes needed from the backend teammate.
 
-All Figma photos/map artwork used for preview are stored in `public/assets/`; live views use server frames and live map tiles. Fonts are bundled locally. No external API secrets belong in Vite environment variables or source code.
+Figma camera photos and archived map artwork remain in `public/assets/`; the map component uses Google Maps when configured. Live camera views use server frames. Fonts are bundled locally. Private provider credentials never belong in Vite environment variables or source code; the restricted public browser Maps key is configured separately as described above.

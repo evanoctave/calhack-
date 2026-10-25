@@ -19,7 +19,7 @@ function sse(path, onMsg) {
 let voiceReady = false;
 function speak(text) {
   if (!("speechSynthesis" in window)) return;
-  const u = new SpeechSynthesisUtterance(text); u.rate = 0.92; u.pitch = 1;
+  const u = new SpeechSynthesisUtterance(text); u.lang = "en-US"; u.rate = 0.92; u.pitch = 1;
   const pick = () => { const v = speechSynthesis.getVoices().find(v => /Samantha|Karen|Moira|Google US English/i.test(v.name)); if (v) u.voice = v; speechSynthesis.cancel(); speechSynthesis.speak(u); };
   if (speechSynthesis.getVoices().length) pick(); else speechSynthesis.onvoiceschanged = pick;
 }

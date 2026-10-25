@@ -25,7 +25,7 @@ export function DoorAudioControls({
             ? "Cancel Talk"
             : talk === "on"
               ? "Stop talking"
-              : "Talk"}
+              : "Talk through the door"}
         </Button>
         <Button
           variant="secondary"
@@ -51,7 +51,7 @@ export function DoorAudioControls({
             : "Listening to the door microphone. "
           : ""}
         {talk === "off" && listen === "off"
-          ? "Use Listen to hear the door and Talk to speak."
+          ? "Listen to hear the entrance. Talk through the door sends your own voice."
           : ""}
       </p>
       {audio.error && <Notice tone="warning">{audio.error}</Notice>}

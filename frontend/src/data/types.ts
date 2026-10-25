@@ -1,4 +1,4 @@
-/** Wire contracts verified against frontend-v1@06869e67. No SDK or API keys in the browser. */
+/** Nightfall wire contracts. Private service credentials stay on the backend. */
 export type SampleKind = "introduction" | "reassurance" | "everyday";
 export type IncidentState =
   | "ARMED_OFF"
@@ -190,6 +190,8 @@ export interface Brief {
   police_report: string;
 }
 export interface NearbyStatus {
+  /** Completed results are bound to the saved home/radius. Absent on older servers. */
+  results_verified?: boolean;
   apify:
     | "idle"
     | "running"

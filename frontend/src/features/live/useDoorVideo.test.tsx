@@ -3,9 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useDoorVideo } from "./useDoorVideo";
 
 class FakeSocket {
+  static OPEN = 1;
   static all: FakeSocket[] = [];
   binaryType = "";
-  onmessage: ((event: { data: Blob }) => void) | null = null;
+  readyState = FakeSocket.OPEN;
+  send = vi.fn();
+  onmessage: ((event: { data: unknown }) => void) | null = null;
   onerror: (() => void) | null = null;
   onclose: ((event: { code: number }) => void) | null = null;
   close = vi.fn();
@@ -46,6 +49,53 @@ afterEach(() => {
 });
 
 describe("door camera freshness", () => {
+  it("acknowledges each accepted JPEG for old and backpressure-aware servers", async () => {
+    const hook = renderHook(() => useDoorVideo("TM-SARAH", false));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const socket = FakeSocket.all[0];
+    act(() => {
+      socket.onmessage?.({
+        data: new Blob(["frame 1"], { type: "image/jpeg" }),
+      });
+      socket.onmessage?.({
+        data: new Blob(["frame 2"], { type: "image/jpeg" }),
+      });
+      socket.onmessage?.({ data: "status" });
+      socket.onmessage?.({ data: new Blob([]) });
+    });
+    expect(socket.send.mock.calls).toEqual([["a"], ["a"]]);
+    expect(hook.result.current.live).toBe(true);
+    const lateMessage = socket.onmessage;
+    hook.unmount();
+    act(() => lateMessage?.({ data: new Blob(["late frame"]) }));
+    expect(socket.send).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not acknowledge or display frames from a replaced connection", async () => {
+    const hook = renderHook(({ member }) => useDoorVideo(member, false), {
+      initialProps: { member: "TM-SARAH" },
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const oldSocket = FakeSocket.all[0];
+    hook.rerender({ member: "TM-MIKE" });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const currentSocket = FakeSocket.all[1];
+    const currentFrame = hook.result.current.src;
+    act(() => oldSocket.onmessage?.({ data: new Blob(["old member frame"]) }));
+    expect(oldSocket.send).not.toHaveBeenCalled();
+    expect(hook.result.current.src).toBe(currentFrame);
+    act(() =>
+      currentSocket.onmessage?.({ data: new Blob(["current member frame"]) }),
+    );
+    expect(currentSocket.send).toHaveBeenCalledExactlyOnceWith("a");
+  });
+
   it("labels a JPEG fallback as a snapshot, never Live", async () => {
     const hook = renderHook(() => useDoorVideo("TM-SARAH", false));
     await act(async () => {

@@ -64,15 +64,42 @@ const fail = (e: unknown) =>
       ? e.message
       : "Something went wrong. Please try again.";
 
-export function VoicePage() {
-  const { step = "samples" } = useParams();
-  const [search, setSearch] = useSearchParams();
+const voiceStages = [
+  "samples",
+  "edit",
+  "record",
+  "review",
+  "create",
+  "preview",
+  "presets",
+] as const;
+type VoiceStage = (typeof voiceStages)[number];
+const validStage = (value: string | undefined): VoiceStage =>
+  voiceStages.includes(value as VoiceStage) ? (value as VoiceStage) : "samples";
+
+export function VoicePage({
+  onboarding = false,
+}: { onboarding?: boolean } = {}) {
+  const { step: routeStep } = useParams();
+  const [search] = useSearchParams();
+  const [step, setStep] = useState<VoiceStage>(() => validStage(routeStep));
   const navigate = useNavigate();
   const { state, preview, mutate, refresh } = useNightfall();
-  const selectedKind = search.get("kind");
-  const kind: SampleKind = kinds.includes(selectedKind as SampleKind)
-    ? (selectedKind as SampleKind)
-    : "introduction";
+  const [kind, setKind] = useState<SampleKind>(() =>
+    kinds.includes(search.get("kind") as SampleKind)
+      ? (search.get("kind") as SampleKind)
+      : "introduction",
+  );
+  const selectedKind = kind;
+  const returnTo = search.get("returnTo") === "/home" ? "/home" : "/care";
+  const finish = () => navigate(onboarding ? "/setup/connect" : returnTo);
+  const goTo = (next: VoiceStage, nextKind?: SampleKind) => {
+    if (nextKind) setKind(nextKind);
+    setStep(next);
+  };
+  useEffect(() => {
+    setStep(validStage(routeStep));
+  }, [routeStep, onboarding]);
   const [recording, setRecording] = useState<Recording | null>(null);
   const [consent, setConsent] = useState(false);
   const [recordingNow, setRecordingNow] = useState(false);
@@ -83,14 +110,18 @@ export function VoicePage() {
   const [uploadError, setUploadError] = useState("");
   const [seconds, setSeconds] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [cloning, setCloning] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [playing, setPlaying] = useState(false);
+  const [playingSample, setPlayingSample] = useState<SampleKind | null>(null);
   const [clone, setClone] = useState<CloneResult | null>(null);
   const [generated, setGenerated] = useState<VoicePreview | null>(null);
   const [situation, setSituation] = useState(
     "He is at the front door at 2 AM and says he needs to go to work.",
   );
+  const pageRef = useRef<HTMLDivElement>(null);
+  const previousStage = useRef(step);
   const stepRef = useRef(step);
   stepRef.current = step;
   const recorder = useRef<MediaRecorder | null>(null);
@@ -130,14 +161,24 @@ export function VoicePage() {
     (k) =>
       voice?.samples[k] || (recording?.kind === k && saveState === "saved"),
   ).length;
+  const nextSampleKind = kinds.find(
+    (sampleKind) =>
+      !voice?.samples[sampleKind] &&
+      !(recording?.kind === sampleKind && saveState === "saved"),
+  );
+  const addSample = () => {
+    if (nextSampleKind) goTo("record", nextSampleKind);
+    else goTo("edit");
+  };
   const availableSamples = kinds.filter(
     (k) => voice?.samples[k] || recording?.kind === k,
   );
   const referenceKind = availableSamples.includes(selectedKind as SampleKind)
     ? (selectedKind as SampleKind)
     : recording?.kind || availableSamples[0];
-  const reviewKind = recording?.kind || kind;
-  const reviewSaved = recording
+  const reviewRecording = recording?.kind === kind ? recording : null;
+  const reviewKind = kind;
+  const reviewSaved = reviewRecording
     ? saveState === "saved"
     : Boolean(voice?.samples[kind]);
   function releaseMic() {
@@ -150,6 +191,7 @@ export function VoicePage() {
     audio.current?.pause();
     audio.current = null;
     setPlaying(false);
+    setPlayingSample(null);
   }
   function cancelPreviewRequest() {
     previewRun.current++;
@@ -184,6 +226,18 @@ export function VoicePage() {
       releaseMic();
       setRecordingNow(false);
     }
+  }, [step]);
+  useEffect(() => {
+    if (previousStage.current === step) return;
+    previousStage.current = step;
+    const page = pageRef.current;
+    const heading =
+      page?.querySelector<HTMLElement>("[data-voice-stage-title]") ||
+      page?.querySelector<HTMLElement>("h1");
+    if (!page || !heading) return;
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+    page.scrollIntoView?.({ block: "start", behavior: "auto" });
   }, [step]);
   useEffect(() => {
     cancelPreviewRequest();
@@ -286,7 +340,7 @@ export function VoicePage() {
         };
         setRecording(take);
         setPreparingSample(false);
-        navigate(`/voice/review?kind=${selected}`);
+        goTo("review", selected);
         void saveSample(take);
       };
       started.current = Date.now();
@@ -383,7 +437,9 @@ export function VoicePage() {
     }
   }
   async function cloneVoice() {
-    if (busy) return;
+    const sourceStage = stepRef.current;
+    if (busy || count === 0 || !["edit", "create"].includes(sourceStage))
+      return;
     if (!consent) {
       setError(
         "Please give permission to create speech using your voice first.",
@@ -394,11 +450,12 @@ export function VoicePage() {
     stopPlayback();
     setGenerated(null);
     setClone(null);
+    setCloning(true);
     setBusy(true);
     setError("");
     try {
       const result = await mutate<CloneResult>("/voice/clone", { name: owner });
-      if (!live.current || stepRef.current !== "create") return;
+      if (!live.current || stepRef.current !== sourceStage) return;
       if (
         !result?.ok ||
         !result.voice_id ||
@@ -408,12 +465,14 @@ export function VoicePage() {
           "Family voice creation was not confirmed. Your saved samples are still available. Try again.",
         );
       setClone(result);
-      if (live.current && stepRef.current === "create")
-        navigate("/voice/preview");
+      if (live.current && stepRef.current === sourceStage) goTo("preview");
     } catch (e) {
-      if (live.current && stepRef.current === "create") setError(fail(e));
+      if (live.current && stepRef.current === sourceStage) setError(fail(e));
     } finally {
-      if (live.current) setBusy(false);
+      if (live.current) {
+        setBusy(false);
+        setCloning(false);
+      }
     }
   }
   async function generate() {
@@ -453,6 +512,7 @@ export function VoicePage() {
     }
   }
   async function removeSample(k: SampleKind) {
+    if (playingSample === k) stopPlayback();
     setBusy(true);
     setError("");
     try {
@@ -466,7 +526,7 @@ export function VoicePage() {
         setUploadError("");
       }
       await refresh();
-      if (stepRef.current === "review") navigate("/voice/samples");
+      if (stepRef.current === "review") goTo("edit");
     } catch (e) {
       setError(fail(e));
     } finally {
@@ -494,12 +554,58 @@ export function VoicePage() {
     </label>
   );
   if (!state) return <Notice>Loading family voice…</Notice>;
+  const selectedVoice = Boolean(voice?.voice_id && (!voice.mock || preview));
+  const top = (
+    <>
+      {onboarding && <Progress step={3} total={4} />}
+      {step === "edit" ? (
+        <header className={styles.familyHeader}>
+          <Button
+            variant="quiet"
+            className={styles.backButton}
+            disabled={busy}
+            aria-label="Back to voice options"
+            onClick={() => goTo("samples")}
+          >
+            <span aria-hidden>‹</span> Back
+          </Button>
+          <h1 data-voice-stage-title tabIndex={-1}>
+            Record your voice
+          </h1>
+          <p className="muted">
+            These samples help AI say new things in your voice.
+          </p>
+        </header>
+      ) : (
+        <PageHeader
+          title="Voice at the door"
+          description={`Choose the voice ${dad} hears from the entrance speaker.`}
+          back={onboarding ? "/setup/contacts" : returnTo}
+        />
+      )}
+      {step !== "samples" && step !== "edit" && (
+        <Button
+          variant="quiet"
+          disabled={busy || recordingNow}
+          onClick={() => goTo("samples")}
+        >
+          Back to voice options
+        </Button>
+      )}
+    </>
+  );
   if (step === "presets")
-    return <Presets onDone={() => navigate("/setup/contacts")} />;
+    return (
+      <div className={styles.page} ref={pageRef}>
+        {top}
+        <Presets onDone={() => goTo("preview")} />
+      </div>
+    );
   if (step === "record")
     return (
-      <div className={styles.page}>
-        <PageHeader
+      <div className={styles.page} ref={pageRef}>
+        {top}
+        <StageHeader
           title="Record a voice sample"
           description="Use your usual, comfortable voice."
           back="/voice/samples"
@@ -555,22 +661,23 @@ export function VoicePage() {
     );
   if (step === "review")
     return (
-      <div className={styles.page}>
-        <PageHeader
+      <div className={styles.page} ref={pageRef}>
+        {top}
+        <StageHeader
           title="Review your voice sample"
-          description={`Sample ${kinds.indexOf(recording?.kind || kind) + 1} · ${owner}’s voice`}
+          description={`Sample ${kinds.indexOf(reviewKind) + 1} · ${owner}’s voice`}
           back="/voice/samples"
         />
-        {recording || voice?.samples[kind] ? (
+        {reviewRecording || voice?.samples[kind] ? (
           <>
             <Card>
               <p className={styles.quote}>“{line(reviewKind)}”</p>
-              {recording && (
+              {reviewRecording && (
                 <div
                   className={styles.wave}
                   aria-label="Recorded sample waveform"
                 >
-                  {recording.levels.map((level, i) => (
+                  {reviewRecording.levels.map((level, i) => (
                     <span
                       key={i}
                       style={{ height: `${Math.max(8, level * 100)}%` }}
@@ -585,7 +692,7 @@ export function VoicePage() {
                     playing
                       ? stopPlayback()
                       : void play(
-                          recording?.url ||
+                          reviewRecording?.url ||
                             (preview
                               ? undefined
                               : `/voice/samples/${kind}.wav`),
@@ -595,11 +702,13 @@ export function VoicePage() {
                   {playing ? "Ⅱ Pause sample" : "▷ Play sample"}
                 </Button>
                 <span className="caption muted">
-                  {recording ? formatTime(recording.seconds) : "Saved sample"}
+                  {reviewRecording
+                    ? formatTime(reviewRecording.seconds)
+                    : "Saved sample"}
                 </span>
               </div>
             </Card>
-            {saveState === "uploading" && (
+            {reviewRecording && saveState === "uploading" && (
               <p role="status" className="caption muted">
                 {preview
                   ? "Saving sample to this preview…"
@@ -613,7 +722,7 @@ export function VoicePage() {
                   : "Sample saved. Next, create your family AI voice."}
               </Notice>
             )}
-            {uploadError && (
+            {reviewRecording && uploadError && (
               <Notice tone="danger">
                 {uploadError} Your take is still here. Retry saving or record
                 again.
@@ -632,21 +741,18 @@ export function VoicePage() {
               <Button
                 variant="secondary"
                 disabled={busy}
-                onClick={() => navigate(`/voice/record?kind=${reviewKind}`)}
+                onClick={() => goTo("record", reviewKind)}
               >
                 Record again
               </Button>
               {reviewSaved ? (
-                <Button
-                  disabled={busy}
-                  onClick={() => navigate("/voice/create")}
-                >
-                  Continue to create voice
+                <Button disabled={busy} onClick={() => goTo("edit")}>
+                  Back to samples
                 </Button>
               ) : (
                 <Button
                   disabled={busy || !consent}
-                  onClick={() => void saveSample()}
+                  onClick={() => void saveSample(reviewRecording)}
                 >
                   {saveState === "uploading" ? "Saving sample…" : "Retry save"}
                 </Button>
@@ -664,7 +770,7 @@ export function VoicePage() {
                     setRecording(null);
                     setSaveState("idle");
                     setUploadError("");
-                    navigate("/voice/samples");
+                    goTo("edit");
                   }
                 }}
               >
@@ -678,7 +784,7 @@ export function VoicePage() {
               No saved sample was found, and the local recording is no longer
               available. Record a new sample to continue.
             </Notice>
-            <Button onClick={() => navigate(`/voice/record?kind=${kind}`)}>
+            <Button onClick={() => goTo("record", kind)}>
               Record a sample
             </Button>
           </>
@@ -687,8 +793,9 @@ export function VoicePage() {
     );
   if (step === "create")
     return (
-      <div className={styles.page}>
-        <PageHeader
+      <div className={styles.page} ref={pageRef}>
+        {top}
+        <StageHeader
           title={
             busy ? "Creating your family voice" : "Create your family voice"
           }
@@ -707,7 +814,7 @@ export function VoicePage() {
             detail={
               busy
                 ? "Waiting for the voice service"
-                : "Create a voice from your saved samples"
+                : "Your new voice is selected when creation succeeds"
             }
             trailing={busy ? "…" : "Next"}
           />
@@ -735,20 +842,17 @@ export function VoicePage() {
           >
             {busy ? "Creating voice…" : "Create family AI voice"}
           </Button>
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={() => navigate("/voice/samples")}
-          >
-            Add another sample
+          <Button variant="secondary" disabled={busy} onClick={addSample}>
+            {nextSampleKind ? "Add another sample" : "Manage saved samples"}
           </Button>
         </div>
       </div>
     );
   if (step === "preview")
     return (
-      <div className={styles.page}>
-        <PageHeader
+      <div className={styles.page} ref={pageRef}>
+        {top}
+        <StageHeader
           title={
             familyVoice
               ? "Preview family AI voice"
@@ -759,6 +863,12 @@ export function VoicePage() {
           description="Hear how your selected voice responds to a new situation."
           back="/voice/samples"
         />
+        {selectedVoice && !preview && (
+          <Notice tone="success">
+            Voice selected · {voiceLabel}. Changes are already applied at the
+            door.
+          </Notice>
+        )}
         {stockVoice && (
           <Notice>
             <p>
@@ -766,7 +876,7 @@ export function VoicePage() {
               sample does not create a family AI voice.
             </p>
             {count > 0 && (
-              <Button disabled={busy} onClick={() => navigate("/voice/create")}>
+              <Button disabled={busy} onClick={() => goTo("create")}>
                 Create family AI voice
               </Button>
             )}
@@ -780,41 +890,44 @@ export function VoicePage() {
           </Notice>
         )}
         {referenceKind && (
-          <Card>
-            <p className="caption muted">
-              {owner}’s recorded sample · {samples[referenceKind].title}
-            </p>
-            {availableSamples.length > 1 && (
-              <label className={styles.selectField}>
-                Reference sample
-                <select
-                  value={referenceKind}
-                  onChange={(e) => setSearch({ kind: e.target.value })}
-                >
-                  {availableSamples.map((sampleKind) => (
-                    <option key={sampleKind} value={sampleKind}>
-                      {samples[sampleKind].title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <p className={styles.quote}>“{line(referenceKind)}”</p>
-            <Button
-              variant="quiet"
-              onClick={() =>
-                void play(
-                  recording?.kind === referenceKind
-                    ? recording.url
-                    : preview
-                      ? undefined
-                      : `/voice/samples/${referenceKind}.wav`,
-                )
-              }
-            >
-              Listen to sample
-            </Button>
-          </Card>
+          <details className={styles.details}>
+            <summary>Your saved reference sample</summary>
+            <Card>
+              <p className="caption muted">
+                {owner}’s recorded sample · {samples[referenceKind].title}
+              </p>
+              {availableSamples.length > 1 && (
+                <label className={styles.selectField}>
+                  Reference sample
+                  <select
+                    value={referenceKind}
+                    onChange={(e) => setKind(e.target.value as SampleKind)}
+                  >
+                    {availableSamples.map((sampleKind) => (
+                      <option key={sampleKind} value={sampleKind}>
+                        {samples[sampleKind].title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <p className={styles.quote}>“{line(referenceKind)}”</p>
+              <Button
+                variant="quiet"
+                onClick={() =>
+                  void play(
+                    recording?.kind === referenceKind
+                      ? recording.url
+                      : preview
+                        ? undefined
+                        : `/voice/samples/${referenceKind}.wav`,
+                  )
+                }
+              >
+                Listen to sample
+              </Button>
+            </Card>
+          </details>
         )}
         <Card>
           <p className={styles.sponsor}>AI-GENERATED SPEECH</p>
@@ -841,11 +954,14 @@ export function VoicePage() {
               Generate a new sentence to hear how Nightfall responds.
             </p>
           )}
-          <Field
-            label="Situation"
-            value={situation}
-            onChange={(e) => setSituation(e.target.value)}
-          />
+          <details className={styles.details}>
+            <summary>Change the example situation</summary>
+            <Field
+              label="Situation"
+              value={situation}
+              onChange={(e) => setSituation(e.target.value)}
+            />
+          </details>
           <Button
             variant="secondary"
             disabled={busy || !situation.trim()}
@@ -861,135 +977,144 @@ export function VoicePage() {
         </p>
         {notices}
         <div className="actions">
-          <Button
-            variant="secondary"
-            onClick={() => navigate("/voice/samples")}
-          >
-            Add another sample
+          <Button variant="secondary" onClick={addSample}>
+            {nextSampleKind ? "Add another sample" : "Manage saved samples"}
           </Button>
-          <Button onClick={() => navigate("/setup/contacts")}>
-            {voice?.voice_id && !voice.mock
-              ? stockVoice
-                ? "Continue with ready-made voice"
-                : "Continue with this voice"
-              : "Continue setup"}
+          <Button disabled={!selectedVoice || busy} onClick={finish}>
+            {onboarding ? "Next: Connect" : "Done"}
           </Button>
         </div>
       </div>
     );
-  return (
-    <div className={styles.page}>
-      <Progress step={2} total={6} />
-      <PageHeader
-        title="A familiar AI voice"
-        description="Record a few samples of your voice."
-        back="/setup/profile"
-      />
-      <div className="inline spread">
-        <strong>{owner}’s voice</strong>
-        <span className="caption muted">
-          {count} sample{count === 1 ? "" : "s"}
-        </span>
-      </div>
-      <Card>
-        {kinds.map((k, i) => (
-          <div className={styles.sample} key={k}>
-            <div className="inline spread">
-              <strong>{samples[k].title}</strong>
+  const renderSample = (k: SampleKind) => {
+    const saved = Boolean(
+      voice?.samples[k] || (recording?.kind === k && saveState === "saved"),
+    );
+    const isPlaying = playing && playingSample === k;
+    return (
+      <div className={styles.sample} key={k}>
+        <div className="inline spread">
+          <h3>{samples[k].title}</h3>
+          <Button
+            variant="quiet"
+            disabled={busy}
+            aria-label={`${saved ? "Redo" : "Record"} ${samples[k].title}`}
+            onClick={() => goTo("record", k)}
+          >
+            {saved ? "Redo" : "Record"}
+          </Button>
+        </div>
+        <p>“{line(k)}”</p>
+        <div className="inline spread">
+          <span className="caption muted">
+            {saved ? "Recorded" : "Not recorded"}
+          </span>
+          {saved && (
+            <div className={styles.sampleActions}>
               <Button
                 variant="quiet"
                 disabled={busy}
-                onClick={() => navigate(`/voice/record?kind=${k}`)}
+                aria-label={`${isPlaying ? "Pause" : "Play"} ${samples[k].title}`}
+                onClick={() => {
+                  if (isPlaying) stopPlayback();
+                  else {
+                    void play(
+                      recording?.kind === k && saveState === "saved"
+                        ? recording.url
+                        : preview
+                          ? undefined
+                          : `/voice/samples/${k}.wav`,
+                    );
+                    setPlayingSample(k);
+                  }
+                }}
               >
-                {voice?.samples[k] ? "Redo" : "Record"}
+                {isPlaying ? "Pause" : "Play"}
+              </Button>
+              <Button
+                variant="quiet"
+                disabled={busy}
+                aria-label={`Delete ${samples[k].title}`}
+                onClick={() => void removeSample(k)}
+              >
+                Delete
               </Button>
             </div>
-            <p>“{line(k)}”</p>
-            <div className="inline spread">
-              <span className="caption muted">
-                Sample {i + 1} ·{" "}
-                {voice?.samples[k] ? "Recorded" : "Not recorded"}
-              </span>
-              {voice?.samples[k] && (
-                <div className={styles.sampleActions}>
-                  <Button
-                    variant="quiet"
-                    onClick={() =>
-                      void play(
-                        preview
-                          ? undefined
-                          : `/voice/samples/${k}.wav?t=${Date.now()}`,
-                      )
-                    }
-                  >
-                    Play
-                  </Button>
-                  <Button
-                    variant="quiet"
-                    disabled={busy}
-                    onClick={() => void removeSample(k)}
-                  >
-                    Delete
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </Card>
-      <p className="caption muted">
-        AI uses your samples to create new sentences and choose a reassuring
-        tone.
-      </p>
-      <p className="caption muted">Voice · Cartesia / Dialogue · Claude</p>
-      {voice?.voice_id && !voice.mock && (
-        <Notice tone={stockVoice ? "info" : "success"}>
-          {stockVoice
-            ? "Ready-made voice selected. Create a family AI voice to use your saved samples."
-            : familyVoice
-              ? "Family AI voice selected for the door."
-              : "A voice is selected for the door."}
-        </Notice>
-      )}
-      {notices}
-      <div className="actions">
-        {voice?.voice_id && (
+          )}
+        </div>
+      </div>
+    );
+  };
+  if (step === "edit")
+    return (
+      <div className={`${styles.page} ${styles.familyPage}`} ref={pageRef}>
+        {top}
+        <div className={`inline spread ${styles.sampleHeading}`}>
+          <h2>{owner}’s voice</h2>
+          <p className="caption muted">
+            {count} sample{count === 1 ? "" : "s"} saved
+          </p>
+        </div>
+        <Card className={styles.sampleCard}>{kinds.map(renderSample)}</Card>
+        {permission}
+        {notices}
+        <Button
+          disabled={busy || count === 0 || !consent}
+          onClick={() => void cloneVoice()}
+        >
+          {cloning ? "Creating voice…" : "Create AI voice"}
+        </Button>
+        {count === 0 && (
+          <p className="caption muted">Save a voice sample to get started.</p>
+        )}
+        <p className={`caption muted ${styles.credit}`}>Voice · Cartesia</p>
+      </div>
+    );
+  return (
+    <div className={styles.page} ref={pageRef}>
+      {top}
+      <div className={styles.choices}>
+        <Card className={styles.choiceCard}>
+          <h2>Create your AI voice</h2>
+          <p>Record a few samples. AI uses your voice to speak new words.</p>
+          <Button disabled={busy} onClick={() => goTo("edit")}>
+            Use my voice
+          </Button>
+        </Card>
+        <Card className={styles.choiceCard}>
+          <h2>Choose a ready-made voice</h2>
+          <p>Pick an AI voice from the library. No recording needed.</p>
           <Button
             variant="secondary"
             disabled={busy}
-            onClick={() => navigate("/voice/preview")}
+            onClick={() => goTo("presets")}
           >
-            {stockVoice
-              ? "Preview ready-made voice"
-              : familyVoice
-                ? "Preview family AI voice"
-                : "Preview current voice"}
+            Browse voices
           </Button>
-        )}
-        <Button
-          variant="secondary"
-          disabled={busy}
-          onClick={() => navigate("/voice/presets")}
-        >
-          Choose a ready-made voice
-        </Button>
-        <Button
-          disabled={busy}
-          onClick={() =>
-            navigate(
-              count ? "/voice/create" : "/voice/record?kind=introduction",
-            )
-          }
-        >
-          {count ? "Create family AI voice" : "Record a voice sample"}
-        </Button>
-        <Button variant="quiet" onClick={() => navigate("/setup/contacts")}>
-          {stockVoice
-            ? "Continue with ready-made voice"
-            : "Continue with current voice"}
-        </Button>
+        </Card>
       </div>
+      {notices}
+      <p className={`caption muted ${styles.credit}`}>Voice · Cartesia</p>
+      {selectedVoice && (
+        <div className={`actions ${styles.navigation}`}>
+          <p className="caption muted">Selected: {voice?.name || voiceLabel}</p>
+          <Button disabled={busy} onClick={finish}>
+            {onboarding ? "Next: Connect" : "Done"}
+          </Button>
+        </div>
+      )}
     </div>
+  );
+}
+
+function StageHeader({ title, description }: Parameters<typeof PageHeader>[0]) {
+  return (
+    <header>
+      <h2 data-voice-stage-title tabIndex={-1}>
+        {title}
+      </h2>
+      {description && <p className="caption muted">{description}</p>}
+    </header>
   );
 }
 
@@ -1075,8 +1200,8 @@ function Presets({ onDone }: { onDone: () => void }) {
     }
   }
   return (
-    <div className={styles.page}>
-      <PageHeader
+    <div className={styles.stage}>
+      <StageHeader
         title="Choose a voice"
         description="Listen first, then choose the voice Dad hears."
         back="/voice/samples"
@@ -1155,35 +1280,38 @@ function Presets({ onDone }: { onDone: () => void }) {
             </button>
           ))}
         </div>
-        <label className={styles.slider}>
-          Speed · {Number(speed.toFixed(2))}×
-          <input
-            type="range"
-            min="0.6"
-            max="1.5"
-            step="0.05"
-            disabled={busy}
-            value={speed}
-            onChange={(e) => setSpeed(Number(e.target.value))}
-          />
-        </label>
-        <label className={styles.select}>
-          Emotion
-          <select
-            disabled={busy}
-            value={emotion}
-            onChange={(e) => setEmotion(e.target.value)}
-          >
-            <option value="neutral">Neutral</option>
-            <option value="calm">Calm</option>
-            <option value="content">Content</option>
-            <option value="happy">Warm</option>
-          </select>
-        </label>
-        <p className="caption muted">
-          Library previews are prerecorded. Speed and emotion apply to new
-          speech after you choose Use.
-        </p>
+        <details className={styles.details}>
+          <summary>Speed & emotion</summary>
+          <label className={styles.slider}>
+            Speed · {Number(speed.toFixed(2))}×
+            <input
+              type="range"
+              min="0.6"
+              max="1.5"
+              step="0.05"
+              disabled={busy}
+              value={speed}
+              onChange={(e) => setSpeed(Number(e.target.value))}
+            />
+          </label>
+          <label className={styles.select}>
+            Emotion
+            <select
+              disabled={busy}
+              value={emotion}
+              onChange={(e) => setEmotion(e.target.value)}
+            >
+              <option value="neutral">Neutral</option>
+              <option value="calm">Calm</option>
+              <option value="content">Content</option>
+              <option value="happy">Warm</option>
+            </select>
+          </label>
+          <p className="caption muted">
+            Library previews are prerecorded. Speed and emotion apply to new
+            speech after you choose Use.
+          </p>
+        </details>
       </Card>
       {preview && <Badge tone="info">Preview · No generated audio</Badge>}
       {error && <Notice tone="danger">{error}</Notice>}

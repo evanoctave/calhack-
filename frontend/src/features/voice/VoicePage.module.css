@@ -62,16 +62,24 @@
   background: currentColor;
 }
 .sample {
-  padding: 8px 0 12px;
+  padding: 8px 0 16px;
 }
 .sample + .sample {
   border-top: 1px solid var(--line, #d8dfe9);
-  padding-top: 12px;
+  padding-top: 16px;
+}
+.sample:last-child {
+  padding-bottom: 0;
+}
+.sample h3 {
+  font-size: 17px;
+  line-height: 24px;
+  letter-spacing: -0.25px;
 }
 .sample p {
-  font-size: 14px;
-  line-height: 20px;
-  margin: 6px 0;
+  font-size: 15px;
+  line-height: 22px;
+  margin: 6px 0 10px;
 }
 .sampleActions {
   display: flex;
@@ -177,4 +185,102 @@
 }
 .playRow > span {
   white-space: nowrap;
+}
+
+.stage,
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.details {
+  font-size: 14px;
+  line-height: 21px;
+}
+.details > summary {
+  color: var(--accent);
+  cursor: pointer;
+  padding: 10px 0;
+  min-height: 44px;
+}
+.details > summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.details[open] > summary {
+  margin-bottom: 8px;
+}
+.details p + p {
+  margin-top: 8px;
+}
+
+.navigation {
+  margin-top: auto;
+  padding-top: 24px;
+}
+.choices {
+  margin-top: 8px;
+}
+.choiceCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.choiceCard h2 {
+  font-size: 22px;
+  line-height: 28px;
+  letter-spacing: -0.4px;
+}
+.choiceCard p {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 22px;
+}
+.choiceCard > button {
+  margin-top: 8px;
+}
+.familyHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.familyHeader .backButton {
+  width: auto;
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0;
+  margin-bottom: 6px;
+}
+.familyHeader .backButton span {
+  margin-right: 4px;
+}
+.familyHeader p {
+  font-size: 15px;
+  line-height: 22px;
+}
+.sampleHeading {
+  margin-top: 4px;
+}
+.sampleHeading h2 {
+  font-size: 16px;
+  line-height: 22px;
+}
+.sampleHeading p {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.sampleCard {
+  padding-top: 10px;
+}
+.familyPage .consent {
+  font-size: 13px;
+  line-height: 20px;
+}
+.credit {
+  font-size: 12px;
+}
+.familyPage .credit {
+  text-align: center;
 }

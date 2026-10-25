@@ -1,10 +1,19 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import {
+  Link,
+  Navigate,
+  useNavigate,
+  useParams,
+  useLocation,
+} from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import QRCode from "qrcode";
 import { api } from "../../data/api";
-import type { Household, NearbyStatus, TreeMember } from "../../data/types";
+import type { Household, TreeMember } from "../../data/types";
 import { useNightfall } from "../../state/NightfallProvider";
+import { useNearbySearch } from "../../state/useNearbySearch";
+import { editSetupPath, returnDestination } from "../../state/setupFlow";
+import { NearbySearchProgress } from "../../components/NearbySearchProgress";
 import {
   Badge,
   Button,
@@ -20,7 +29,6 @@ import MapView from "../../components/MapView";
 import cameraIcon from "./assets/camera.svg";
 import styles from "./SetupPage.module.css";
 
-const STEPS = ["profile", "voice", "contacts", "places", "camera", "sound"];
 const DESCRIPTION_FIELDS = [
   ["sex", "Sex"],
   ["height", "Height"],
@@ -42,7 +50,10 @@ const initialCaps = (name: string) =>
 export function SetupPage() {
   const { step = "profile" } = useParams();
   const { state, loading, error } = useNightfall();
-  if (step === "voice") return <Navigate to="/voice/samples" replace />;
+  const location = useLocation();
+  const editing = new URLSearchParams(location.search).get("mode") === "edit";
+  if (step === "voice") return <Navigate to="/setup/voice" replace />;
+  if (step === "ready") return <Navigate to="/setup/connect" replace />;
   if (!state)
     return (
       <Notice tone={error ? "danger" : "info"}>
@@ -53,30 +64,35 @@ export function SetupPage() {
       </Notice>
     );
   const page = {
-    profile: <ProfileStep household={state.household} />,
-    contacts: <ContactsStep />,
+    profile: <ProfileStep household={state.household} editing={editing} />,
+    contacts: <ContactsStep editing={editing} />,
     places: <PlacesStep />,
     nearby: <NearbyStep />,
     camera: <CameraStep />,
     sound: <SoundStep />,
-    ready: <ReadyStep />,
   }[step];
   if (!page) return <Navigate to="/setup/profile" replace />;
   return (
     <div className={styles.setup} data-figma-page="detailed-archive">
-      {STEPS.includes(step) && (
-        <Progress step={STEPS.indexOf(step) + 1} total={6} />
-      )}
+      {step === "profile" && !editing && <Progress step={1} total={4} />}
+      {step === "contacts" && !editing && <Progress step={2} total={4} />}
       {page}
     </div>
   );
 }
 
-function ProfileStep({ household }: { household: Household }) {
-  const { preview, mutate } = useNightfall();
+function ProfileStep({
+  household,
+  editing,
+}: {
+  household: Household;
+  editing: boolean;
+}) {
+  const { mutate } = useNightfall();
+  const search = useNearbySearch();
   const navigate = useNavigate();
-  const [editing, setEditing] = useState(false);
-  const [searchDetailsOpen, setSearchDetailsOpen] = useState(false);
+  const location = useLocation();
+  const destination = returnDestination(location.search);
   const [unsupported, setUnsupported] = useState<string | null>(null);
   const [draft, setDraft] = useState({
     person_full_name: household.person_full_name,
@@ -89,138 +105,106 @@ function ProfileStep({ household }: { household: Household }) {
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const alive = useRef(true);
+  const saving = useRef(false);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   async function save(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
+    if (saving.current) return;
     setError("");
     const clean = {
       ...draft,
       person_full_name: draft.person_full_name.trim(),
-      person_name: draft.person_name.trim(),
+      person_name:
+        draft.person_name.trim() || draft.person_full_name.trim().split(" ")[0],
       caregiver_name: draft.caregiver_name.trim(),
       description: Object.fromEntries(
-        Object.entries(draft.description).map(([key, value]) => [
-          key,
-          value.trim(),
-        ]),
+        Object.entries(draft.description).map(([k, v]) => [k, v.trim()]),
       ),
       diagnosis: draft.diagnosis.trim(),
       doctor: Object.fromEntries(
-        Object.entries(draft.doctor).map(([key, value]) => [key, value.trim()]),
+        Object.entries(draft.doctor).map(([k, v]) => [k, v.trim()]),
       ),
     };
+    const address = search.draft.address.trim();
     if (
       !clean.person_full_name ||
       !clean.person_name ||
-      !clean.caregiver_name
+      !clean.caregiver_name ||
+      !address
     ) {
-      setError("Enter a name in each field.");
-      setBusy(false);
+      setError(
+        "Enter the care recipient’s name, your name and a home address.",
+      );
       return;
     }
+    if (
+      !Number.isFinite(clean.person_age) ||
+      clean.person_age < 0 ||
+      clean.person_age > 120
+    ) {
+      setError("Enter an age between 0 and 120.");
+      return;
+    }
+    saving.current = true;
+    setBusy(true);
     try {
-      await mutate("/profile", clean);
-      setEditing(false);
-    } catch (e) {
-      setError(err(e));
+      const changes = Object.fromEntries(
+        Object.entries(clean).filter(
+          ([key, value]) =>
+            JSON.stringify(value) !==
+            JSON.stringify(household[key as keyof Household]),
+        ),
+      );
+      // Address goes through the shared search once, never through /profile as well.
+      if (Object.keys(changes).length) {
+        const result = await mutate<{ ok: boolean }>("/profile", changes);
+        if (!result?.ok)
+          throw new Error(
+            "Your care details were not confirmed saved. Please try again.",
+          );
+      }
+      if (!alive.current) return;
+      const sameRequest =
+        search.input?.address.trim().toLowerCase() === address.toLowerCase() &&
+        search.input?.radius_mi === search.draft.radius_mi;
+      const sameSavedAddress =
+        household.address.trim().toLowerCase() === address.toLowerCase() &&
+        household.radius_mi === search.draft.radius_mi;
+      // A name-only edit must not trigger a paid search. A failed status read also
+      // cannot establish that the saved address needs a new search job.
+      if (
+        !search.busy &&
+        !(editing && sameSavedAddress) &&
+        !(search.phase === "error" && (sameRequest || sameSavedAddress))
+      ) {
+        search.start({ address, radius_mi: search.draft.radius_mi });
+      }
+      navigate(editing ? destination : "/setup/contacts");
+    } catch (cause) {
+      if (alive.current) setError(err(cause));
     } finally {
-      setBusy(false);
+      saving.current = false;
+      if (alive.current) setBusy(false);
     }
   }
   return (
     <>
       <PageHeader
-        title="Who are we caring for?"
-        description={`Start with ${household.person_name}’s details and your relationship.`}
-        back="/care"
+        title="You & home"
+        description="A few essentials. Everything else can wait."
+        back={editing ? destination : "/home"}
       />
-      <Card>
-        <p className="caption muted">Person you care for</p>
-        <div className={styles.identity}>
-          <button
-            className={styles.photoButton}
-            onClick={() => setUnsupported("Photo")}
-            aria-label={`Add ${household.person_name}’s photo`}
-          >
-            {household.photo ? (
-              <img
-                className={`${styles.portrait} ${household.photo.includes("camera-demo.png") ? styles.portraitDemo : ""}`}
-                src={household.photo}
-                alt={household.person_full_name}
-              />
-            ) : (
-              <>
-                <img src={cameraIcon} alt="" width="24" height="24" />
-                <span>Add photo</span>
-              </>
-            )}
-          </button>
-          <button
-            className={styles.identityEdit}
-            onClick={() => setEditing(true)}
-          >
-            <strong>
-              {household.person_name} ({household.person_full_name})
-            </strong>
-            <span className="caption muted">
-              {household.person_age} years old
-            </span>
-            <span className={styles.editLabel}>Edit details</span>
-          </button>
-        </div>
-        <p className={`${styles.dividerNote} caption muted`}>
-          Use a clear, recent photo to help your family recognize them.
-        </p>
-      </Card>
-      <Card>
-        <Row
-          title="Your information"
-          detail={`${household.caregiver_name} · Primary caregiver`}
-          trailing="Edit"
-          onClick={() => setEditing(true)}
-        />
-        <Row
-          title="Search & medical details"
-          detail="Physical description, diagnosis and doctor"
-          trailing="Edit"
-          onClick={() => {
-            setSearchDetailsOpen(true);
-            setEditing(true);
-          }}
-        />
-      </Card>
-      <Card>
-        <div className="inline spread">
-          <h2>Medications</h2>
-          <Button
-            className={styles.inlineButton}
-            variant="quiet"
-            onClick={() => setUnsupported("Medications")}
-          >
-            {preview ? "Edit" : "Details"}
-          </Button>
-        </div>
-        {household.medications.length ? (
-          household.medications.map((m, i) => (
-            <Row
-              key={`${m.name}-${i}`}
-              title={m.name}
-              detail={m.note}
-              trailing={m.dose}
-            />
-          ))
-        ) : (
-          <p className="caption muted">No medications added.</p>
-        )}
-      </Card>
-      <div className="actions">
-        <Button onClick={() => navigate("/voice/samples")}>Continue</Button>
-      </div>
-      {editing && (
-        <Sheet title="Care details" onClose={() => setEditing(false)}>
-          <form className="stack" onSubmit={save}>
+      <form className="stack" onSubmit={save}>
+        <Card>
+          <div className="stack">
             <Field
-              label="Full name"
+              label="Who do you care for?"
               required
               maxLength={80}
               value={draft.person_full_name}
@@ -228,26 +212,32 @@ function ProfileStep({ household }: { household: Household }) {
                 setDraft({ ...draft, person_full_name: e.target.value })
               }
             />
-            <Field
-              label="Name used at the door"
-              required
-              maxLength={40}
-              value={draft.person_name}
-              onChange={(e) =>
-                setDraft({ ...draft, person_name: e.target.value })
+            <button
+              type="button"
+              className={styles.profilePhoto}
+              aria-label={
+                household.photo ? "Photo: change photo" : "Photo: add photo"
               }
-            />
-            <Field
-              label="Age"
-              type="number"
-              min={0}
-              max={120}
-              required
-              value={draft.person_age}
-              onChange={(e) =>
-                setDraft({ ...draft, person_age: Number(e.target.value) })
-              }
-            />
+              onClick={() => setUnsupported("Photo")}
+            >
+              <span className={styles.profilePhotoHeading}>
+                <strong>Photo</strong>
+                <span>{household.photo ? "Change photo" : "Add photo"}</span>
+              </span>
+              <span className={styles.profilePhotoImage}>
+                {household.photo ? (
+                  <img src={household.photo} alt={household.person_full_name} />
+                ) : (
+                  <img
+                    className={styles.profilePhotoPlaceholder}
+                    src={cameraIcon}
+                    width={36}
+                    height={36}
+                    alt=""
+                  />
+                )}
+              </span>
+            </button>
             <Field
               label="Your name"
               required
@@ -257,16 +247,52 @@ function ProfileStep({ household }: { household: Household }) {
                 setDraft({ ...draft, caregiver_name: e.target.value })
               }
             />
-            <details
-              className={styles.optionalDetails}
-              open={searchDetailsOpen}
-              onToggle={(e) => setSearchDetailsOpen(e.currentTarget.open)}
-            >
+            <Field
+              label="Home address"
+              required
+              maxLength={240}
+              value={search.draft.address}
+              disabled={search.busy}
+              onChange={(e) =>
+                search.setDraft({ ...search.draft, address: e.target.value })
+              }
+            />
+          </div>
+          <p className={`${styles.dividerNote} caption muted`}>
+            Nearby places and hazards are found automatically from your home
+            address.
+          </p>
+        </Card>
+        <details className={styles.optionalDetails}>
+          <summary>
+            More care details <span className="caption muted">· Optional</span>
+          </summary>
+          <div className="stack">
+            <Card>
+              <div className="stack">
+                <Field
+                  label="Name used at the door"
+                  maxLength={40}
+                  value={draft.person_name}
+                  onChange={(e) =>
+                    setDraft({ ...draft, person_name: e.target.value })
+                  }
+                />
+                <Field
+                  label="Age"
+                  type="number"
+                  min={0}
+                  max={120}
+                  value={draft.person_age}
+                  onChange={(e) =>
+                    setDraft({ ...draft, person_age: Number(e.target.value) })
+                  }
+                />
+              </div>
+            </Card>
+            <details className={styles.optionalDetails}>
               <summary>Search & medical details</summary>
               <div className="stack">
-                <p className="caption muted">
-                  Optional details your family can share when asking for help.
-                </p>
                 <div className={styles.descriptionFields}>
                   {DESCRIPTION_FIELDS.map(([key, label]) => (
                     <Field
@@ -319,18 +345,57 @@ function ProfileStep({ household }: { household: Household }) {
                 />
               </div>
             </details>
-            {error && <Notice tone="danger">{error}</Notice>}
-            {preview && (
-              <p className="caption muted">
-                Changes apply only to this preview session.
-              </p>
-            )}
-            <Button disabled={busy} type="submit">
-              {busy ? "Saving…" : preview ? "Update preview" : "Save details"}
-            </Button>
-          </form>
-        </Sheet>
-      )}
+            <Card>
+              <h2>Medications</h2>
+              {household.medications.map((m, i) => (
+                <Row
+                  key={`${m.name}-${i}`}
+                  title={m.name}
+                  detail={m.note}
+                  trailing={m.dose}
+                />
+              ))}
+              {!household.medications.length && (
+                <p className="caption muted">No medications added.</p>
+              )}
+              <Button
+                variant="quiet"
+                onClick={() => setUnsupported("Medications")}
+              >
+                Medication details
+              </Button>
+            </Card>
+          </div>
+        </details>
+        {search.busy && (
+          <Notice>
+            {search.phase === "locating"
+              ? "Saving the home address…"
+              : "Address saved. Preparing nearby places…"}
+          </Notice>
+        )}
+        {search.error && (
+          <Notice tone="warning">
+            {search.error} You can continue; check Home & nearby places to
+            retry.
+          </Notice>
+        )}
+        {error && <Notice tone="danger">{error}</Notice>}
+        <div className="actions">
+          <Button
+            type="submit"
+            disabled={busy || (search.loading && !search.busy)}
+          >
+            {busy
+              ? "Saving…"
+              : search.loading && !search.busy
+                ? "Checking saved places…"
+                : editing
+                  ? "Save changes"
+                  : "Continue"}
+          </Button>
+        </div>
+      </form>
       {unsupported && (
         <DraftSheet
           kind={unsupported}
@@ -478,7 +543,8 @@ function PhotoDraft() {
   );
 }
 
-function ContactsStep() {
+function ContactsStep({ editing }: { editing: boolean }) {
+  const destination = returnDestination(useLocation().search);
   const { state, preview, mutate } = useNightfall();
   const navigate = useNavigate();
   const [invite, setInvite] = useState(false);
@@ -505,22 +571,20 @@ function ContactsStep() {
     <>
       <PageHeader
         title="Who should we call?"
-        description="Choose who hears from Nightfall first."
-        back="/voice/samples"
+        description="Your family’s current call order. Add someone if needed."
+        back={editing ? destination : "/setup/profile"}
       />
       <Card>
+        {!members.length && (
+          <p className="muted">
+            Add a family member to receive Nightfall’s calls.
+          </p>
+        )}
         {members.map((member, i) => (
           <div key={member.id} className={styles.contact}>
             <span className={styles.number}>{member.tier}</span>
             <div className={styles.contactName}>
               <strong>{member.name}</strong>
-              <span className="caption muted">
-                {member.tier === 1
-                  ? "Call first"
-                  : member.tier === 2
-                    ? "Next if no answer"
-                    : "Third contact"}
-              </span>
             </div>
             {preview && (
               <div className={styles.move}>
@@ -558,7 +622,12 @@ function ContactsStep() {
       )}
       {error && <Notice tone="danger">{error}</Notice>}
       <div className="actions">
-        <Button onClick={() => navigate("/setup/places")}>Continue</Button>
+        <Button
+          disabled={!editing && !members.length}
+          onClick={() => navigate(editing ? destination : "/setup/voice")}
+        >
+          {editing ? "Done" : "Next: Voice"}
+        </Button>
       </div>
       {invite && <InvitationSheet onClose={() => setInvite(false)} />}
     </>
@@ -696,45 +765,35 @@ function InvitationSheet({ onClose }: { onClose: () => void }) {
 }
 
 function PlacesStep() {
-  const { state, preview, mutate } = useNightfall();
+  const destination = returnDestination(useLocation().search);
+  const { state, preview } = useNightfall();
+  const search = useNearbySearch();
   const navigate = useNavigate();
   const hh = state!.household;
-  const [address, setAddress] = useState(hh.address);
-  const [radius, setRadius] = useState(hh.radius_mi);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const { address, radius_mi: radius } = search.draft;
   const [edit, setEdit] = useState(false);
-  async function search(e: FormEvent) {
+  function prepare(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      await mutate("/setup/address", {
-        address: address.trim(),
-        radius_mi: radius,
-        google: true,
-      });
-      navigate("/setup/nearby");
-    } catch (e) {
-      setError(err(e));
-    } finally {
-      setBusy(false);
-    }
+    search.start({ address: address.trim(), radius_mi: radius });
+    navigate(editSetupPath("nearby", destination));
   }
   return (
     <>
       <PageHeader
         title="Home & familiar places"
-        description="Help your family know where to look."
-        back="/setup/contacts"
+        description="Prepare where to look, before your family needs it."
+        back={destination}
       />
-      <form className="stack" onSubmit={search}>
+      <form className="stack" onSubmit={prepare}>
         <Card>
           <Field
             label="Home address"
             required
             value={address}
-            onChange={(e) => setAddress(e.target.value)}
+            onChange={(e) =>
+              search.setDraft({ address: e.target.value, radius_mi: radius })
+            }
+            disabled={search.busy}
             autoComplete="street-address"
           />
         </Card>
@@ -770,7 +829,10 @@ function PlacesStep() {
             step={0.1}
             required
             value={radius}
-            onChange={(e) => setRadius(Number(e.target.value))}
+            onChange={(e) =>
+              search.setDraft({ address, radius_mi: Number(e.target.value) })
+            }
+            disabled={search.busy}
           />
           <p className="caption muted">
             Nearby water, roads, and places open at night are included in the
@@ -778,8 +840,8 @@ function PlacesStep() {
           </p>
           {!preview && (
             <p className="caption muted">
-              Your home address and search radius are saved when you find nearby
-              places.
+              We’ll check this address and prepare nearby places. You can keep
+              setting up while the search runs.
             </p>
           )}
         </Card>
@@ -788,10 +850,24 @@ function PlacesStep() {
           <br />
           Hazards · OpenStreetMap
         </p>
-        {error && <Notice tone="danger">{error}</Notice>}
+        {search.saved && !search.busy && (
+          <Notice tone="success">
+            Saved results are available for this address and radius. Opening
+            them does not start another search.
+          </Notice>
+        )}
+        {search.error && !search.busy && (
+          <Notice tone="warning">{search.error}</Notice>
+        )}
         <div className="actions">
-          <Button disabled={busy} type="submit">
-            {busy ? "Finding nearby places…" : "Find nearby places"}
+          <Button disabled={search.loading && !search.busy} type="submit">
+            {search.busy
+              ? "View search progress"
+              : search.loading
+                ? "Checking saved places…"
+                : search.saved
+                  ? "View saved places"
+                  : "Prepare nearby places"}
           </Button>
         </div>
       </form>
@@ -806,38 +882,111 @@ function PlacesStep() {
   );
 }
 function NearbyStep() {
-  const { preview } = useNightfall();
+  const destination = returnDestination(useLocation().search);
+  const { preview, state } = useNightfall();
+  const search = useNearbySearch();
   const navigate = useNavigate();
-  const query = useQuery({
-    queryKey: ["nearby", preview],
-    queryFn: ({ signal }) => api.get<NearbyStatus>("/setup/status", { signal }),
-    refetchInterval: (query) =>
-      query.state.data?.apify === "running" ? 3000 : false,
-  });
-  const data = query.data;
+  const data = search.data;
+  const showResults =
+    data &&
+    data.total > 0 &&
+    (preview || ["apify", "overpass"].includes(data.places_source));
+  const place = search.input || search.draft;
   return (
     <>
       <PageHeader
-        title="Know the area first"
-        description={
-          data
-            ? `${data.address || "Home"} · ${data.home.radius_mi} mi around home`
-            : "Finding the places that matter."
+        title={
+          search.busy ? "We’re preparing nearby places" : "Your search area"
         }
-        back="/setup/places"
+        description={`${place.address || state?.household.address || "Home"} · ${place.radius_mi} mi around home`}
+        back={editSetupPath("places", destination)}
         eyebrow="Home and places"
       />
-      {query.isPending && <Notice>Finding nearby places…</Notice>}
-      {query.error && (
+      {search.loading && !search.busy && (
+        <Notice>Checking saved places…</Notice>
+      )}
+      {(search.phase === "locating" || search.phase === "searching") && (
+        <NearbySearchProgress
+          phase={search.phase}
+          startedAt={search.startedAt}
+        />
+      )}
+      {search.phase === "error" && (
         <Notice tone="danger">
-          {err(query.error)}{" "}
-          <Button variant="quiet" onClick={() => void query.refetch()}>
+          <p>
+            {search.error ||
+              "The search could not finish. Your address is still here."}
+          </p>
+          <p className="caption">
+            Your entered address is kept. Check the status before starting
+            another search.
+          </p>
+          <Button variant="quiet" onClick={search.reload}>
+            Check status
+          </Button>
+          <Button variant="secondary" onClick={search.retry}>
             Try again
           </Button>
         </Notice>
       )}
-      {data && (
+      {!search.busy &&
+        search.phase === "ready" &&
+        !search.loading &&
+        data?.total === 0 && (
+          <Notice>
+            No nearby places were returned for this search. You can change the
+            address or radius and try again.
+          </Notice>
+        )}
+      {!search.busy &&
+        search.phase !== "error" &&
+        search.phase !== "ready" &&
+        !search.loading &&
+        !showResults && (
+          <Card>
+            <h2>Prepare your nearby places</h2>
+            <p className="caption muted">
+              Find nearby risks and places your family can call. You can
+              continue setup while we prepare them.
+            </p>
+            <Button onClick={() => search.start(search.draft)}>
+              Start search
+            </Button>
+          </Card>
+        )}
+      {showResults && (
         <>
+          <div className="inline spread">
+            <Badge
+              tone={
+                search.busy || search.phase === "error" ? "neutral" : "success"
+              }
+            >
+              {preview
+                ? "Preview · Sample places"
+                : search.busy || search.phase === "error"
+                  ? "Previously available places"
+                  : search.completedAt
+                    ? "Search complete"
+                    : "Saved results"}
+            </Badge>
+            {!search.busy && (
+              <Button
+                variant="quiet"
+                className={styles.inlineButton}
+                onClick={() => search.start(place, { force: true })}
+                disabled={search.loading}
+              >
+                Refresh
+              </Button>
+            )}
+          </div>
+          {(search.busy || search.phase === "error") && (
+            <p className="caption muted">
+              These places are from the previous result. They have not been
+              updated by this search.
+            </p>
+          )}
           <MapView
             home={data.home}
             hazards={data.hazards_ranked}
@@ -857,32 +1006,21 @@ function NearbyStep() {
               trailing={String(data.call_first.length)}
             />
           </Card>
-          {data.apify === "running" && (
-            <Notice>
-              Business search is still running. Nearby hazards are ready; more
-              results will appear here.
-            </Notice>
-          )}
-          {["failed", "no token", "cancelled"].includes(data.apify) && (
-            <Notice tone="warning">
-              Nearby business search is unavailable. Showing the places already
-              available. {data.error}
-            </Notice>
-          )}
           <p className="caption muted">
             Familiar places stay separate from nearby risks. This map is a
             search reference, not a live location.
           </p>
           <p className="caption muted">
-            Nearby business data · Apify
+            Nearby businesses · Apify
             <br />
-            Source: {data.places_source}
+            Nearby risks · OpenStreetMap
           </p>
         </>
       )}
       <div className="actions">
-        <Button onClick={() => navigate("/setup/camera")} disabled={!data}>
-          Use these nearby places
+        <Button onClick={() => navigate(destination)}>Done</Button>
+        <Button variant="quiet" onClick={() => navigate("/home")}>
+          Go to Home
         </Button>
       </div>
     </>
@@ -897,6 +1035,7 @@ interface EnrollmentRequest {
 }
 
 function CameraStep() {
+  const destination = returnDestination(useLocation().search);
   const { state, preview, memberId, mutate, lastEvent } = useNightfall();
   const navigate = useNavigate();
   const [edge, setEdge] = useState("far");
@@ -1047,7 +1186,7 @@ function CameraStep() {
       <PageHeader
         title="Set up the door camera"
         description="Keep the computer facing the entrance."
-        back="/setup/nearby"
+        back={destination}
         eyebrow="Device setup"
       />
       <div className={styles.camera}>
@@ -1162,7 +1301,7 @@ function CameraStep() {
         </Button>
       )}
       <div className="actions">
-        <Button onClick={() => navigate("/setup/sound")}>Continue</Button>
+        <Button onClick={() => navigate(destination)}>Done</Button>
       </div>
       {showOther && (
         <Sheet title="Household member" onClose={() => setShowOther(false)}>
@@ -1197,7 +1336,8 @@ function CameraStep() {
   );
 }
 function SoundStep() {
-  const { state, memberId, soundEnabled, enableSound } = useNightfall();
+  const destination = returnDestination(useLocation().search);
+  const { state, memberId, soundEnabled, testSound } = useNightfall();
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const member = state?.household.tree.find((m) => m.id === memberId);
@@ -1206,8 +1346,8 @@ function SoundStep() {
       <PageHeader
         title="Let this phone ring"
         description="Tap once to enable Nightfall’s alert sound."
-        back="/setup/camera"
-        eyebrow="Last step"
+        back={destination}
+        eyebrow="This phone"
       />
       <Card>
         <div className={styles.soundIcon} aria-hidden="true">
@@ -1233,61 +1373,14 @@ function SoundStep() {
       <div className="actions">
         <Button
           onClick={() => {
-            void enableSound()
-              .then(() => navigate("/setup/ready"))
-              .catch((e) => setError(err(e)));
+            void testSound().catch((e) => setError(err(e)));
           }}
         >
-          Enable sound and finish
+          Test phone sound
         </Button>
-        <Button variant="quiet" onClick={() => navigate("/setup/ready")}>
-          Continue without sound
+        <Button variant="quiet" onClick={() => navigate(destination)}>
+          Done
         </Button>
-      </div>
-    </>
-  );
-}
-function ReadyStep() {
-  const { state, soundEnabled } = useNightfall();
-  const navigate = useNavigate();
-  return (
-    <>
-      <PageHeader
-        title="Your care circle is ready"
-        description="You can change your care setup any time."
-        eyebrow="Setup complete"
-      />
-      <Card>
-        <Row
-          title="Care details"
-          detail={state!.household.person_full_name}
-          trailing="✓"
-        />
-        <Row
-          title="Family voice"
-          detail={
-            state!.voice.mock
-              ? "Demo voice mode"
-              : state!.voice.voice_id
-                ? "Selected voice"
-                : "No voice selected"
-          }
-        />
-        <Row
-          title="Call order"
-          detail={state!.household.tree
-            .map((m) => `${m.tier} ${m.name}`)
-            .join(" → ")}
-        />
-        <Row
-          title="Phone sound"
-          detail={
-            soundEnabled ? "Enabled while this page is open" : "Not enabled"
-          }
-        />
-      </Card>
-      <div className="actions">
-        <Button onClick={() => navigate("/home")}>Go to Night watch</Button>
       </div>
     </>
   );
@@ -1416,28 +1509,27 @@ export function CarePage() {
           detail={`${state.household.person_age} years old · ${state.household.caregiver_name}`}
           trailing="Edit"
           onClick={() => {
-            window.location.hash = "/setup/profile";
+            window.location.hash = editSetupPath("profile");
           }}
         />
       </Card>
       <Card>
-        <Link className={styles.linkRow} to="/voice/samples">
-          <strong>Family AI voice</strong>
-          <span>Samples, voice library and preview →</span>
+        <Link className={styles.linkRow} to="/voice?returnTo=/care">
+          <strong>Voice at the door</strong>
+          <span>Your selected voice, recordings and previews →</span>
         </Link>
-        <Link className={styles.linkRow} to="/setup/contacts">
+        <Link className={styles.linkRow} to={editSetupPath("contacts")}>
           <strong>Who gets called first</strong>
-          <span>{state.household.tree.map((m) => m.name).join(" → ")}</span>
         </Link>
-        <Link className={styles.linkRow} to="/setup/places">
+        <Link className={styles.linkRow} to={editSetupPath("places")}>
           <strong>Home & nearby places</strong>
           <span>{state.household.address}</span>
         </Link>
-        <Link className={styles.linkRow} to="/setup/camera">
+        <Link className={styles.linkRow} to={editSetupPath("camera")}>
           <strong>Door camera</strong>
           <span>Camera position and face registration →</span>
         </Link>
-        <Link className={styles.linkRow} to="/setup/sound">
+        <Link className={styles.linkRow} to={editSetupPath("sound")}>
           <strong>This phone’s sound</strong>
           <span>Allow Nightfall to ring →</span>
         </Link>

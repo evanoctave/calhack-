@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -12,10 +13,23 @@ import { createPreviewState } from "../../data/preview";
 import { api } from "../../data/api";
 import { JoinPage, SetupPage } from "./SetupPage";
 const context = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
+const nearby = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
 vi.mock("../../state/NightfallProvider", () => ({
   useNightfall: () => context.current,
 }));
+vi.mock("../../state/useNearbySearch", async () => {
+  const { useState } = await import("react");
+  return {
+    useNearbySearch: () => {
+      const [draft, setDraft] = useState(nearby.current.draft);
+      return { ...nearby.current, draft, setDraft };
+    },
+  };
+});
 vi.mock("../../components/MapView", () => ({ default: () => <div>Map</div> }));
+vi.mock("qrcode", () => ({
+  default: { toDataURL: vi.fn(async () => "data:image/png;base64,example") },
+}));
 vi.mock("../../data/api", async () => {
   const actual = await vi.importActual("../../data/api");
   return { ...actual, api: { get: vi.fn() } };
@@ -38,10 +52,25 @@ beforeEach(() => {
   context.current = {
     state: createPreviewState(),
     preview: false,
-    mutate: vi.fn(),
+    mutate: vi.fn().mockResolvedValue({ ok: true }),
     setMember: vi.fn(),
     loading: false,
     error: null,
+  };
+  nearby.current = {
+    phase: "idle",
+    data: null,
+    input: null,
+    error: null,
+    draft: { address: createPreviewState().household.address, radius_mi: 1.5 },
+    busy: false,
+    loading: false,
+    saved: false,
+    startedAt: null,
+    completedAt: null,
+    start: vi.fn(),
+    retry: vi.fn(),
+    reload: vi.fn(),
   };
 });
 afterEach(() => vi.useRealTimers());
@@ -64,6 +93,295 @@ function mountCamera() {
 }
 
 describe("Setup actions", () => {
+  it("saves the profile once, then goes through contacts before voice without duplicate writes or search", async () => {
+    const mutate = vi.fn().mockResolvedValue({ ok: true });
+    context.current = { ...context.current, mutate };
+    render(
+      <MemoryRouter initialEntries={["/setup/profile"]}>
+        <Routes>
+          <Route path="/setup/voice" element={<p>Voice step</p>} />
+          <Route path="/setup/:step" element={<SetupPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByLabelText("Set up Nightfall, step 1 of 4"),
+    ).toBeVisible();
+    expect(
+      screen.getByText(/More care details/).closest("details"),
+    ).not.toHaveAttribute("open");
+    fireEvent.change(screen.getByLabelText("Your name"), {
+      target: { value: "Alex" },
+    });
+    fireEvent.change(screen.getByLabelText("Home address"), {
+      target: { value: "123 New Street" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(
+      await screen.findByRole("heading", { name: "Who should we call?" }),
+    ).toBeVisible();
+    expect(
+      screen.getByLabelText("Set up Nightfall, step 2 of 4"),
+    ).toBeVisible();
+    expect(screen.getByRole("link", { name: /Back/ })).toHaveAttribute(
+      "href",
+      "/setup/profile",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Next: Voice" }));
+    expect(await screen.findByText("Voice step")).toBeVisible();
+    expect(mutate).toHaveBeenCalledExactlyOnceWith("/profile", {
+      caregiver_name: "Alex",
+    });
+    expect(nearby.current.start).toHaveBeenCalledExactlyOnceWith({
+      address: "123 New Street",
+      radius_mi: 1.5,
+    });
+  });
+
+  it("shows Photo and automatic nearby search without manual places in the main profile", () => {
+    render(
+      <MemoryRouter initialEntries={["/setup/profile"]}>
+        <Routes>
+          <Route path="/setup/:step" element={<SetupPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const photo = screen.getByRole("button", { name: /^Photo/ });
+    const details = screen.getByText(/More care details/).closest("details")!;
+    expect(photo).toBeVisible();
+    expect(photo.closest("details")).toBeNull();
+    expect(screen.queryByText("Familiar places")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Place details" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Nearby places and hazards are found automatically/),
+    ).toBeVisible();
+    expect(
+      screen.queryByText("A recent photo helps family recognize them."),
+    ).not.toBeInTheDocument();
+    expect(details).not.toHaveAttribute("open");
+    expect(within(details).getByText("Medications")).not.toBeVisible();
+    expect(screen.queryByText("First contact")).not.toBeInTheDocument();
+    expect(screen.queryByText("Care circle")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: /^(Add|Invite).*(family|contact)/i,
+      }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText(/More care details/));
+    expect(screen.queryByText("Familiar places")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Photo")).toHaveLength(1);
+    expect(screen.queryByText("Care circle")).not.toBeInTheDocument();
+  });
+
+  it("keeps unsupported live photo edits honest without sending save requests", async () => {
+    render(
+      <MemoryRouter initialEntries={["/setup/profile"]}>
+        <Routes>
+          <Route path="/setup/:step" element={<SetupPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Photo/ }));
+    expect(
+      await screen.findByText(/Editing isn’t available yet/),
+    ).toHaveTextContent("photo");
+    expect(screen.queryByLabelText("Choose a photo")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(
+      screen.queryByRole("button", { name: "Place details" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Save|Update preview/ }),
+    ).not.toBeInTheDocument();
+    expect(context.current.mutate).not.toHaveBeenCalled();
+    expect(nearby.current.start).not.toHaveBeenCalled();
+  });
+
+  it("reuses unchanged details and returns a profile edit to Home", async () => {
+    render(
+      <MemoryRouter
+        initialEntries={["/setup/profile?mode=edit&returnTo=/home"]}
+      >
+        <Routes>
+          <Route path="/home" element={<p>Home again</p>} />
+          <Route path="/setup/:step" element={<SetupPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(
+      screen.queryByLabelText(/Set up Nightfall, step/),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("Home again")).toBeVisible();
+    expect(context.current.mutate).not.toHaveBeenCalled();
+    expect(nearby.current.start).not.toHaveBeenCalled();
+  });
+
+  it("does not launch a new search when the initial status lookup failed for the saved address", async () => {
+    nearby.current = {
+      ...nearby.current,
+      phase: "error",
+      input: null,
+      error: "Could not load the existing search",
+    };
+    render(
+      <MemoryRouter initialEntries={["/setup/profile"]}>
+        <Routes>
+          <Route path="/setup/voice" element={<p>Voice step</p>} />
+          <Route path="/setup/:step" element={<SetupPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(
+      await screen.findByRole("heading", { name: "Who should we call?" }),
+    ).toBeVisible();
+    expect(nearby.current.start).not.toHaveBeenCalled();
+  });
+
+  it("saves a name-only edit without rerunning the saved address search", async () => {
+    render(
+      <MemoryRouter
+        initialEntries={["/setup/profile?mode=edit&returnTo=/home"]}
+      >
+        <Routes>
+          <Route path="/home" element={<p>Home again</p>} />
+          <Route path="/setup/:step" element={<SetupPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText("Your name"), {
+      target: { value: "Alex" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("Home again")).toBeVisible();
+    expect(context.current.mutate).toHaveBeenCalledExactlyOnceWith("/profile", {
+      caregiver_name: "Alex",
+    });
+    expect(nearby.current.start).not.toHaveBeenCalled();
+  });
+
+  it("stays on the first step when profile persistence fails and does not start address search", async () => {
+    context.current = {
+      ...context.current,
+      mutate: vi.fn().mockRejectedValue(new Error("Could not save profile")),
+    };
+    render(
+      <MemoryRouter initialEntries={["/setup/profile"]}>
+        <Routes>
+          <Route path="/setup/:step" element={<SetupPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText("Your name"), {
+      target: { value: "Alex" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not save profile",
+    );
+    expect(nearby.current.start).not.toHaveBeenCalled();
+  });
+
+  it("does not restart an uncertain failed address request just to move to the contact step", async () => {
+    nearby.current = {
+      ...nearby.current,
+      phase: "error",
+      error: "Connection lost",
+      input: nearby.current.draft,
+    };
+    render(
+      <MemoryRouter initialEntries={["/setup/profile"]}>
+        <Routes>
+          <Route path="/setup/voice" element={<p>Voice step</p>} />
+          <Route path="/setup/:step" element={<SetupPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(
+      await screen.findByRole("heading", { name: "Who should we call?" }),
+    ).toBeVisible();
+    expect(nearby.current.start).not.toHaveBeenCalled();
+  });
+
+  it("finishes contact editing at its source instead of pushing another setup step", () => {
+    render(
+      <MemoryRouter
+        initialEntries={["/setup/contacts?mode=edit&returnTo=/home"]}
+      >
+        <Routes>
+          <Route path="/home" element={<p>Home again</p>} />
+          <Route path="/setup/:step" element={<SetupPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(
+      screen.queryByLabelText(/Set up Nightfall, step/),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.getByText("Home again")).toBeVisible();
+    expect(context.current.mutate).not.toHaveBeenCalled();
+  });
+
+  it("uses the existing add-contact API only from the dedicated contact step", async () => {
+    render(
+      <MemoryRouter initialEntries={["/setup/contacts"]}>
+        <Routes>
+          <Route path="/setup/:step" element={<SetupPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByLabelText("Set up Nightfall, step 2 of 4"),
+    ).toBeVisible();
+    const contacts = [...createPreviewState().household.tree].sort(
+      (a, b) => a.tier - b.tier,
+    );
+    for (const member of contacts) {
+      const card = screen.getByText(member.name).parentElement!.parentElement!;
+      expect(within(card).getByText(String(member.tier))).toBeVisible();
+    }
+    expect(context.current.mutate).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Invite a family member" }),
+    );
+    fireEvent.change(await screen.findByLabelText("Name"), {
+      target: { value: "Robin" },
+    });
+    fireEvent.change(screen.getByLabelText("Call priority"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add contact" }));
+    await screen.findByText(/Robin was added/);
+    expect(context.current.mutate).toHaveBeenCalledExactlyOnceWith("/tree", {
+      name: "Robin",
+      phone: "web",
+      tier: 2,
+    });
+    expect(nearby.current.start).not.toHaveBeenCalled();
+  });
+
+  it("does not fabricate a first contact when the care circle is empty", () => {
+    const emptyState = createPreviewState();
+    emptyState.household.tree = [];
+    context.current = { ...context.current, state: emptyState };
+    render(
+      <MemoryRouter initialEntries={["/setup/contacts"]}>
+        <Routes>
+          <Route path="/setup/:step" element={<SetupPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("button", { name: "Next: Voice" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Invite a family member" }),
+    ).toBeEnabled();
+    expect(context.current.mutate).not.toHaveBeenCalled();
+  });
+
   it("saves optional physical, diagnosis and doctor details using the supported profile fields", async () => {
     const mutate = vi.fn().mockResolvedValue({ ok: true });
     context.current = { ...context.current, mutate };
@@ -74,9 +392,8 @@ describe("Setup actions", () => {
         </Routes>
       </MemoryRouter>,
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: /Search & medical details/ }),
-    );
+    fireEvent.click(screen.getByText(/More care details/));
+    fireEvent.click(screen.getByText("Search & medical details"));
     fireEvent.change(screen.getByLabelText("Height"), {
       target: { value: " 5 ft 8 in " },
     });
@@ -89,7 +406,7 @@ describe("Setup actions", () => {
     fireEvent.change(screen.getByLabelText("Doctor’s phone"), {
       target: { value: " 555-0100 " },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save details" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() =>
       expect(mutate).toHaveBeenCalledWith(
         "/profile",
@@ -215,9 +532,9 @@ describe("Setup actions", () => {
     });
     expect(setMember).toHaveBeenCalledWith("TM-NEW");
   });
-  it("saves the address and radius with the same request that starts the nearby search", async () => {
-    const mutate = vi.fn().mockResolvedValue({});
-    context.current = { ...context.current, mutate };
+  it("opens progress immediately without waiting for the shared address search", async () => {
+    const start = vi.fn(() => new Promise(() => {}));
+    nearby.current = { ...nearby.current, start };
     render(
       <MemoryRouter initialEntries={["/setup/places"]}>
         <Routes>
@@ -229,11 +546,80 @@ describe("Setup actions", () => {
     fireEvent.change(screen.getByLabelText("Home address"), {
       target: { value: "New home address" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Find nearby places" }));
-    await waitFor(() => expect(mutate).toHaveBeenCalledTimes(1));
-    expect(mutate.mock.calls[0]).toEqual([
-      "/setup/address",
-      { address: "New home address", radius_mi: 1.5, google: true },
-    ]);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Prepare nearby places" }),
+    );
+    expect(start).toHaveBeenCalledExactlyOnceWith({
+      address: "New home address",
+      radius_mi: 1.5,
+    });
+    expect(screen.getByText("Nearby results")).toBeVisible();
+    expect(context.current.mutate).not.toHaveBeenCalled();
+  });
+
+  it("returns to settings while the address request is pending, without showing fixture places", () => {
+    nearby.current = {
+      ...nearby.current,
+      phase: "locating",
+      busy: true,
+      startedAt: Date.now(),
+      data: { total: 11, places_source: "fixture" },
+    };
+    render(
+      <MemoryRouter initialEntries={["/setup/nearby"]}>
+        <Routes>
+          <Route path="/care" element={<p>Care settings</p>} />
+          <Route path="/setup/:step" element={<SetupPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/has not been confirmed saved yet/)).toBeVisible();
+    expect(screen.queryByText("Map")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.getByText("Care settings")).toBeVisible();
+    expect(nearby.current.start).not.toHaveBeenCalled();
+  });
+
+  it("labels retained results while refreshing and only starts a fresh search on Refresh", () => {
+    const data = {
+      total: 2,
+      places_source: "apify",
+      home: { lat: 37.8, lng: -122.44, radius_mi: 1.5 },
+      hazards_ranked: [],
+      call_first: [],
+      familiar: [],
+    };
+    nearby.current = {
+      ...nearby.current,
+      phase: "searching",
+      busy: true,
+      data,
+    };
+    // Params are required to select the nearby setup screen.
+    const page = () => (
+      <MemoryRouter initialEntries={["/setup/nearby"]}>
+        <Routes>
+          <Route path="/setup/:step" element={<SetupPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    const view = render(page());
+    expect(screen.getByText("Previously available places")).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Refresh" }),
+    ).not.toBeInTheDocument();
+    nearby.current = {
+      ...nearby.current,
+      phase: "ready",
+      busy: false,
+      saved: true,
+    };
+    view.rerender(page());
+    expect(screen.getByText("Saved results")).toBeVisible();
+    expect(nearby.current.start).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(nearby.current.start).toHaveBeenCalledWith(nearby.current.draft, {
+      force: true,
+    });
   });
 });

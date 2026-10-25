@@ -157,8 +157,11 @@ __pycache__/
 .pytest_cache/
 data/faces.json
 data/history.json
+data/*.live.json
+data/*.live.meta.json
 
 # Generated React production build (run npm run build in frontend)
 static/ui/
 /.playwright-cli/
 /static/team-preview/
+.gstack/

@@ -46,6 +46,15 @@ describe("caregiver incident semantics", () => {
     ).toBe("0:00");
     expect(countdown(null, Date.now())).toBe("—");
   });
+  it("does not treat recognition of another household member as Dad’s return", () => {
+    const incident = {
+      state: "RETURNED",
+      identity: "other",
+      checkin: "none",
+    } as Incident;
+    expect(confirmedReturned(incident)).toBe(false);
+    expect(incidentTitle(incident, "Dad")).toBe("A family member checked in");
+  });
   it("distinguishes a Help button request from an exit while still allowing a family response", () => {
     const incident = { state: "ESCALATING", cause: "help" } as Incident;
     expect(isHelpIncident(incident)).toBe(true);

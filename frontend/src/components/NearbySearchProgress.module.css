@@ -1,0 +1,56 @@
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.elapsed {
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0;
+  margin: 20px 0;
+}
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.steps li[aria-current="step"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+.marker {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  font-size: 12px;
+}
+[aria-current="step"] .marker {
+  color: var(--accent);
+  border-color: currentColor;
+}
+.note {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 12px 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .steps :global(.spinner) {
+    animation: none;
+  }
+}

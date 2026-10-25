@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
-from typing import Any
+from typing import Any, Final
 
+from anyio import CancelScope
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 router = APIRouter()
@@ -185,19 +186,71 @@ async def ws_door(ws: WebSocket) -> None:
 
 
 class VideoHub:
-    """Door camera -> every phone watching. JPEG frames as binary messages; the door streams only while watched."""
+    """Send each watching phone only its newest JPEG, independently of slow peers."""
+
+    INFLIGHT: Final = 2
+    ACK_GRACE_S: Final = 1.5
 
     def __init__(self) -> None:
         self.watchers: dict[WebSocket, str] = {}
         self.door: WebSocket | None = None
         self.frames = 0
+        self._latest: dict[WebSocket, bytes] = {}
+        self._wake: dict[WebSocket, asyncio.Event] = {}
+        self._unacked: dict[WebSocket, int] = {}
+        self._last_sent: dict[WebSocket, float] = {}
+
+    def add(self, ws: WebSocket, member_id: str) -> None:
+        self.watchers[ws] = member_id
+        self._wake[ws] = asyncio.Event()
+        self._unacked[ws] = 0
+        self._last_sent[ws] = 0.0
+
+    def remove(self, ws: WebSocket) -> None:
+        wake = self._wake.pop(ws, None)
+        if wake is not None:
+            wake.set()
+        for entries in (self.watchers, self._latest, self._unacked, self._last_sent):
+            entries.pop(ws, None)
+
+    def ack(self, ws: WebSocket) -> None:
+        if ws in self._unacked:
+            self._unacked[ws] = max(0, self._unacked[ws] - 1)
+            self._wake[ws].set()
 
     async def broadcast(self, data: bytes) -> None:
-        for ws in list(self.watchers):
+        # Never await a phone's transport here: a stalled phone must not block the camera or other phones.
+        for ws in self.watchers:
+            self._latest[ws] = data
+            self._wake[ws].set()
+
+    async def pump(self, ws: WebSocket) -> None:
+        loop = asyncio.get_running_loop()
+        while ws in self.watchers:
+            wake = self._wake[ws]
+            wake.clear()
+            if self._unacked[ws] >= self.INFLIGHT:
+                remaining = self.ACK_GRACE_S - (loop.time() - self._last_sent[ws])
+                if remaining > 0:
+                    # The deadline is tied to the last send, not the latest wake-up. Continuous incoming
+                    # frames therefore cannot starve legacy phones that do not acknowledge frames.
+                    with suppress(TimeoutError):
+                        await asyncio.wait_for(wake.wait(), remaining)
+                    continue
+                self._unacked[ws] = 0
+            data = self._latest.pop(ws, None)
+            if data is None:
+                await wake.wait()
+                continue
+            self._unacked[ws] += 1
+            self._last_sent[ws] = loop.time()
             try:
                 await ws.send_bytes(data)
-            except Exception:  # noqa: BLE001
-                self.watchers.pop(ws, None)
+            except Exception:  # noqa: BLE001 - a dead phone must not affect the other pumps
+                self.remove(ws)
+                with suppress(Exception):
+                    await ws.close(code=1011, reason="Video connection lost")
+                return
 
     async def tell_door(self) -> None:
         if self.door is not None:
@@ -248,15 +301,24 @@ async def ws_video(ws: WebSocket, member_id: str) -> None:
         await ws.close(code=4403)
         return
     await ws.accept()
-    video.watchers[ws] = member_id
-    await video.tell_door()
+    video.add(ws, member_id)
+    sender = asyncio.create_task(video.pump(ws))
     try:
+        await video.tell_door()
         while True:
             msg = await ws.receive()
             if msg.get("type") == "websocket.disconnect":
                 break
+            if msg.get("text") == "a":
+                video.ack(ws)
     except WebSocketDisconnect:
         pass
     finally:
-        video.watchers.pop(ws, None)
-        await video.tell_door()
+        video.remove(ws)
+        sender.cancel()
+        # ASGI can cancel the whole connection scope on disconnect. Complete
+        # cleanup before propagating it so the door receives its watcher count.
+        with CancelScope(shield=True):
+            with suppress(asyncio.CancelledError):
+                await sender
+            await video.tell_door()

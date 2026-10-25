@@ -15,6 +15,11 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { useNightfall } from "./state/NightfallProvider";
+import {
+  rememberSetupStep,
+  resumedSetupStep,
+  type SetupStep,
+} from "./state/setupFlow";
 import { Badge, Button, Notice, Sheet } from "./components/ui";
 import { isHelpIncident } from "./features/incident/incidentView";
 import { HomePage } from "./features/home/HomePage";
@@ -32,6 +37,18 @@ const CarePage = lazy(() =>
 const VoicePage = lazy(() =>
   import("./features/voice/VoicePage").then((m) => ({ default: m.VoicePage })),
 );
+const ConnectPage = lazy(() =>
+  import("./features/setup/ConnectPage").then((m) => ({
+    default: m.ConnectPage,
+  })),
+);
+
+function ResumeSetup() {
+  const { preview, memberId } = useNightfall();
+  return (
+    <Navigate to={`/setup/${resumedSetupStep(preview, memberId)}`} replace />
+  );
+}
 const AlertPage = lazy(() =>
   import("./features/incident/IncidentPage").then((m) => ({
     default: m.AlertPage,
@@ -77,19 +94,6 @@ class ScreenBoundary extends Component<
   }
 }
 
-const scenarios = [
-  ["watching", "Night watch", "No incident. Ready for the night."],
-  ["approach", "Dad approaches", "The familiar voice speaks at the door."],
-  ["countdown", "Out of view", "A short check before calling family."],
-  ["returned", "Dad returns", "Back inside. Family calls are cancelled."],
-  ["ringing", "Dad leaves", "The family phone rings with a brief."],
-  ["responding", "You are on it", "Other family calls have stopped."],
-  ["other-family", "Mike is on it", "Another family member is responding."],
-  ["emergency", "15-minute mark", "A recommendation to call 911."],
-  ["visitor", "Someone at the door", "A visitor, separate from an exit alert."],
-  ["help", "Help requested", "The door help button alerts the family."],
-];
-
 export default function App() {
   const {
     state,
@@ -100,15 +104,19 @@ export default function App() {
     refresh,
     mutate,
     enableSound,
-    setScenario,
     silenceRing,
     shouldRing,
     visitorMessage,
   } = useNightfall();
   const location = useLocation(),
     navigate = useNavigate();
-  const [scenarioOpen, setScenarioOpen] = useState(false),
-    [dismissed, setDismissed] = useState("");
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("mode") === "edit") return;
+    const step = location.pathname.replace("/setup/", "");
+    if (["profile", "contacts", "voice", "connect"].includes(step))
+      rememberSetupStep(step as SetupStep, preview, memberId);
+  }, [location.pathname, location.search, preview, memberId]);
+  const [dismissed, setDismissed] = useState("");
   const [dismissedVisitor, setDismissedVisitor] = useState("");
   const [answering, setAnswering] = useState(false),
     [answerError, setAnswerError] = useState("");
@@ -164,20 +172,11 @@ export default function App() {
           </span>{" "}
           Nightfall
         </span>
-        {preview ? (
-          <button onClick={() => setScenarioOpen(true)} className={styles.mode}>
-            Preview · Scenarios
-          </button>
-        ) : (
+        {!preview && (
           <span className={styles.mode}>Caregiver</span>
         )}
       </div>
       <main className={styles.content}>
-        {preview && (
-          <p className={`${styles.previewNote} no-print`}>
-            Preview · Sample data, no calls placed
-          </p>
-        )}
         {error && !standalone && (
           <Notice tone="warning">
             <p>{error}</p>
@@ -188,8 +187,6 @@ export default function App() {
             <button className="link-button" onClick={() => navigate("/join")}>
               Join care circle
             </button>
-            <span> · </span>
-            <a href="/ui/index.html?preview=1#/home">Open preview</a>
           </Notice>
         )}
         <ScreenBoundary resetKey={location.pathname}>
@@ -210,11 +207,10 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Navigate to="/home" replace />} />
                 <Route path="/home" element={<HomePage />} />
+                <Route path="/setup/voice" element={<VoicePage onboarding />} />
+                <Route path="/setup/connect" element={<ConnectPage />} />
                 <Route path="/setup/:step" element={<SetupPage />} />
-                <Route
-                  path="/setup"
-                  element={<Navigate to="/setup/profile" replace />}
-                />
+                <Route path="/setup" element={<ResumeSetup />} />
                 <Route path="/care" element={<CarePage />} />
                 <Route path="/join" element={<JoinPage />} />
                 <Route path="/voice/:step?" element={<VoicePage />} />
@@ -261,46 +257,6 @@ export default function App() {
             </NavLink>
           ))}
         </nav>
-      )}
-      {scenarioOpen && (
-        <Sheet title="Choose a scenario" onClose={() => setScenarioOpen(false)}>
-          <p className="caption muted">
-            Explore the complete flow using sample data.
-          </p>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setScenarioOpen(false);
-              navigate("/setup/profile");
-            }}
-          >
-            Start with setup
-          </Button>
-          {scenarios.map(([value, title, detail]) => (
-            <button
-              key={value}
-              className={styles.scenario}
-              onClick={() => {
-                setDismissed("");
-                setScenario(value);
-                setScenarioOpen(false);
-                navigate(
-                  ["responding", "other-family", "returned"].includes(value)
-                    ? "/incident/respond"
-                    : ["ringing", "emergency", "help"].includes(value)
-                      ? "/incident"
-                      : "/home",
-                );
-              }}
-            >
-              <strong>{title}</strong>
-              <span>{detail}</span>
-            </button>
-          ))}
-          <a href="/ui/index.html#/home" className="caption">
-            Switch to connected app
-          </a>
-        </Sheet>
       )}
       {incident?.state === "VISITOR" &&
         dismissedVisitor !== incident.id &&

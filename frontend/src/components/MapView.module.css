@@ -1,15 +1,61 @@
-.map {
-  height: 275px;
+.frame {
+  position: relative;
   border-radius: 20px;
-  z-index: 0;
   overflow: hidden;
   background: #dfe8ed;
 }
-.preview {
+.map {
+  height: 320px;
   width: 100%;
-  height: 270px;
-  border-radius: 20px;
-  object-fit: cover;
+}
+.placeholder {
+  position: absolute;
+  inset: 0;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  background: #e5edf3;
+}
+.mapFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.mapButton {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 12px;
+  color: var(--blue, #245dd6);
+  background: #ffffffb3;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mapButton:focus-visible {
+  outline: 2px solid #245dd6;
+  outline-offset: 2px;
+}
+.popup {
+  max-width: 230px;
+  color: #182335;
+  font:
+    14px/1.5 "Geist",
+    sans-serif;
+}
+.popup p {
+  margin: 8px 0;
+}
+.popup a {
+  color: #245dd6;
+  display: inline-block;
+  padding: 8px 0;
 }
 .legend {
   display: flex;

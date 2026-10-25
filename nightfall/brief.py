@@ -18,6 +18,7 @@ from typing import Any, Final
 
 from nightfall.engine import Incident
 from nightfall.household import Household
+from nightfall.places import source_summary
 from nightfall.search import rank
 
 SECRET: Final[bytes] = (os.environ.get("BRIEF_SECRET") or secrets.token_hex(16)).encode()
@@ -179,7 +180,7 @@ def build(
         "familiar": sections.familiar,
         "contacts": sections.contacts,
         "prose": prose_text,
-        "places_source": places[0].get("source", "fixture") if places else "none",
+        "places_source": source_summary(places),
         "habits": [{"text": h["text"], "kind": h.get("kind", "habit")} for h in (habits or [])],
         "memory_source": memory_source,
         "person_full_name": hh.person_full_name or hh.person_name,

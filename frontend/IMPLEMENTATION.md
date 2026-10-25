@@ -6,7 +6,7 @@ This React, TypeScript, and Vite application implements the detailed caregiver f
 
 The phone is the caregiver interface. The existing computer `/door` screen remains the camera, microphone, detector, and entrance speaker. This change does not replace the door detection engine or install a native iOS application.
 
-The frontend uses React Router's HashRouter, TanStack Query, CSS Modules, Leaflet, and QRCode. Shared controls use the archived Soft Glass palette, Geist typography, and mobile layouts. External Figma labels, flow arrows, mock status bars, and iPhone home indicators are not application controls. Existing care-profile photos are displayed when supplied rather than replaced with the demonstration portrait. Camera assets are the supplied actual demonstration captures; preview labels distinguish them from live camera frames, and the brief separates reference photos from incident captures.
+The frontend uses React Router's HashRouter, TanStack Query, CSS Modules, Google Maps JavaScript API, and QRCode. Shared controls use the archived Soft Glass palette, Geist typography, and mobile layouts. External Figma labels, flow arrows, mock status bars, and iPhone home indicators are not application controls. Existing care-profile photos are displayed when supplied rather than replaced with the demonstration portrait. Camera assets are the supplied actual demonstration captures; preview labels distinguish them from live camera frames, and the brief separates reference photos from incident captures.
 
 ### Entry points
 
@@ -27,9 +27,9 @@ During development, Vite proxies the existing REST, SSE, and WebSocket paths to 
 | Route after `#`             | Purpose and next step                                                                                                              |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `/home`                     | Night watch status, latest event, camera preview, family and voice entry points. Opens the current alert or live door controls.    |
-| `/setup/profile`            | Person's name, familiar name, age, caregiver name, photo, medications. Continue opens family voice.                                |
-| `/setup/voice`              | Compatibility route to `/voice/samples`.                                                                                           |
-| `/voice/samples`            | Three sample categories: introduction, reassurance, everyday speech. Record, replay, delete, create a voice, or choose a preset.   |
+| `/setup/profile`            | Person's name, large photo, caregiver name and address. Optional care/medical details stay collapsed. Continue opens contacts.       |
+| `/setup/voice`              | Choose between creating a family AI voice and selecting a ready-made voice; both paths continue to connection checks.               |
+| `/voice/samples`            | Voice choices in edit mode. Family path shows three samples, consent, record/replay/delete controls and Create AI voice inline.    |
 | `/voice/record?kind=<kind>` | Explicit voice consent and microphone permission, recording, then stop for local review.                                           |
 | `/voice/review?kind=<kind>` | Actual local recording waveform, playback, record again, and automatic upload after Stop & save, with retry on failure.            |
 | `/voice/create`             | Create a family voice from saved samples. Displays pending service work without invented percentages.                              |
@@ -40,7 +40,8 @@ During development, Vite proxies the existing REST, SSE, and WebSocket paths to 
 | `/setup/nearby`             | Map, nearby hazards, places to call, and search status. Continue opens camera setup.                                               |
 | `/setup/camera`             | Door edge, latest frame, monitored-person and other-household face registration requests.                                          |
 | `/setup/sound`              | User gesture to enable sound in the open web page.                                                                                 |
-| `/setup/ready`              | Review of the selected setup, then Home.                                                                                           |
+| `/setup/connect`            | Camera, phone sound, selected door voice and heard confirmation; explicitly arm night watch when ready, or connect later.          |
+| `/setup/ready`              | Compatibility redirect to `/setup/connect`.                                                                                       |
 | `/join`                     | Add or reconnect to a care-circle member, select that identity on this phone, enable sound, then Home.                             |
 | `/care`                     | Reopen settings, voice, camera, nearby places, and phone sound; select a demo family identity.                                     |
 | `/incident`                 | Current incident, status progression, family contact state, answer/open brief/acknowledge actions.                                 |
@@ -50,7 +51,9 @@ During development, Vite proxies the existing REST, SSE, and WebSocket paths to 
 | `/brief/:token`             | Shared scrollable brief, images, clothing, map, care details, contacts, dispatcher summary, print, and acknowledgment.             |
 | `/incident/respond`         | Your response, another family member's response, or confirmed return.                                                              |
 
-The normal setup order is profile → voice → contacts → home/nearby places → camera → sound → Home. Recording, presets, invitation, and nearby results are subflows, not new top-level navigation tabs.
+The normal setup order has four top-level screens: You & home → Care circle → Voice at the door → Connect & start. Home-address search continues in the background after the first screen; users do not enter nearby hazards. Familiar places from the stored profile are separate from automatic place search and are not listed as a manual task on the first screen. Medical details stay optional. Recording, review, creation and preview stay within the voice flow. Existing `/voice/*` and detailed `/setup/*` links remain available. Edits opened from Home or Care return there instead of restarting onboarding.
+
+The family voice path starts with three sample prompts and explicit generation consent. Saving a sample does not create an AI voice; Create AI voice calls the existing clone endpoint, which immediately selects a successful voice. Ready-made voices use the existing library, sample playback and selection API. No additional save action is shown after the backend has already selected a voice. Connection checks distinguish an audio request sent from a sound the user actually heard; they do not simulate exits, reset incidents, or place family calls.
 
 The incident flow is server-driven. A detected approach can return safely without family escalation. If the person remains out of view, the app displays the server's wait/call state, receives family notifications, opens the call or brief, and shows response or return. A separate Help-button cause prompts a check at the door without asserting an exit. Visitor messages, watch-only observations, household check-ins, and confirmed returns have distinct wording. Answering a call is distinct from acknowledging responsibility. Ending the agent conversation does not itself assert that Dad is safe.
 
@@ -145,7 +148,9 @@ These are local patches on the stated baseline, not a deployment or remote merge
 | No live position or familiar-route geometry contract                                                   | Maps show home/search references, known places, and hazards; no fabricated moving location or familiar route.                                                                            |
 | Demo identity selection is not authentication                                                          | Member selectors and invitation routes support the current demo backend. Production authentication and household access control are not added here.                                      |
 
-Known integrations are labeled at the relevant scene: voice with Cartesia, generated dialogue with Claude, nearby business data with Apify, and hazards with OpenStreetMap. Code presence and connected mock responses do not establish that production keys or services are running.
+Known integrations are labeled at the relevant scene: voice with Cartesia, generated dialogue with Claude, nearby search with Apify, and hazards with OpenStreetMap. The Apify Actor also queries Overpass for hazards. Familiar places in the current brief come from the care profile, not automatic inference of personal history. Code presence and connected mock responses do not establish that production keys or services are running.
+
+The shared map component loads Google Maps only on map screens and only when its restricted browser key is configured. Both Preview and connected mode use the same map adapter; Preview supplies sample coordinates, keeps the sample label, and never contacts Nightfall APIs. The adapter draws a home pin, category pins, and a search-radius circle; popup content uses DOM text rather than HTML from place data. Snapshot updates replace overlays without resetting pan/zoom. Missing configuration, invalid home coordinates, SDK timeouts, network errors, and Google authentication failures leave the place lists accessible. SDK-mocked tests do not verify real Google tiles, billing, referrer restrictions, or a production map ID. See README for configuration.
 
 ## Verification
 

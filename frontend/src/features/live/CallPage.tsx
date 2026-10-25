@@ -514,7 +514,7 @@ export function CallPage() {
   if (!state || !incident)
     return (
       <div className="stack">
-        <PageHeader back="/incident" title="Call with Nightfall" />
+        <PageHeader back="/incident" title="Talk to Nightfall" />
         <Notice tone="info">There is no current incident to discuss.</Notice>
       </div>
     );
@@ -530,7 +530,7 @@ export function CallPage() {
               ? "Call ended"
               : "On the line"
         }
-        title="Call with Nightfall"
+        title="Talk to Nightfall"
         description="Hear what happened. Ask what to do next."
       />
       {error && <Notice tone="danger">{error}</Notice>}
@@ -542,7 +542,9 @@ export function CallPage() {
       )}
       {noLongerActive && (
         <Notice tone="success">
-          {incident.state === "RETURNED" && incident.checkin !== "self_other"
+          {incident.state === "RETURNED" &&
+          incident.checkin !== "self_other" &&
+          incident.identity !== "other"
             ? `${state.household.person_name} is back inside.`
             : incident.state === "WATCHING"
               ? "Nightfall is observing. Family calls are not active."

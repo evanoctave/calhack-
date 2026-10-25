@@ -340,11 +340,14 @@ export function BriefPage() {
         preview={preview}
       />
       <p className="sponsor">
-        Nearby business data · Apify{" "}
+        Nearby search · Apify{" "}
         {b.places_source === "preview" ||
         ["fixture", "mock"].includes(b.places_source)
           ? "· Sample places"
           : ""}
+      </p>
+      <p className="caption muted">
+        Hazards · OpenStreetMap. Familiar places · From the care profile.
       </p>
       <PlaceList title="Check first" places={b.hazards} tone="danger" />
       <PlaceList
