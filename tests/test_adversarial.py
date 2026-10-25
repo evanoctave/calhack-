@@ -116,3 +116,11 @@ def test_door_commands(client: TestClient) -> None:
     assert client.post("/door/command", json={"cmd": "door_edge", "edge": "left"}).json()["ok"]
     assert client.post("/door/command", json={"cmd": "door_edge", "edge": "diagonal"}).status_code == 422
     assert client.get("/door").status_code == 200
+
+
+def test_family_report_starts_a_search_and_says_who_reported(client: TestClient) -> None:
+    payload = {"source": "family_report", "by": "Nam"}
+    r = client.post("/event", json={"kind": "sos", "payload": payload}).json()
+    assert r["to"] == "ESCALATING"
+    sos = next(e for e in client.get("/state").json()["log"] if e["type"] == "sos")
+    assert sos["source"] == "family_report" and sos["by"] == "Nam"

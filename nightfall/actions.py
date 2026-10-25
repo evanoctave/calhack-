@@ -87,9 +87,11 @@ async def run_actions(store: Store, tr: engine.Transition, inc: engine.Incident)
                 )
             emit(store, {"type": kind, "incident_id": inc.id, "said": said, "who": who, "detail": tr.detail})
         elif a == "notify:sos":
+            via = store.last_payload or {}
+            extra = {"source": via.get("source", "door"), "by": via.get("by", "")}
             for m in store.hh.tree:
-                store.hub.publish(f"phone:{m.id}", {"type": "sos", "incident_id": inc.id})
-            emit(store, {"type": "sos", "incident_id": inc.id})
+                store.hub.publish(f"phone:{m.id}", {"type": "sos", "incident_id": inc.id, **extra})
+            emit(store, {"type": "sos", "incident_id": inc.id, **extra})
         elif a == "log:returned":
             _record_history(store, inc, tr)
         elif a == "notify:returned":

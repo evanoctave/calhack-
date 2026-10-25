@@ -228,6 +228,17 @@ async function saveProfile() {
 async function addMember() { openInvite(); }
 async function testAlert() { await runDemo("start"); }
 function openBrief() { go("brief"); }
+let reportingMissing = false;
+// Report missing: starts a real incident (the same path as the door's help button) so a brief is built and the care circle is rung.
+async function reportMissing() {
+  const inc = S?.incident;
+  if (inc?.exited_at && ["ESCALATING", "ACKED", "EXHAUSTED", "WATCHING"].includes(inc.state)) { openBrief(); return; }
+  if (!confirm("Start a search now? This builds the search brief and rings your care circle.")) return;
+  reportingMissing = true;
+  try { const r = await requestJSON("/event", {kind: "sos", payload: {source: "family_report", by: meName()}}); if (r.incident_id) { incident = rungFor = r.incident_id; } await refresh(); openBrief(); }
+  catch (error) { toast(error.message); }
+  finally { reportingMissing = false; }
+}
 async function respond() { if (!incident) return; await post("/ack", {incident_id: incident, member_id: member}); await post("/answer", {incident_id: incident, member_id: member}); await refresh(); }
 async function gotHim() { await acknowledgeIncident(); }
 async function answerCall() { enableSound(); stopRing(); if (incident) post("/answer", {incident_id: incident, member_id: member}); go("call"); openingLine(); }
@@ -252,7 +263,7 @@ let rungFor = ""; let lastRingMsg = "";
 function showIncoming(msg) { const who = (S && S.household.person_name) || "They"; $("inc-title").textContent = /help button/i.test(msg || "") ? "Help requested at the door" : who + " has left home"; $("inc-ctx").textContent = who + "'s care circle"; $("inc-msg").textContent = msg || ""; $("incoming").hidden = false; }
 function answerFromOverlay() { $("incoming").hidden = true; answerCall(); }
 function dismissOverlay() { $("incoming").hidden = true; stopRing(); go("alert"); }
-function ringNow(incId, msg) { if (rungFor === incId) return; rungFor = incId; incident = incId; lastRingMsg = msg; if (homeIncident === incId && location.hash === "#home") return; startRing(); showIncoming(msg); fillIncoming(); }
+function ringNow(incId, msg) { if (reportingMissing || rungFor === incId) return; rungFor = incId; incident = incId; lastRingMsg = msg; if (homeIncident === incId && location.hash === "#home") return; startRing(); showIncoming(msg); fillIncoming(); }
 function headingText(h) { return {left: "to the left of the door camera", right: "to the right of the door camera", away: "away from the camera, out the door", toward: "toward the camera", unknown: "direction not seen"}[h || "unknown"]; }
 function fillIncoming() {
   if (!S || !S.incident) return; const inc = S.incident, c = inc.clothing;
@@ -273,7 +284,7 @@ function onEvent(e) {
   if (e.type === "visitor_said") { $("vis-said").textContent = e.said ? 'They said: "' + e.said + '"' : ""; }
   if (e.type === "visitor_left") { hideVisitor(); notice("Visitor left", e.detail || ""); refresh(); }
   if (e.type === "home") { notice(e.who === "other" ? "A household member is home" : (S.household.person_full_name.split(" ")[0] || "He") + " came back in", "No alert. Recognized at the door."); refresh(); }
-  if (e.type === "sos") { ringNow(e.incident_id, "Help button pressed at the door."); refresh(); }
+  if (e.type === "sos") { ringNow(e.incident_id, e.source === "family_report" ? "Reported missing by " + (e.by || "family") + "." : "Help button pressed at the door."); refresh(); }
   if (e.type === "stand_down") { stopRing(); $("incoming").hidden = true; notice((e.who || "A household member") + " stepped out", "No alert. " + (e.detail || "")); refresh(); }
   if (e.type === "watch_only") { notice("Someone left, watching only", "Nightfall is not ringing the family for this one. " + (e.detail || "")); refresh(); }
 }
