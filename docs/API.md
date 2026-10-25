@@ -12,6 +12,7 @@ Pages and scripts are served with `Cache-Control: no-store`. Anything arriving t
 | POST | `/arm` | `{on}` | `{night_mode}` |
 | POST | `/event` | `{kind, payload?}` (`ack` is rejected here, use `/ack`) kinds: `person_enter person_lost person_back features stand_down reply{text} motion door_open door_close person_seen{inside} tick close sos` | `{incident_id, from, to, rule, detail, actions}` |
 | POST | `/ack` | `{incident_id, member_id}` | `{ok, acked_by, first}` (403 non-member, 404) |
+| POST | `/care/confirm-return` | `{incident_id, member_id}` | `{ok,state:"RETURNED",returned_by}` (403 non-member, 409 stale/inactive search); stops pending calls and records a family-confirmed return without changing camera visibility. |
 | POST | `/tree` | `{name, phone:"web"|E.164, tier}` | `{member_id, phone_url, existing?}` idempotent by name |
 | GET | `/brief/{token}` | | Brief JSON (404 bad, 410 expired) |
 | GET | `/sse/dashboard` | | `state speak ring takeover_skip live door setup command command_log brief_ready exit_frames_request tree arm reset memory features stand_down watch_only call takeover live answered clothing voice command door visitor* home sos call_911_option returned` |

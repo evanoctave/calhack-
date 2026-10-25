@@ -22,6 +22,25 @@ window.addEventListener("unhandledrejection", event => { toast(event.reason?.mes
 document.querySelectorAll('a[onclick]:not([href]), .chip[onclick], .row.link[onclick]').forEach(el => { el.setAttribute("role", "button"); el.tabIndex = 0; });
 document.addEventListener("keydown", event => { if ((event.key === "Enter" || event.key === " ") && event.target.matches('[role="button"]')) { event.preventDefault(); event.target.click(); } });
 function backToApp() { if (navStack.length > 1) history.back(); else go("home"); }
+let homeIncident = "", confirmingReturn = false;
+try { homeIncident = sessionStorage.getItem("nf-home-incident") || ""; } catch (error) {}
+function backToNightWatch() {
+  homeIncident = S?.incident?.id || "";
+  try { sessionStorage.setItem("nf-home-incident", homeIncident); } catch (error) {}
+  if (homeIncident) rungFor = homeIncident;
+  $("incoming").hidden = true; stopRing(); go("home");
+}
+async function confirmPersonHome() {
+  if (!S.incident || confirmingReturn) return;
+  confirmingReturn = true;
+  document.querySelectorAll("[data-confirm-return]").forEach(button => { button.disabled = true; });
+  try {
+    if (await confirmSafeReturn(S.incident.id, member, S.household.person_name)) {
+      await refresh(); backToNightWatch(); toast("Return confirmed. Pending family calls stopped.");
+    }
+  } catch (error) { toast(error.message); }
+  finally { confirmingReturn = false; document.querySelectorAll("[data-confirm-return]").forEach(button => { button.disabled = false; }); }
+}
 document.addEventListener("input", event => {
   const screen = event.target.closest(".screen");
   if (screen) careDrafts.add(screen.id);
@@ -152,6 +171,10 @@ function renderCareStatus() {
 }
 function renderBriefCards() {
   const b = window.B, inc = S.incident;
+  const active = !!inc?.exited_at && ["ESCALATING", "ACKED", "EXHAUSTED", "WATCHING"].includes(inc.state);
+  $("b-confirm-return").hidden = !active;
+  $("h-active-search").hidden = !active;
+  $("h-search-status").textContent = inc?.acked_by_name ? inc.acked_by_name + " is responding. Return is not yet confirmed." : "The search is still active. Family alerts continue.";
   const hazard = b?.hazards?.[0];
   $("b-first").textContent = hazard?.name || (b ? "No nearby hazards listed" : "Brief appears after a confirmed exit");
   $("b-first-detail").textContent = hazard ? (HAZ_LABEL[hazard.category] || hazard.category) + " · " + hazard.distance_mi + " mi" : "";
@@ -162,6 +185,8 @@ function renderBriefCards() {
     $("back-title").textContent = S.household.person_name + " is back inside";
     $("back-tag").textContent = S.rings.length ? "Return confirmed" : "Returned before a call";
     $("back-call-status").textContent = S.rings.length ? "Pending family calls were cancelled." : "No family call was needed.";
+    $("back-sub").textContent = inc.returned_by_name ? "Safe return confirmed by " + inc.returned_by_name + "." : "Their return was detected at the door.";
+    $("back-camera-caption").textContent = inc.returned_by_name ? "Family confirmed the return" : "Back in view · Live";
   }
 }
 async function runDemo(scenario) {

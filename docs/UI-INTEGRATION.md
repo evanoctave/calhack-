@@ -33,6 +33,11 @@ The browser uses its own incoming-call overlay.
 “I'm on it” acknowledges responsibility and stops the call ladder. It does not report a return.
 The server's `RETURNED` state supplies the separate return confirmation. Opening an SMS brief and answering an agent call remain separate entry points. Timings come from the server, including shortened demo timers.
 
+**Back to night watch** leaves the search active and shows a home card to reopen the brief. Automatic state updates
+respect that choice for the current incident; a new incident can still raise an alert. **Confirm back home** asks
+the caregiver to confirm a safe return, then stops pending calls, records who confirmed, and returns to night watch.
+This family confirmation does not claim the camera saw the person. Both actions are available from a shared brief.
+
 ## Implementation
 
 - `static/app-tokens.css`: Soft Glass values and light/dark appearance.
@@ -65,6 +70,7 @@ Recordings use the existing ignored samples directory. The browser submits mono 
 | POST / GET | `/care/photo` | Multipart `photo`, JPEG/PNG/WebP up to 5 MB; GET serves the current image. |
 | PUT | `/care/call-order` | `{member_ids:[...]}` includes every member once; saves order and tiers for subsequent incidents. |
 | POST | `/care/members` | `{name}` creates or reuses a web member and returns `member_id` and `invitation_url`. |
+| POST | `/care/confirm-return` | `{incident_id,member_id}` confirms a safe return for the current search; rejects non-members and stale incidents. |
 | PUT | `/care/places` | `{places:[{name,note?,lat?,lng?}]}`; geocodes new locations before applying changes. |
 | POST | `/care/demo/{scenario}` | Mock only: `start`, `leave`, `return`, `visitor`, `home`, `help`, `other-response`, `deadline`. |
 

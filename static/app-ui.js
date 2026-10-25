@@ -63,8 +63,8 @@ function render() {
   $("h-cam").textContent = "Front entrance";
   $("h-feedcap").textContent = S.live_frame ? "Live" : demoRequested && S.demo_available ? "Recorded demo" : "Camera offline";
   $("h-camstat").textContent = S.live_frame ? "Connected" : "Standby"; $("h-camstat").className = "v " + (S.live_frame ? "ok" : "");
-  $("h-event").textContent = inc && inc.exited_at ? "Exit " + hhmm(inc.exited_at) : inc && inc.state === "CONVERSATION" ? "At the door now" : "No exit detected";
-  $("h-event").className = "body " + (inc && inc.exited_at && !inc.acked_by ? "danger" : "");
+  $("h-event").textContent = inc?.state === "RETURNED" ? "Back home · Return confirmed" : inc && inc.exited_at ? "Exit " + hhmm(inc.exited_at) : inc && inc.state === "CONVERSATION" ? "At the door now" : "No exit detected";
+  $("h-event").className = "body " + (inc && inc.exited_at && !inc.acked_by && inc.state !== "RETURNED" ? "danger" : "");
   $("h-voice").textContent = (S.voice.source === "clone" ? (S.voice.name || h.caregiver_name) + "'s voice" : S.voice.mock ? "Browser voice (mock)" : "Stock voice") + " · " + (S.voice.source === "clone" ? "cloned" : "Demo profile");
   $("h-tree").textContent = h.tree.map((m, i) => (i + 1) + " " + m.name).join(" → ");
   $("h-demo").textContent = "Demo session · " + (S.places_source === "apify" ? "Live places" : "Sample places") + " · memory " + S.memory_source;
@@ -222,7 +222,7 @@ let rungFor = ""; let lastRingMsg = "";
 function showIncoming(msg) { const who = (S && S.household.person_name) || "They"; $("inc-title").textContent = /help button/i.test(msg || "") ? "Help requested at the door" : who + " has left home"; $("inc-ctx").textContent = who + "'s care circle"; $("inc-msg").textContent = msg || ""; $("incoming").hidden = false; }
 function answerFromOverlay() { $("incoming").hidden = true; answerCall(); }
 function dismissOverlay() { $("incoming").hidden = true; stopRing(); go("alert"); }
-function ringNow(incId, msg) { if (rungFor === incId) return; rungFor = incId; incident = incId; lastRingMsg = msg; startRing(); showIncoming(msg); fillIncoming(); }
+function ringNow(incId, msg) { if (rungFor === incId) return; rungFor = incId; incident = incId; lastRingMsg = msg; if (homeIncident === incId && location.hash === "#home") return; startRing(); showIncoming(msg); fillIncoming(); }
 function headingText(h) { return {left: "to the left of the door camera", right: "to the right of the door camera", away: "away from the camera, out the door", toward: "toward the camera", unknown: "direction not seen"}[h || "unknown"]; }
 function fillIncoming() {
   if (!S || !S.incident) return; const inc = S.incident, c = inc.clothing;
@@ -247,7 +247,7 @@ function onEvent(e) {
   if (e.type === "stand_down") { stopRing(); $("incoming").hidden = true; notice((e.who || "A household member") + " stepped out", "No alert. " + (e.detail || "")); refresh(); }
   if (e.type === "watch_only") { notice("Someone left, watching only", "Nightfall is not ringing the family for this one. " + (e.detail || "")); refresh(); }
 }
-(async function main() {
+document.addEventListener("DOMContentLoaded", async function main() {
   await resolveMember(); await refresh(); connect(); setInterval(() => refresh().catch(() => { $("h-feedcap").textContent = "Reconnecting…"; }), 2000); startHomeFeed(); loadEnrolled(); try { $("h-edge").value = localStorage.getItem("nf-door-edge-phone") || "far"; } catch (e) {}
   $("h-edge").addEventListener("change", () => { try { localStorage.setItem("nf-door-edge-phone", $("h-edge").value); } catch (e) {} });
   document.querySelectorAll("#cam-edge button").forEach(b => b.addEventListener("click", () => { $("h-edge").value = b.dataset.e; $("h-edge").dispatchEvent(new Event("change")); syncEdge(); }));
@@ -255,7 +255,7 @@ function onEvent(e) {
   // Browsers only allow sound after a tap, so unlock it on the first tap anywhere instead of gating the app.
   document.addEventListener("pointerdown", () => enableSound(), {once: true});
   show(new URLSearchParams(location.search).has("join") ? "join" : location.hash.slice(1) || (S.household.person_full_name ? "home" : "setup"));
-})();
+}, {once: true});
 
 // ---------- Figma screens: renderers and state-driven navigation ----------
 function meName() { const m = S.household.tree.find(t => t.id === member); return m ? m.name : S.household.caregiver_name; }
@@ -313,12 +313,12 @@ function autoRoute() {
   const inc = S.incident; const key = inc ? [inc.id, inc.state, inc.acked_by || "", S.call_911 ? 1 : 0].join("|") : "none";
   if (key === routeKey) return; const prev = routeKey; routeKey = key; if (!prev) return;  // first load: stay where the user is
   if (!inc || inc.state === "CLOSED") return;
-  const here = location.hash.slice(1) || "home", busy = ["talk", "takeover", "call", "brief", "search", "profile", "medical", "record", "review", "creating"].includes(here);
+  const here = location.hash.slice(1) || "home", busy = (here === "home" && homeIncident === inc.id) || ["talk", "takeover", "call", "brief", "search", "profile", "medical", "record", "review", "creating"].includes(here);
   if (S.call_911 && !prev.endsWith("|1") && !["RETURNED","CLOSED"].includes(inc.state)) { toast("Emergency call option available."); if (!busy && !["RETURNED","CLOSED"].includes(inc.state)) go("emergency"); return; }
   if (inc.state === "CONVERSATION" && !busy) go("door");
   else if (inc.state === "DOOR_OPEN" && !busy) go("wait");
-  else if (["ESCALATING", "EXHAUSTED"].includes(inc.state) && !inc.acked_by && ["door", "wait", "home", "back"].includes(here)) go("alert");
-  else if (inc.state === "RETURNED" && inc.checkin !== "self_other" && !["talk", "takeover"].includes(here)) go("back");
+  else if (["ESCALATING", "EXHAUSTED"].includes(inc.state) && !inc.acked_by && !busy && ["door", "wait", "home", "back"].includes(here)) go("alert");
+  else if (inc.state === "RETURNED" && inc.checkin !== "self_other" && !(here === "home" && homeIncident === inc.id) && !["talk", "takeover"].includes(here)) go("back");
   else if (inc.acked_by && inc.acked_by === member && !busy) go("responding");
   else if (inc.acked_by && inc.acked_by !== member && !busy) go("alert");
 

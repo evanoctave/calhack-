@@ -1,5 +1,12 @@
 // Shared helpers: escaping, theme toggle, SSE, fetch. No framework.
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+async function confirmSafeReturn(incidentId, memberId, name) {
+  if (!confirm(`Confirm ${name || "your family member"} is back home and safe? This ends the search and stops pending family calls.`)) return false;
+  const response = await fetch("/care/confirm-return", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({incident_id: incidentId, member_id: memberId})});
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Could not confirm the return. Please try again.");
+  return true;
+}
 function nearbyCallRows(places, empty = "No open places listed in this search area.") {
   const available = (places || []).filter(p => p.open_now !== false);
   return available.map(p => {

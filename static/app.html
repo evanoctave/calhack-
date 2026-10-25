@@ -161,6 +161,7 @@
 <section id="s-home" class="screen">
   <header class="head"><a class="back" onclick="if (navStack.length > 1) history.back(); else go('setup')">Back</a><p class="eyebrow" id="h-greet">Good evening</p><h1 id="h-title">Night watch is on</h1></header>
   <div id="h-notice" class="card pad ok" hidden><p class="title green" id="h-noticet">Back inside</p><p class="body" id="h-notices"></p></div>
+  <div id="h-active-search" class="card pad alarm" hidden><p class="title">Search still active</p><p class="body" id="h-search-status"></p><button class="btn mt" onclick="openBrief()">Reopen search brief</button><button class="text-btn" data-confirm-return onclick="confirmPersonHome()">Confirm back home</button></div>
   <div id="h-cd" class="banner" hidden><b id="h-cdt">Out of view</b><div id="h-cds" class="small"></div></div>
   <div class="media"><img id="h-feed" class="feed-live" alt="Front door camera" style="display:none"><div class="ph" id="h-door"></div></div>
   <p class="media-cap"><span id="h-cam">Front entrance</span> · <span id="h-feedcap">Waiting for camera</span></p>
@@ -257,7 +258,7 @@
 </section>
 
 <section id="s-brief" class="screen">
-  <header class="head"><p class="eyebrow caps">Search brief</p><h1 id="b-name">Dad left home</h1><p class="sub" id="b-seen">Last seen 2:03 AM · Front entrance</p></header>
+  <header class="head"><a class="back" href="#home" onclick="backToNightWatch(); return false">Night watch</a><p class="eyebrow caps">Search brief</p><h1 id="b-name">Dad left home</h1><p class="sub" id="b-seen">Last seen 2:03 AM · Front entrance</p></header>
   <p class="cap" id="b-loc" hidden style="color:var(--red);font-weight:500">Current location unknown</p>
   <div class="who"><div class="media" id="b-hero"><div class="ph"></div></div><div><p class="title" style="font:600 18px/25px var(--font);margin:0" id="b-wear">See photo</p><p class="cap" id="b-wear2"></p><p class="cap" id="b-conf">AI-described · Check the photo.</p></div></div>
   <div><p class="title" style="font:600 20px/27px var(--font);margin:0">Where to look first</p><p class="cap" id="b-radius">Within 1.5 mi of home</p></div>
@@ -270,7 +271,7 @@
     <div class="inline mt"><button class="btn small" onclick="copyPolice()">Copy</button><a class="btn small" href="tel:911" style="color:var(--red)">Call 911</a><span class="cap" id="b-copied"></span></div></div></details>
   <p class="cap">Backup contact: <span id="b-backup">Mike</span></p>
   <div id="b-responding" class="card pad ok" hidden><p class="title green">You're on it</p><p class="body">Other phones stopped ringing.</p></div>
-  <div class="actions"><button class="btn primary" id="b-respond" onclick="acknowledgeIncident()">I’m on it</button><button class="btn" id="b-response-status" onclick="go('responding')" hidden>View response status</button></div>
+  <div class="actions"><button class="btn primary" id="b-respond" onclick="acknowledgeIncident()">I’m on it</button><button class="btn" id="b-response-status" onclick="go('responding')" hidden>View response status</button><button class="btn" id="b-confirm-return" data-confirm-return onclick="confirmPersonHome()" hidden>Confirm back home</button><button class="btn" onclick="backToNightWatch()">Back to night watch</button></div>
 </section>
 
 <section id="s-search" class="screen">
@@ -292,13 +293,13 @@
   <header class="head"><p class="eyebrow caps">Response confirmed</p><h1>You're on it.</h1><p class="sub">Other phones stopped ringing.</p></header>
   <div class="card pad ok"><p class="title green" style="font-size:23px;line-height:32px" id="rs-who">Sarah · Responding</p><p class="body" id="rs-stopped">Calls to Mike and Linda stopped.</p></div>
   <p class="cap" id="rs-return">Dad's return is not yet confirmed.</p>
-  <div class="actions"><button class="btn primary" onclick="openBrief()">Keep search brief open</button><button class="btn" onclick="go('talk')">Open the door camera</button></div>
+  <div class="actions"><button class="btn primary" onclick="openBrief()">Keep search brief open</button><button class="btn" onclick="go('talk')">Open the door camera</button><button class="btn" onclick="backToNightWatch()">Back to night watch</button></div>
 </section>
 
 <section id="s-back" class="screen">
   <header class="head"><p class="eyebrow green caps"><span id="back-tag">Return confirmed</span></p><h1 id="back-title">Dad is back inside</h1><p class="sub" id="back-sub">His return was detected at the door.</p></header>
   <div class="media tall"><img class="feed-live" alt="Door camera" style="display:none"><div class="ph"></div></div>
-  <p class="media-cap">Back in view · Live</p>
+  <p class="media-cap" id="back-camera-caption">Back in view · Live</p>
   <div class="card pad ok"><p class="title green" id="back-call-status">Return confirmed.</p><p class="body">Night watch continues. This check-in is saved in tonight's activity.</p></div>
   <div class="actions"><button class="btn primary" onclick="go('home')">Back to night watch</button></div>
 </section>

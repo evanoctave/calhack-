@@ -5,7 +5,7 @@
 </head><body><main class="phone">
 <section id="brief-error" class="screen on" hidden><header class="head"><p class="eyebrow">NIGHTFALL</p><h1 id="error-title">This link is not valid</h1><p class="sub" id="error-copy">Check that you opened the complete link from the family message.</p></header><div class="actions"><a class="btn primary" href="/app">Open Nightfall</a></div></section>
 <section id="shared-brief" class="screen on">
-<header class="head"><p class="eyebrow">SEARCH BRIEF</p><h1 id="brief-title">Loading the brief…</h1><p class="sub" id="brief-seen"></p></header>
+<header class="head"><a class="back" id="brief-home" href="/app#home" onclick="prepareBriefHome()">Night watch</a><p class="eyebrow">SEARCH BRIEF</p><h1 id="brief-title">Loading the brief…</h1><p class="sub" id="brief-seen"></p></header>
 <p id="brief-state" class="cap" role="status"></p>
 <div class="who"><div class="media" id="brief-photo"><div class="ph"></div></div><div><p class="title" id="brief-clothing"></p><p class="cap">AI-described · Check the photo.</p></div></div>
 <div><h2 style="font-size:21px;margin:0">Where to look first</h2><p class="cap" id="brief-radius"></p></div><div id="map"></div>
@@ -14,5 +14,5 @@
 <p class="label">Check first</p><div class="card" id="brief-hazards"></div><p class="label">Nearby open places &amp; phone numbers</p><div class="card" id="brief-calls"></div><p class="label">Familiar places</p><div class="card" id="brief-familiar"></div>
 <details class="disclosure"><summary>Care notes, medications &amp; contacts</summary><div><p id="brief-prose"></p><div id="brief-notes"></div><p class="label">Medications shared by family</p><div id="brief-medications"></div><p class="label">Contacts</p><div id="brief-contacts"></div></div></details>
 <details class="disclosure"><summary>Read this to the dispatcher</summary><div><p id="brief-police"></p><button class="btn" onclick="copyDispatcher()">Copy dispatcher information</button><a class="btn mt" href="tel:911">Call 911</a></div></details>
-<p class="cap" id="brief-source"></p><p class="form-status" id="brief-status" role="status"></p><div class="actions"><button class="btn primary" id="brief-ack" onclick="acknowledgeBrief()">I'm on it</button><a class="btn" id="brief-app" href="/app">Open caregiver app</a></div>
+<p class="cap" id="brief-source"></p><p class="form-status" id="brief-status" role="status"></p><div class="actions"><button class="btn primary" id="brief-ack" onclick="acknowledgeBrief()">I'm on it</button><button class="btn" id="brief-confirm-return" onclick="confirmSharedReturn()" hidden>Confirm back home</button><a class="btn" id="brief-app" href="/app#home" onclick="prepareBriefHome()">Back to night watch</a></div>
 </section></main><script src="/brief-page.js"></script></body></html>

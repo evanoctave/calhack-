@@ -216,7 +216,7 @@ def _record_history(store: Store, inc: engine.Incident, tr: engine.Transition) -
     outcome = {"RETURNED": "returned", "ACKED": "acked", "EXHAUSTED": "exhausted", "CLOSED": "closed"}.get(
         tr.to_state.value, "closed"
     )
-    if inc.acked_by:
+    if inc.acked_by and not inc.returned_by:
         outcome = "acked"
     if "stand down" in tr.detail:
         outcome = "stand_down"

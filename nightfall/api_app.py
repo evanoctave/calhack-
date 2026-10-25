@@ -91,6 +91,8 @@ async def app_state(member: str = "") -> dict[str, Any]:
             "minutes_since_exit": round((now - exited).total_seconds() / 60, 1) if exited else None,
             "deadline_at": inc.deadline_at.isoformat() if inc.deadline_at else None,
             "acked_by": inc.acked_by,
+            "returned_by": inc.returned_by,
+            "returned_by_name": next((m.name for m in hh.tree if m.id == inc.returned_by), None),
             "acked_by_name": next((m.name for m in hh.tree if m.id == inc.acked_by), None),
             "lines_spoken": inc.lines_spoken,
             "last_line": next((text for role, text in reversed(store.history) if role == "system"), ""),
