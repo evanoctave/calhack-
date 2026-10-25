@@ -182,7 +182,7 @@
 
 <section id="s-missing" class="screen">
   <header class="head"><a class="back" onclick="go('home')">Home</a><p class="eyebrow red">Report missing</p><h1 id="ms-title">Call 911 first</h1><p class="sub">Read the script below to the officer. Nightfall never dials for you.</p></header>
-  <div class="actions"><a class="btn primary" href="tel:911" style="background:var(--red);border-color:var(--red)">Call 911</a></div>
+  <div class="actions"><button class="btn primary" onclick="openBrief()">Search Brief</button></div>
   <p class="label">What to tell the officer</p>
   <div class="card"><label class="field"><span class="lbl">Last seen at</span><input id="ms-time" placeholder="Time" oninput="renderMissingScript()"></label>
     <label class="field"><span class="lbl">Wearing</span><input id="ms-wear" placeholder="Top, bottom, shoes" oninput="renderMissingScript()"></label></div>
