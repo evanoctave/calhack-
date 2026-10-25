@@ -203,4 +203,4 @@ Keep API credentials in the ignored `.env` file and personal profile data out of
 
 ## Author
 
-Nam Do, Evan Barreau, Ethan Ikenhga, Jun Kim
+Nam Do, Evan Barreau, Ethan Ikenaga, Jun Kim
