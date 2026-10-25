@@ -27,6 +27,7 @@ Built at Cal Hacks 13.0 (UC Berkeley), October 2026.
 ```
 ./run.sh          # serves http://127.0.0.1:8000 in mock mode, no keys
 ./run.sh demo     # all interfaces, short timers, live places file, prints the phone URL
+./run.sh tunnel   # demo + Cloudflare quick tunnel; prints public https links for the phone and the door
 ./run.sh test
 ./run.sh check    # gate before every commit
 ```

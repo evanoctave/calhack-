@@ -4,8 +4,8 @@
 
 ```
 cp .env.example .env            # fill keys; MOCK=0 for real services
-./run.sh demo                   # binds all interfaces, 3 s door wait, 15 s ladder, prints links
-cloudflared tunnel --url http://localhost:8000     # in another terminal; paste the https URL into PUBLIC_URL in .env, restart
+./run.sh demo                   # LAN only: binds all interfaces, 5 s door wait, 15 s ladder, prints links
+./run.sh tunnel                 # same, plus a Cloudflare quick tunnel; sets PUBLIC_URL to it (Twilio needs this) and prints the https links
 ```
 
 Laptop: open http://localhost:8000, click **Start the door**, click **test speaker**, set the door edge and enroll faces from the phone.
@@ -29,7 +29,7 @@ Phone: open `https://<tunnel>/app?me=<your name>`, tap **Arm alerts**, keep the 
 | Phone never rings | Tab in background (iOS suspends it). Bring it to the foreground. Server log shows the ring; `/state` shows `rings`. |
 | Detector never says "no person" | Something else in frame reads as a person (poster, second person). Caption shows box size; raise the min height in `cam.js`. |
 | Face says unknown | Lighting, or not enrolled. Unknown rings by default. |
-| Tunnel URL changed | cloudflared restarted. Update `PUBLIC_URL`, restart. |
+| Tunnel URL changed | `./run.sh tunnel` mints a new URL every start; reopen the printed phone link. A hand-run cloudflared needs `PUBLIC_URL` updated and a restart. |
 | Phantom `motion` events | A pre-detector admin tab is open. Close it. |
 | Cartesia / Claude / Moss down | Each falls back to mock on the spot and prints `<name> fallback: <reason>`. `/health` shows which are mock. |
 | Need a clean slate | `curl -X POST localhost:8000/reset` (keeps faces and profile; drops the incident, log and judge members). |
