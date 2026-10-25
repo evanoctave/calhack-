@@ -261,8 +261,8 @@
   <header class="head"><a class="back" onclick="backToApp()">Back</a><p class="eyebrow caps">Door camera</p><h1>Talk to Dad at the door</h1><p class="sub">See the entrance and speak through its speaker.</p></header>
   <div class="media"><img id="r-feed" class="feed-live" alt="Live door camera" style="display:none"><div class="ph"></div></div>
   <p class="media-cap" id="r-feedcap">Live camera at the door</p>
-  <div class="card pad"><div class="pair"><button class="rec" id="r-live" onclick="liveToggle('r-live','r-livestat')">Talk live</button><button class="rec" id="t-listen" onclick="listenToggle('t-listen')">Listen</button></div>
-    <p class="cap mt" id="r-livestat">Talk plays your voice at the door and pauses Nightfall's automatic speech until you stop. Listen brings the door's microphone here.</p></div>
+  <div class="card pad"><button class="rec" id="r-live" onclick="liveToggle('r-live','r-livestat')">Talk live</button>
+    <p class="cap mt" id="r-livestat">Talk plays your voice at the door and pauses Nightfall's automatic speech until you stop.</p></div>
   <div class="card pad"><p class="k" style="font-weight:600;margin:0 0 6px">Say in the family AI voice</p>
     <div class="chips"><span class="chip" onclick="sayText(this.textContent)">Hi Dad, I'm here.</span><span class="chip" onclick="sayText(this.textContent)">Please come back inside.</span><span class="chip" onclick="sayText(this.textContent)">Let's sit down together.</span></div></div>
   <span id="r-tostat" hidden></span>
@@ -345,8 +345,8 @@
 <div id="visitor" class="call-screen gate" hidden><div style="max-width:390px;width:100%;margin:0 auto;display:flex;flex-direction:column;flex:1;gap:16px">
   <div><p class="eyebrow caps">Doorbell</p><h1>Someone is at the door</h1><p class="sub" id="vis-said">Nightfall greeted the visitor.</p></div>
   <div class="media"><img id="vis-feed" class="feed-live" alt="Door camera" style="display:none"><div class="ph"></div></div>
-  <div class="pair"><button class="rec" id="vis-talk" onclick="liveToggle('vis-talk','vis-stat')">Talk live</button><button class="rec" id="vis-listen" onclick="listenToggle('vis-listen')">Listen</button></div>
-  <p class="cap" id="vis-stat">Listen to the entrance or speak through its speaker.</p>
+  <button class="rec" id="vis-talk" onclick="liveToggle('vis-talk','vis-stat')">Talk live</button>
+  <p class="cap" id="vis-stat">Speak through the entrance speaker.</p>
   <div class="actions"><button class="btn" onclick="dismissVisitor()">Not now</button></div></div></div>
 
 <!-- Incoming call from Nightfall -->

@@ -154,19 +154,6 @@ async function liveToggle(btnId, statId) {
 }
 function liveStop() { Live.on = false; try { Live.proc && Live.proc.disconnect(); Live.src && Live.src.disconnect(); } catch (e) {} try { Live.ws && Live.ws.close(); } catch (e) {} Live.ws = null; Live.sent = 0; Live.ctx?.close(); Live.ctx = null; Recorder.stream?.getTracks().forEach(track=>track.stop()); Recorder.stream = null; }
 
-// Listen: door microphone -> this phone (PCM over /ws/listen), scheduled with a small jitter buffer.
-const Listen = {ws: null, ctx: null, t: 0, on: false, btn: null};
-function listenToggle(btnId) {
-  const btn = $(btnId);
-  if (Listen.on) { listenStop(); btn.classList.remove("on"); btn.textContent = "Listen"; return; }
-  Listen.ctx = Listen.ctx || new (window.AudioContext || window.webkitAudioContext)({sampleRate: 16000}); Listen.ctx.resume();
-  const proto = location.protocol === "https:" ? "wss" : "ws"; const ws = new WebSocket(`${proto}://${location.host}/ws/listen/${member}`); ws.binaryType = "arraybuffer"; Listen.ws = ws; Listen.btn = btn;
-  ws.onopen = () => { Listen.on = true; btn.classList.add("on"); btn.textContent = "Listening · tap to stop"; };
-  ws.onmessage = ev => { if (typeof ev.data === "string" || !Listen.on || !Listen.ctx) return; const pcm = new Int16Array(ev.data), buf = Listen.ctx.createBuffer(1, pcm.length, 16000), ch = buf.getChannelData(0); for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768; const src = Listen.ctx.createBufferSource(); src.buffer = buf; src.connect(Listen.ctx.destination); const now = Listen.ctx.currentTime; if (Listen.t < now + 0.05) Listen.t = now + 0.15; src.start(Listen.t); Listen.t += buf.duration; };
-  ws.onclose = () => { if (Listen.on) { Listen.on = false; btn.classList.remove("on"); btn.textContent = "Listen"; } };
-}
-function listenStop() { Listen.on = false; try { Listen.ws && Listen.ws.close(); } catch (e) {} Listen.ws = null; Listen.ctx?.close(); Listen.ctx = null; Listen.t = 0; if (Listen.btn) { Listen.btn.classList.remove("on"); Listen.btn.textContent = "Listen"; } }
-
 // Live video from the door (JPEG frames over /ws/video). Paints into every element with class "feed-live".
 const Feed = {ws: null, on: false, url: null, frames: 0, lastAt: 0, poll: null};
 function feedStart() {
