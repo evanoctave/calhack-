@@ -1,117 +1,206 @@
 # Nightfall
 
-**Life Alert inside a doorbell camera, for families keeping a parent with dementia at home.**
+A door-camera and caregiver app for families caring for someone with dementia at home. Nightfall detects activity at the door, speaks a familiar redirect, and alerts the care circle if the person leaves. The family receives a search brief with a recent image, clothing description, nearby places, and phone numbers.
 
-**quote**
-"Well, uhm yeah it was very hard taking care of my grandmother, uhm, it was very hard wait, ok because what i wanna say is like it was hard seeing her you know her memory and all that diminish and it was very hard knowing that i couldnt take care of her and i couldnt get her to understand why she couldnt do things or why she couldnt do dfferent things and we just couldnt connect anymore. I didn't have what I needed. There is nothing you can say or do that would connect with them becuase they're in a different world, theres no more comprehension here. Like me and you im the one thats sending communication and youre giving it back to me. thats why when you see the silver alerts around the neighborhood, they're broadcasted around the entire neighborhood. They're telling everyone to look for them because theres no other way unless someone is watching them constantly at all times. assistance is required, especially to balance everything else I have to do"
+Built at Cal Hacks 13.0, UC Berkeley, October 2026.
 
+## Purpose
 
-Six in ten people with dementia will wander. Half of those not found within 24 hours are seriously hurt or die
-(Alzheimer's Association figures). Tonight, a caregiver's first fifteen minutes go to finding a photo, remembering
-what Dad was wearing, and guessing which way he went.
+When a family member leaves home unexpectedly, caregivers need clear information and a way to coordinate. Nightfall brings door monitoring, family calls, live communication, and search information into one workflow.
 
-Nightfall is a door device and a phone app. When he heads for the door at 2 AM it talks him back to bed in his
-daughter's voice. If he leaves anyway, her phone rings within seconds with what he is wearing, which way he went,
-a map of the dangers and the open-all-night places nearby, a live feed of the door, and a button to speak through
-it in her own voice. A neighbor at the door gets a doorbell chime and a polite greeting instead. A red HELP button
-on the door rings the family at any hour.
+The prototype uses a laptop as the door device and a mobile browser as the caregiver interface.
 
-Who it is for, what we would build next, and how it makes money: `docs/PRODUCT.md`.
-How it works: `docs/ARCHITECTURE.md`. Every route: `docs/API.md`. Demo day: `docs/RUNBOOK.md`.
-Why it decides the way it does: `docs/DECISIONS.md`, `docs/TRACKS.md`. Voice: `docs/VOICE.md`.
+## Features
 
-Built at Cal Hacks 13.0 (UC Berkeley), October 2026.
+- **Door monitoring:** browser-based person detection, optional face enrollment, direction estimates, and a help button.
+- **Caregiver voice:** record and review voice samples, create a consented voice clone, and play familiar prompts at the door.
+- **Family escalation:** call contacts in order through Twilio, send brief links by SMS, and deliver browser alerts over Server-Sent Events.
+- **Live communication:** view the door camera and use Talk or Listen from the caregiver app.
+- **Search briefs:** share a recent image, clothing details, last-seen information, mapped hazards when available, and nearby open businesses with visible tap-to-call numbers.
+- **Care profiles:** save the monitored person's details, photo, medical information, familiar places, and care-circle call order across restarts.
+- **Clear response states:** acknowledge responsibility with **I'm on it**, return to night watch while a search stays active, or explicitly **Confirm back home** to close the search.
+- **Activity reports:** review wandering history and a morning summary, with sample activity labeled when used.
 
-## Run
+## Tech Stack
 
-```
-./run.sh          # serves http://127.0.0.1:8000 in mock mode, no keys
-./run.sh demo     # all interfaces, short timers, live places file, prints the phone URL
-./run.sh test
-./run.sh check    # gate before every commit
-```
+| Layer                     | Technologies                                                              |
+| ------------------------- | ------------------------------------------------------------------------- |
+| Backend                   | Python, FastAPI, Uvicorn, asyncio, Pydantic, HTTPX                        |
+| Frontend                  | HTML, CSS, vanilla JavaScript; no frontend build step                     |
+| Camera and face detection | TensorFlow.js, COCO-SSD, MediaPipe, face-api.js                           |
+| Live updates and media    | Server-Sent Events, WebSockets, browser camera/microphone APIs, Web Audio |
+| Maps and location data    | Leaflet, OpenStreetMap, Nominatim, Overpass                               |
+| AI and voice              | Cartesia speech synthesis, transcription, and voice cloning               |
+| Calls and messaging       | Twilio Voice, TwiML, SMS                                                  |
+| Place discovery           | Apify Google Maps Scraper; a separate Node.js Apify Actor                 |
+| Care-note retrieval       | Moss semantic search with a local TF-IDF fallback                         |
+| Storage                   | Local JSON files, cached media, and signed brief links                    |
+| Testing and quality       | pytest, pytest-asyncio, FastAPI TestClient, Ruff                          |
 
-Caregiver UI: open `/app`. For the Figma scenario demo, open `/app?demo=1` in mock mode.
-UI screen references, new controls, and verification: [docs/UI-INTEGRATION.md](docs/UI-INTEGRATION.md).
+## How It Works
 
-The first launch starts with setup. Your profile and care-circle phone numbers are saved in the gitignored
-`data/household.live.json` and kept across restarts. `FRESH_START=0` selects the tracked demo household instead.
-Use **Who are we monitoring → Save care details** to save the person's profile; later saves replace the previous details.
-For real calls, set `MOCK=0`, the `TWILIO_*` credentials and an HTTPS tunnel base URL in `PUBLIC_URL`, then restart.
-Add your number in the care circle and use **Phone alerts → Test call** to check delivery before testing the camera.
+1. The door browser detects a person and sends approach, departure, and identity events to FastAPI.
+2. A deterministic state machine evaluates the event and selects actions such as speaking, waiting, or escalating.
+3. If an exit triggers escalation, the server builds a brief and starts the care-circle call ladder.
+4. The caregiver app receives updates through SSE and polling, with video and audio relayed over WebSockets.
+5. Acknowledgment stops further escalation. A camera-detected return or explicit family confirmation marks the person as returned.
 
-Demo knobs: `DOOR_WAIT_S=5 ESCALATION_STEP_S=10 ./run.sh` shortens the waits.
+The state machine and escalation rules live separately from AI integrations. AI supplies descriptions and conversation; application code controls alert transitions.
 
-## Devices
+The server currently handles one household per process. Household details, medical records, places, and activity history are saved locally; active incidents and background tasks remain in memory.
 
-Life Alert inside a doorbell camera. The laptop at `/` is the door device: camera, speaker, one red HELP button, nothing else to click. The phone at `/app?me=<name>` is the caregiver's dashboard: live feed, alert, brief, search, live voice, door settings and face enrollment. `/dashboard.html` is the admin view.
+See [Architecture](docs/ARCHITECTURE.md) and the [API contract](docs/API.md) for implementation details.
 
-## The moment
+## Repository Structure
 
-1. `./run.sh demo`. Open the dashboard on the laptop, Enable camera (TensorFlow.js person detector loads). Add yourself in the judge box, open the phone link on a phone, tap Enable sound.
-2. Walk into the frame (simulating stepping out the front door). The detector fires `person_enter`; the door speaks the redirect in the caregiver voice and keeps talking every 8 s while you stay (4 lines max). Type a reply to steer it; Moss notes shape the next line.
-3. Walk out of frame for 3 s: `person_lost`, exit timer starts (5 s in demo). The clothing model reads the last frame with you in it.
-4. Phone rings. Tap Answer: live camera feed, the AI call agent's opening (time, clothing, hazards, open places), and the brief link.
-5. Tap Talk live: your voice plays at the door and the AI pauses until you stop. Quick phrases play in the caregiver voice.
-6. Still out of view 45 s later: a Call 911 option appears on every phone (you dial, never the system). Walk back into frame: rings cancel, phones show returned.
-7. Address setup: `/app#places` turns any address into hazards (OpenStreetMap) in seconds and open-at-night places (Apify) in a minute.
-
-Keys: `m` approach, `l` leave frame, `b` back in frame, `o`/`c` door.
-
-R11 wander score (docs/TRACKS.md): direction from the door zone, voice check-in by name, face recognition against enrolled faces, attire, time. Entry from the door and a household member answering at the door never ring; unknown always does.
-
-## What is real vs mock
-
-| Piece | Real when | Mock otherwise |
-|---|---|---|
-| State machine, rules, ladder, tokens, ranking, SSE ring, webcam frames | always | |
-| Door voice (Cartesia Sonic, cached, pre-synthesized) | `CARTESIA_API_KEY` + `CARTESIA_VOICE_ID` | browser SpeechSynthesis |
-| Reply hearing (Cartesia Ink) | same | typed reply |
-| Redirect line, clothing fields, call QA (Claude) | `ANTHROPIC_API_KEY` | scripted lines, fixture clothing |
-| Memory (Moss semantic notes) | `MOSS_PROJECT_ID` + `MOSS_PROJECT_KEY` | TF-IDF over the same notes |
-| Places: our Apify Actor [night-search-radius](https://apify.com/evanoctave/night-search-radius) (Overpass hazards + Google Maps open places) | `APIFY_TOKEN` at setup, `/app#places` or `scripts/run_actor.py` | Sample fixture |
-| Family call (Twilio + TwiML agent) | `TWILIO_*` + `PUBLIC_URL` | phone page over SSE |
-
-`MOCK=1` forces every mock. `MOCK=0` with missing keys falls back per row and prints `<name> fallback: <reason>`.
-`/health` reports which rows are mock. Every brief carries `places_source` and `memory_source` badges.
-
-## Layout
-
-```
-nightfall/   engine (pure state machine), escalation, notify, brief, search, script, household, store, actions, api
-             voice, llm, call_agent, memory, places, api_voice, integrations/ (cartesia, anthropic, twilio, moss, apify, overpass)
-scripts/     run_actor.py (Apify + Overpass -> data/places.<slug>.live.json)
-static/      dashboard.html, phone.html, brief.html, tokens.css (light + dark), app.js
-data/        household.json, places.sample.json
-tests/       engine, escalation, brief, api
-docs/        API.md (the contract between lanes)
+```text
+.
+|-- nightfall/                 # Python application
+|   |-- api*.py                # HTTP, SSE, and WebSocket routes
+|   |-- engine.py              # Incident state machine
+|   |-- rules.py               # Deterministic wandering assessment
+|   |-- escalation.py          # Care-circle call ladder
+|   |-- actions.py             # Transition side effects
+|   |-- brief.py               # Search brief and signed links
+|   |-- search.py              # Distance and opening-hours ranking
+|   |-- household.py           # Care profile and contact models
+|   |-- store.py               # Runtime state and household loading
+|   `-- integrations/          # External service adapters
+|-- static/                    # Caregiver, door, admin, and shared-brief UI
+|-- actor/                     # Standalone Apify search-radius Actor
+|-- scripts/                   # Place fetching, search plans, and timing tools
+|-- data/                      # Fixtures, saved profiles, and place caches
+|-- contracts/                 # JSON schemas and example payloads
+|-- tests/                     # Backend, integration, and behavior tests
+|-- docs/                      # Architecture, API, product, and demo guides
+|-- .env.example               # Environment configuration template
+|-- requirements.txt           # Python dependencies
+|-- pyproject.toml             # pytest and Ruff configuration
+`-- run.sh                     # Server and development commands
 ```
 
-## What police ask for first, and where Nightfall has it ready
+## Getting Started
 
-From AARP, the Alzheimer's Association, the BJA law-enforcement guide and the Herbert Protocol toolkit, the first
-questions a dispatcher asks when a person with dementia is missing, and where each answer lives in the brief:
+### Prerequisites
 
-| Dispatcher asks | Where it is |
-|---|---|
-| Full name, age, physical description, a recent photo | profile photo, name and age at the top of the brief, description in the dispatcher script |
-| What they were wearing | clothing from the exit frame (AI-described, the frame shown beside it) |
-| When and where last seen, which way they went | exit time, home address, heading relative to the door camera |
-| That they have dementia, other conditions, medication list, doctor | diagnosis in the caregiver's words, medications (opt-in), doctor contact |
-| Prior wandering: how often, how long, where found | wander history from past incidents |
-| Routines and familiar routes | familiar places and habits from the care notes, pinned on the map |
-| Classify as "missing and at risk", ask for a Silver Alert | the dispatcher script opens with those words |
+- Python 3.12 or newer.
+- A browser with camera and microphone support for the door experience.
+- Internet access for browser model downloads, map tiles, address lookups, and live integrations.
+- Optional: FFmpeg for uploaded audio formats that need conversion. The built-in recorder produces WAV files directly.
 
-The brief carries a "Read this to the dispatcher" paragraph assembled from those fields, with a Copy button. Sources:
-[AARP: what to do if an older person is missing](https://www.aarp.org/caregiving/basics/dementia-wandering-finding-missing-person/),
-[BJA: Alzheimer's-aware law enforcement program guide](https://bja.ojp.gov/sites/g/files/xyckuh186/files/Publications/AlzheimersAware.pdf),
-[Herbert Protocol toolkit](https://herbertprotocol.com/carer-toolkits/how-to-find-missing-person-with-dementia/),
-[Alzheimer's Association: wandering](https://www.alz.org/help-support/caregiving/stages-behaviors/wandering).
+Node.js is only needed to work on the standalone [Apify Actor](actor/README.md).
 
-## Evidence
+### Local Setup
 
-Figures are the Alzheimer's Association's claims: six in ten people living with dementia will wander at least once
-([alz.org wandering tip sheet](https://www.alz.org/getmedia/e4480fd3-e7fe-4bcb-81b3-30066c57de7f/alzheimers-dementia-wandering-behavior-ts.pdf));
-if not found within 24 hours, up to half risk serious injury or death ([NCOA](https://www.ncoa.org/article/understanding-wandering-risks/));
-most are found within 1.5 miles of where they were last seen, some sources say 94% ([Washoe County Sheriff](https://washoesheriff.com/general-information/staying-safe/wandering-prevention-alzheimers-and-dementia-walkaways.php));
-the Association's guidance is to begin search efforts immediately and call 911 after 15 minutes.
+From the repository root:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+For a fresh checkout, create the environment file. Keep your existing `.env` if you already have one.
+
+```bash
+cp .env.example .env
+./run.sh
+```
+
+The example configuration uses `MOCK=1` and empty service credentials, so you can explore the app without paid integrations. Address lookups and map tiles still use the network. Place searches use `APIFY_TOKEN` whenever it is configured.
+
+### App Pages
+
+| Page            | Local URL                                                             | Purpose                                               |
+| --------------- | --------------------------------------------------------------------- | ----------------------------------------------------- |
+| Caregiver app   | [localhost:8000/app](http://localhost:8000/app)                       | Setup, night watch, alerts, briefs, and care settings |
+| Door device     | [localhost:8000](http://localhost:8000/)                              | Laptop camera, speaker, microphone, and help button   |
+| Admin dashboard | [localhost:8000/dashboard.html](http://localhost:8000/dashboard.html) | Event log and simulation controls                     |
+| Mock scenarios  | [localhost:8000/app?demo=1](http://localhost:8000/app?demo=1)         | Simulated caregiver flows when `MOCK=1`               |
+
+A mobile browser opening `/` is redirected to the caregiver app.
+
+### First Use
+
+1. Open `/app` and select **Who are we monitoring**. Enter the person's details and choose **Save care details**.
+2. Add care-circle members and phone numbers, then set the call order.
+3. Set the home address under **Home & nearby places** and run the place search.
+4. Record a familiar voice if needed. Open the door page on the laptop, start the camera, and allow the requested permissions.
+5. Start night watch. Use mock scenarios to explore alerts, briefs, and return confirmation before configuring real calls.
+
+Profile edits replace the previous saved details. Returning from a brief to night watch keeps an ongoing search active; **Confirm back home** is a separate action.
+
+## Configuration
+
+`run.sh` loads `.env` before starting the app. Restart the server after changing service settings.
+
+| Variable                                                 | Purpose                                                                                                                              |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `MOCK`                                                   | `1` selects mock behavior for voice, reasoning, calls, and care-note retrieval; `0` enables configured live adapters                 |
+| `ANTHROPIC_API_KEY`                                      | Claude conversation, clothing descriptions, and call-agent answers                                                                   |
+| `CARTESIA_API_KEY`, `CARTESIA_VOICE_ID`                  | Speech synthesis and transcription; voice cloning uses the Cartesia API                                                              |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` | Outbound calls and SMS                                                                                                               |
+| `PUBLIC_URL`                                             | Public server base URL for Twilio callbacks and shared links                                                                         |
+| `APIFY_TOKEN`                                            | Nearby-business searches                                                                                                             |
+| `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY`                    | Optional semantic retrieval over care notes; add these to `.env` to use Moss                                                         |
+| `BRIEF_SECRET`                                           | Signing secret for shared brief links                                                                                                |
+| `DOOR_WAIT_S`, `ESCALATION_STEP_S`                       | Exit delay and time between call tiers                                                                                               |
+| `FRESH_START`                                            | Defaults to `1`, which creates the live household on first launch and preserves it afterward; `0` selects the tracked demo household |
+| `PLACES_FILE`                                            | Optional override for the places JSON file                                                                                           |
+
+Missing credentials use the relevant fallback where supported. `/health` reports which integrations are running in mock mode. Moss requires project credentials; `MOSS_API_KEY` alone does not enable it.
+
+### Real Phone Calls
+
+1. Set `MOCK=0` and the Twilio credentials in `.env`.
+2. Expose port `8000` through an HTTPS tunnel, such as ngrok, and set `PUBLIC_URL` to its base URL. Keep `/app` out of this value.
+3. Restart the server and open `<PUBLIC_URL>/app` on the phone.
+4. Add the recipient's full phone number, including country code, in the care circle.
+5. Use **Phone alerts > Test call** to verify delivery.
+
+Browser alerts work without Twilio. SMS delivery depends on the configured Twilio account and messaging capabilities. Nightfall offers a caregiver-controlled 911 link; it does not call emergency services automatically.
+
+## Development and Testing
+
+```bash
+./run.sh             # Local server, using .env settings
+./run.sh demo        # Bind all interfaces; use shorter default timers
+./run.sh test        # Python test suite
+./run.sh check       # Ruff lint, formatting check, and tests
+```
+
+Demo mode defaults to a 5-second door wait and 15-second escalation steps when those settings are not already configured. The server defaults are 20 and 60 seconds. Set the desired values in `.env`.
+
+Tests cover incident transitions, escalation cancellation, signed links, profile persistence, medical records, place ranking, voice handling, and API behavior. Test configuration forces mock mode and clears vendor credentials.
+
+### Local Data
+
+| Path                           | Contents                                                                                |
+| ------------------------------ | --------------------------------------------------------------------------------------- |
+| `data/household.live.json`     | Saved profile, care-circle contacts, home location, and familiar places; ignored by Git |
+| `data/household.json`          | Tracked demo household selected with `FRESH_START=0`                                    |
+| `data/places.custom.live.json` | Places found through address setup                                                      |
+| `data/faces.json`              | Locally saved face descriptors; ignored by Git                                          |
+| `data/history.json`            | Saved incident outcomes; ignored by Git                                                 |
+| `data/medical.json`            | Medical record; ignored by Git                                                          |
+| `out/`                         | Profile photos, voice samples, and other generated media; ignored by Git                |
+
+Keep API credentials in the ignored `.env` file and personal profile data out of commits.
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md): event flow and module responsibilities.
+- [API contract](docs/API.md): HTTP, SSE, and WebSocket interfaces.
+- [UI integration](docs/UI-INTEGRATION.md): screen behavior and design implementation.
+- [Demo runbook](docs/RUNBOOK.md): device setup and troubleshooting.
+- [Voice guide](docs/VOICE.md): recording, cloning, and speech behavior.
+- [Product overview](docs/PRODUCT.md): audience and product direction.
+- [Engineering decisions](docs/DECISIONS.md) and [implementation tracks](docs/TRACKS.md).
+- [Apify Actor](actor/README.md): standalone search-radius service.
+
+## License
+
+[MIT](LICENSE).
+
+## Author
+
+Nam Do, Evan Barreau, Ethan Ikenhga, Jun Kim
