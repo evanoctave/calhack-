@@ -47,6 +47,7 @@ class Household:
     diagnosis: str = ""
     doctor: dict[str, str] = field(default_factory=dict)  # name, phone
     caregiver_relationship: str = ""
+    watch_enabled: bool = True  # the on/off switch; the active times only matter while it is on
 
     def members_at(self, tier: int) -> list[TreeMember]:
         """Tree members at exactly this tier."""
@@ -111,6 +112,7 @@ def load(path: str | Path) -> Household:
         home_lng=float(raw["home_lng"]),
         radius_mi=radius,
         meds_opt_in=bool(raw.get("meds_opt_in", True)),
+        watch_enabled=bool(raw.get("watch_enabled", True)),
         tree=tree,
         medications=tuple(raw.get("medications", [])),
         familiar_places=tuple(raw.get("familiar_places", [])),

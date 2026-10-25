@@ -59,6 +59,7 @@ async def app_state(member: str = "") -> dict[str, Any]:
     samples = {k: (SAMPLES / f"{k}.wav").exists() for k in KINDS}
     vid = os.environ.get("CARTESIA_VOICE_ID", "")
     return {
+        "public_url": os.environ.get("PUBLIC_URL", ""),
         "now": now.isoformat(),
         "night_mode": store.night(),
         "household": {
@@ -70,6 +71,9 @@ async def app_state(member: str = "") -> dict[str, Any]:
             "address": hh.address,
             "photo": hh.person_photo,
             "radius_mi": hh.radius_mi,
+            "watch_enabled": hh.watch_enabled,
+            "night_start": hh.night_start.strftime("%H:%M"),
+            "night_end": hh.night_end.strftime("%H:%M"),
             "home": {"lat": hh.home_lat, "lng": hh.home_lng},
             "tree": [m.__dict__ for m in hh.tree],
             "familiar_places": list(hh.familiar_places),
@@ -235,6 +239,9 @@ def _persist_household(hh: Any) -> None:
                 "diagnosis": hh.diagnosis,
                 "doctor": dict(hh.doctor),
                 "radius_mi": hh.radius_mi,
+                "watch_enabled": hh.watch_enabled,
+                "night_start": hh.night_start.strftime("%H:%M"),
+                "night_end": hh.night_end.strftime("%H:%M"),
                 "home_lat": hh.home_lat,
                 "home_lng": hh.home_lng,
                 "tree": [

@@ -56,6 +56,6 @@ async def test_no_ack_rings_all_tiers() -> None:
     await r.start("I", hh(), "m")
     await asyncio.sleep(0.2)
     assert [t for t, _ in n.calls] == [1, 2, 3]
-    assert n.calls[2][1] == ["A", "B", "C"]
+    assert n.calls[2][1] == ["C"]  # tier 3 is everyone not yet called
     await r.cancel("I")
     assert r.live() == 0

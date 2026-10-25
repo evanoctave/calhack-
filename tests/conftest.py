@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 os.environ["MOCK"] = "1"
 os.environ["FRESH_START"] = "0"  # tests use the tracked demo household
+os.environ["IGNORE_CLOCK"] = "1"  # tests do not depend on the time of day
 for key in (
     "ANTHROPIC_API_KEY",
     "CARTESIA_API_KEY",
@@ -29,3 +30,12 @@ _TMP = Path(tempfile.mkdtemp(prefix="nightfall-tests-"))
 os.environ["HISTORY_FILE"] = str(_TMP / "history.json")
 os.environ["MEDICAL_FILE"] = str(_TMP / "medical.json")
 os.environ["PLACES_FILE"] = str(ROOT / "data" / "places.sample.json")
+
+
+# Some tests save through the app, which writes the tracked demo household; put it back when the run ends.
+_DEMO_HOUSEHOLD = ROOT / "data" / "household.json"
+_DEMO_BYTES = _DEMO_HOUSEHOLD.read_bytes()
+
+
+def pytest_sessionfinish(session, exitstatus):
+    _DEMO_HOUSEHOLD.write_bytes(_DEMO_BYTES)

@@ -78,7 +78,7 @@ class Store:
         self.call_911_sent: bool = False
         self.voice_source: str = "clone" if os.environ.get("VOICE_IS_CLONE") == "1" else "stock"
         self.voice_name: str = os.environ.get("VOICE_NAME", "")
-        self.night_mode: bool = True
+        self.night_mode: bool = os.environ.get("IGNORE_CLOCK") == "1"  # tests and demos: always inside the active times
         self.last_open_at: Any = None  # when the door last said its opening line
         self.quiet_until: Any = None  # after a family member says he's safe, re-entries don't restart the door
         self.hub = Hub()
@@ -102,4 +102,6 @@ class Store:
         return f"{PUBLIC_URL}/brief.html#{briefmod.mint(incident_id, member_id, self.now())}"
 
     def night(self) -> bool:
+        if not self.hh.watch_enabled:
+            return False
         return self.night_mode or in_window(self.now().time(), self.hh.night_start, self.hh.night_end)

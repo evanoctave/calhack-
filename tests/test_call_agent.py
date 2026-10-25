@@ -17,7 +17,13 @@ def make_brief() -> dict:
 
 def test_opening_has_facts() -> None:
     s = call_agent.opening(hh, make_brief(), "Sarah")
-    assert "2:03 AM" in s and "navy hoodie" in s and "Palace of Fine Arts lagoon" in s and "Lombard Gas" in s
+    assert (
+        "2:03 AM" in s
+        and "navy hoodie" in s
+        and "Say yes if you are present and can help." in s
+        and "file a report" in s
+        and len(s) < 260
+    )
 
 
 def test_ack_intent() -> None:
@@ -82,3 +88,13 @@ def test_all_clear_phrases_ack_and_stop_calls() -> None:
 def test_got_it_on_my_way_is_responding_not_found() -> None:
     assert call_agent.handle(hh, make_brief(), "Sarah", "got it, I'm on my way").intent == "responding"
     assert call_agent.handle(hh, make_brief(), "Sarah", "I'm heading back, I got him").intent == "ack"
+
+
+def test_yes_takes_the_alert_and_no_keeps_the_other_calls_going() -> None:
+    for said in ("Yes", "yeah I can help", "Yes, I'm here"):
+        r = call_agent.handle(hh, make_brief(), "Sarah", said)
+        assert r.intent == "responding" and r.ack and not r.done, said
+    for said in ("no", "I can't right now", "not home"):
+        r = call_agent.handle(hh, make_brief(), "Sarah", said)
+        assert r.intent == "declined" and r.done and not r.ack, said
+    assert call_agent.handle(hh, make_brief(), "Sarah", "yes, where should I look").intent == "hazards"

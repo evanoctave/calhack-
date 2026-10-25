@@ -114,7 +114,10 @@ async def add_member(body: MemberIn, request: Request) -> dict:
         existing = replace(existing, relationship=relationship or existing.relationship, phone=phone or existing.phone)
         store.hh = replace(store.hh, tree=tuple(existing if m.id == existing.id else m for m in store.hh.tree))
         api_app._persist_household(store.hh)
-    url = str(request.base_url).rstrip("/") + "/app?" + urlencode({"member": existing.id})
+    base = os.environ.get("PUBLIC_URL", "").rstrip("/") or str(request.base_url).rstrip(
+        "/"
+    )  # a link must work off this laptop
+    url = base + "/app?" + urlencode({"member": existing.id})
     return {"ok": True, "member_id": existing.id, "invitation_url": url}
 
 
@@ -141,6 +144,54 @@ async def address_suggest(q: str = "") -> dict:
     except Exception as error:  # noqa: BLE001 — suggestions are optional
         print(f"address suggest failed: {type(error).__name__}")
         return {"suggestions": []}
+
+
+@router.post("/clear")
+async def clear_everything() -> dict:
+    """Erase everything the family entered and start from the blank setup. Cloned voices at Cartesia are not touched."""
+    import json
+    import shutil
+
+    from nightfall import api, api_enroll, api_setup, history, medical
+    from nightfall.store import ROOT, household_filename, household_path
+
+    if household_filename() == "household.json":  # FRESH_START=0 works on the committed demo household
+        raise HTTPException(409, "Clear is not available while running on the demo household (FRESH_START=0).")
+    shutil.copyfile(ROOT / "data" / "household.blank.json", household_path())
+    for target in (api_enroll.FACES, medical.path(), history.FILE, PHOTO):
+        Path(target).unlink(missing_ok=True)
+    for clip in api_app.SAMPLES.glob("*.wav"):
+        clip.unlink(missing_ok=True)
+    (ROOT / "data" / "places.custom.live.json").write_text(json.dumps([]) + "\n")
+    api_setup.reset_state()
+    store = api_app._store()
+    store.voice_source, store.voice_name = "stock", ""
+    await api.reset()
+    store.places = []
+    return {"ok": True}
+
+
+class ScheduleIn(BaseModel):
+    enabled: bool
+    start: str = Field(pattern=r"^\d{2}:\d{2}$")
+    end: str = Field(pattern=r"^\d{2}:\d{2}$")
+
+
+@router.put("/schedule")
+async def set_schedule(body: ScheduleIn) -> dict:
+    """The on/off switch and the daily active times; the window may wrap past midnight (9 PM to 6 AM)."""
+    from datetime import time
+
+    try:
+        start, end = time.fromisoformat(body.start), time.fromisoformat(body.end)
+    except ValueError:
+        raise HTTPException(422, "Enter times like 21:00.") from None
+    if start == end:
+        raise HTTPException(422, "Start and end times must be different.")
+    store = api_app._store()
+    store.hh = replace(store.hh, watch_enabled=body.enabled, night_start=start, night_end=end)
+    api_app._persist_household(store.hh)
+    return {"ok": True, "enabled": body.enabled, "start": body.start, "end": body.end}
 
 
 class TestCallIn(BaseModel):
