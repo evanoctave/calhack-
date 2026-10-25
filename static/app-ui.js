@@ -233,8 +233,10 @@ let reportingMissing = false;
 async function reportMissing() {
   const inc = S?.incident;
   if (inc?.exited_at && ["ESCALATING", "ACKED", "EXHAUSTED", "WATCHING"].includes(inc.state)) { openBrief(); return; }
-  if (!confirm("Start a search now? This builds the search brief and rings your care circle.")) return;
-  reportingMissing = true;
+  $("missing-dialog").showModal();
+}
+async function startMissingSearch() {
+  $("missing-dialog").close(); reportingMissing = true;
   try { const r = await requestJSON("/event", {kind: "sos", payload: {source: "family_report", by: meName()}}); if (r.incident_id) { incident = rungFor = r.incident_id; } await refresh(); openBrief(); }
   catch (error) { toast(error.message); }
   finally { reportingMissing = false; }
