@@ -190,3 +190,20 @@ def test_address_suggest_needs_a_real_query_and_survives_lookup_failure(client, 
     assert client.get("/care/address-suggest?q=1 main").json()["suggestions"] == ["1 Main St, Town, Country"]
     monkeypatch.setattr(api_care.geocode, "suggest", lambda q: (_ for _ in ()).throw(RuntimeError("down")))
     assert client.get("/care/address-suggest?q=1 main").json() == {"suggestions": []}
+
+
+def test_test_call_needs_a_dialable_member_and_twilio(client, monkeypatch):
+    from nightfall.integrations import twilio
+
+    assert client.post("/care/test-call", json={"member_id": "nope"}).status_code == 404
+    made = client.post("/care/members", json={"name": "Aunt Bea"}).json()
+    assert client.post("/care/test-call", json={"member_id": made["member_id"]}).status_code == 422
+    client.post("/care/members", json={"name": "Aunt Bea", "phone": "415-555-0123"})
+    monkeypatch.setattr(twilio, "enabled", lambda: False)
+    assert client.post("/care/test-call", json={"member_id": made["member_id"]}).status_code == 409
+    placed = []
+    monkeypatch.setattr(twilio, "enabled", lambda: True)
+    monkeypatch.setattr(twilio, "create_call", lambda to, url: placed.append((to, url)) or "CA1")
+    assert client.post("/care/test-call", json={"member_id": made["member_id"]}).json()["called"] == "Aunt Bea"
+    assert placed[0][0] == "+14155550123" and placed[0][1].endswith("/twiml/test/" + made["member_id"])
+    assert "test call" in client.post("/twiml/test/" + made["member_id"]).text.lower()

@@ -323,6 +323,7 @@
 <div id="arm" class="call-screen gate" hidden><div style="max-width:390px;width:100%;margin:0 auto;display:flex;flex-direction:column;flex:1">
   <h1>Let this phone ring</h1><p class="sub">Tap once to enable Nightfall's alert sound.</p>
   <div class="card pad mt"><div class="avatar" style="width:44px;height:44px">&#9834;</div><p class="title mt" id="arm-who">Sarah · First contact</p><p class="body">When Dad leaves and does not return, your phone rings first.</p><p class="cap mt">Keep this page open and your volume on.</p></div>
+  <div class="card pad mt"><p class="title">Send a test call</p><p class="cap">Rings a number from your call order to check it works.</p><label class="field"><span class="lbl">Call</span><select id="test-who"></select></label><p id="test-status" class="form-status" role="status"></p><button class="btn mt" id="test-call" onclick="sendTestCall()">Send a test call</button></div>
   <div class="actions"><button class="btn primary" onclick="armPhone()">Enable sound</button></div></div></div>
 
 <!-- Someone is at the door -->

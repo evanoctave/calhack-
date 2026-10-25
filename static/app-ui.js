@@ -203,7 +203,18 @@ async function answerCall() { enableSound(); stopRing(); if (incident) post("/an
 function startFeed() { feedStart(); }
 function enableSound() { if (soundOn) return; soundOn = true; try { const a = $("ring"); a.src = ringDataUrl(); a.load(); a.volume = 1; a.play().then(() => { a.pause(); a.currentTime = 0; renderCareStatus(); }).catch(() => { soundOn = false; renderCareStatus(); toast("Tap Phone alerts to enable sound on this phone."); }); } catch (e) {} try { speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch (e) {} }
 function armPhone() { enableSound(); $("arm").hidden = true; renderCareStatus(); try { localStorage.setItem("nf-armed", "1"); } catch (e) {} }
-function showArm() { $("arm").hidden = false; }
+function showArm() {
+  const callable = S.household.tree.filter(m => m.phone && m.phone.startsWith("+"));
+  $("test-who").innerHTML = callable.map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join("");
+  $("test-call").disabled = !callable.length; $("test-status").textContent = callable.length ? "" : "Add a phone number in Call order first.";
+  $("arm").hidden = false;
+}
+async function sendTestCall() {
+  $("test-call").disabled = true; $("test-status").textContent = "Calling…";
+  try { const r = await requestJSON("/care/test-call", {member_id: $("test-who").value}); $("test-status").textContent = "Calling " + r.called + " now."; }
+  catch (error) { $("test-status").textContent = error.message; }
+  finally { $("test-call").disabled = false; }
+}
 let rungFor = ""; let lastRingMsg = "";
 function showIncoming(msg) { const who = (S && S.household.person_name) || "They"; $("inc-title").textContent = /help button/i.test(msg || "") ? "Help requested at the door" : who + " has left home"; $("inc-ctx").textContent = who + "'s care circle"; $("inc-msg").textContent = msg || ""; $("incoming").hidden = false; }
 function answerFromOverlay() { $("incoming").hidden = true; answerCall(); }

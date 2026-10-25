@@ -148,6 +148,34 @@ async def address_suggest(q: str = "") -> dict:
         return {"suggestions": []}
 
 
+class TestCallIn(BaseModel):
+    member_id: str
+
+
+@router.post("/test-call")
+async def test_call(body: TestCallIn) -> dict:
+    """Ring one care-circle member now with a short test message, through the same Twilio path as a real alert."""
+    from nightfall.integrations import twilio
+    from nightfall.store import PUBLIC_URL
+
+    store = api_app._store()
+    member = store.hh.member(body.member_id)
+    if member is None:
+        raise HTTPException(404, "That person is not in the care circle.")
+    if not member.phone.startswith("+"):
+        raise HTTPException(422, f"Add a phone number for {member.name} in the call order first.")
+    if not twilio.enabled():
+        raise HTTPException(409, "Phone calls are off: the app is in mock mode or Twilio is not set up.")
+    try:
+        await asyncio.to_thread(twilio.create_call, member.phone, f"{PUBLIC_URL}/twiml/test/{member.id}")
+    except Exception as error:  # noqa: BLE001 — Twilio/network errors become a readable message
+        print(f"test call failed: {type(error).__name__}: {error}")
+        raise HTTPException(
+            502, "Twilio could not place the call. Check the number, and that the account can call it."
+        ) from None
+    return {"ok": True, "called": member.name}
+
+
 class FamiliarPlaceIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     note: str = Field(default="", max_length=400)

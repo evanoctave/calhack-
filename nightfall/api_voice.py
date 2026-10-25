@@ -55,6 +55,19 @@ def _ctx(incident_id: str, member_id: str) -> tuple[Any, dict[str, Any], str]:
     return store, b, m.name
 
 
+@router.post("/twiml/test/{member_id}")
+async def twiml_test(member_id: str) -> Response:
+    """The test call from the Phone alerts screen: one short message, then hang up. Declared before the incident route."""
+    store = _store()
+    who = store.hh.person_name or "your family member"
+    return _twiml(
+        f"This is a test call from Nightfall. If you can hear this, your phone is set up to get an alert if {who} leaves home. Goodbye.",
+        None,
+        True,
+        use_cartesia=False,
+    )
+
+
 @router.post("/twiml/{incident_id}/{member_id}")
 async def twiml_open(incident_id: str, member_id: str) -> Response:
     store, b, name = _ctx(incident_id, member_id)
