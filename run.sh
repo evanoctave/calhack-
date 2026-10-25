@@ -17,12 +17,22 @@ fi
 export MOCK="${MOCK:-1}" PYTHONUNBUFFERED=1
 PORT="${PORT:-8000}"
 
-print_links() {  # $1 = public base URL
+print_links() {  # $1 = public base URL; phone links use the first care-circle member of the active household
+  read -r MEMBER_ID MEMBER_NAME <<<"$($PY - <<'PYEOF'
+import json, os
+f = "data/household.json" if os.environ.get("FRESH_START", "1") not in ("1", "keep") else "data/household.live.json"
+try:
+    m = json.load(open(f))["tree"][0]
+    print(m["id"], m["name"].split()[0])
+except Exception:
+    print("", "")
+PYEOF
+)"
   echo "places:    ${PLACES_FILE:-auto: setup-page cache, else sample live run, else fixture}"
   echo "door:      http://localhost:${PORT}   (laptop = doorbell camera + speaker)"
   echo "admin:     http://localhost:${PORT}/dashboard.html"
-  echo "phone app: $1/app?me=Evan"
-  echo "phone:     $1/phone.html#TM-PRIMARY"
+  echo "phone app: $1/app?me=${MEMBER_NAME:-Evan}"
+  [ -n "$MEMBER_ID" ] && echo "phone:     $1/phone.html#${MEMBER_ID}   (legacy page)"
 }
 
 case "${1:-serve}" in
