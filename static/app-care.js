@@ -53,13 +53,19 @@ function renderCallOrder() {
   const key = JSON.stringify(ordered);
   if ($("p-tree").dataset.key === key) return;
   $("p-tree").dataset.key = key;
-  $("p-tree").innerHTML = ordered.map((m, i) => `<div class="row" draggable="true" data-member="${esc(m.id)}"><div class="lead"><span class="badge ${i === 0 ? "on" : ""}">${i + 1}</span><div><span class="k">${esc(m.name)}${m.relationship ? " · " + esc(m.relationship) : ""}</span><span class="sub2">${i === 0 ? "Call first" : i === 1 ? "Next if no answer" : "Then everyone in the care circle"}${m.id === member ? " · This phone" : ""}</span></div></div><div class="reorder"><button aria-label="Move ${esc(m.name)} up" onclick="moveContact(${i},-1)" ${i === 0 ? "disabled" : ""}>↑</button><button aria-label="Move ${esc(m.name)} down" onclick="moveContact(${i},1)" ${i === ordered.length - 1 ? "disabled" : ""}>↓</button><button aria-label="Remove ${esc(m.name)}" onclick="removeContact('${esc(m.id)}')">Remove</button></div></div>`).join("") || '<div class="row"><span class="muted">No one yet. Invite a family member to start the call order.</span></div>';
+  $("p-tree").innerHTML = ordered.map((m, i) => `<div class="row" draggable="true" data-member="${esc(m.id)}"><div class="lead"><span class="badge ${i === 0 ? "on" : ""}">${i + 1}</span><div><span class="k">${esc(m.name)}${m.relationship ? " · " + esc(m.relationship) : ""}</span><span class="sub2">${i === 0 ? "Call first" : i === 1 ? "Next if no answer" : "Then everyone in the care circle"}${m.id === member ? " · This phone" : ""}</span></div></div><div class="reorder"><button aria-label="Move ${esc(m.name)} up" onclick="moveContact(${i},-1)" ${i === 0 ? "disabled" : ""}>↑</button><button aria-label="Move ${esc(m.name)} down" onclick="moveContact(${i},1)" ${i === ordered.length - 1 ? "disabled" : ""}>↓</button><button aria-label="Copy link for ${esc(m.name)}" onclick="copyMemberLink('${esc(m.id)}')">Link</button><button aria-label="Remove ${esc(m.name)}" onclick="removeContact('${esc(m.id)}')">Remove</button></div></div>`).join("") || '<div class="row"><span class="muted">No one yet. Invite a family member to start the call order.</span></div>';
   let dragged;
   $("p-tree").querySelectorAll("[data-member]").forEach(row => {
     row.addEventListener("dragstart", e => { dragged = row.dataset.member; e.dataTransfer.setData("text/plain", dragged); });
     row.addEventListener("dragover", e => e.preventDefault());
     row.addEventListener("drop", e => { e.preventDefault(); const from = ids.indexOf(dragged), to = ids.indexOf(row.dataset.member); if (from < 0 || to < 0) return; callOrderDraft = [...ids]; callOrderDraft.splice(to, 0, callOrderDraft.splice(from, 1)[0]); renderCallOrder(); });
   });
+}
+function memberLink(id) { return (S.public_url || location.origin).replace(/\/$/, "") + "/app?member=" + encodeURIComponent(id); }
+async function copyMemberLink(id) {
+  const url = memberLink(id), name = (S.household.tree.find(m => m.id === id) || {}).name || "this person";
+  try { await navigator.clipboard.writeText(url); toast("Link for " + name + " copied."); }
+  catch (error) { toast(url); }
 }
 async function removeContact(id) {
   const name = (S.household.tree.find(m => m.id === id) || {}).name || "this person";

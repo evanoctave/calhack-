@@ -114,7 +114,10 @@ async def add_member(body: MemberIn, request: Request) -> dict:
         existing = replace(existing, relationship=relationship or existing.relationship, phone=phone or existing.phone)
         store.hh = replace(store.hh, tree=tuple(existing if m.id == existing.id else m for m in store.hh.tree))
         api_app._persist_household(store.hh)
-    url = str(request.base_url).rstrip("/") + "/app?" + urlencode({"member": existing.id})
+    base = os.environ.get("PUBLIC_URL", "").rstrip("/") or str(request.base_url).rstrip(
+        "/"
+    )  # a link must work off this laptop
+    url = base + "/app?" + urlencode({"member": existing.id})
     return {"ok": True, "member_id": existing.id, "invitation_url": url}
 
 

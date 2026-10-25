@@ -261,3 +261,10 @@ def test_clear_everything_wipes_entered_data_in_a_scratch_copy(client, monkeypat
     assert not any(p.exists() for p in (data / "faces.json", data / "history.json", medical, photo))
     assert list(samples.glob("*.wav")) == [] and api.store.places == []
     assert api.store.hh.tree == () and api.store.hh.caregiver_name == ""
+
+
+def test_invitation_link_uses_the_public_url_so_it_works_off_this_laptop(client, monkeypatch):
+    monkeypatch.setenv("PUBLIC_URL", "https://family.example.com/")
+    made = client.post("/care/members", json={"name": "Cousin Dee"}).json()
+    assert made["invitation_url"] == "https://family.example.com/app?member=" + made["member_id"]
+    assert client.get("/app/state").json()["public_url"] == "https://family.example.com/"

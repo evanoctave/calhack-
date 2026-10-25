@@ -59,6 +59,7 @@ async def app_state(member: str = "") -> dict[str, Any]:
     samples = {k: (SAMPLES / f"{k}.wav").exists() for k in KINDS}
     vid = os.environ.get("CARTESIA_VOICE_ID", "")
     return {
+        "public_url": os.environ.get("PUBLIC_URL", ""),
         "now": now.isoformat(),
         "night_mode": store.night(),
         "household": {
