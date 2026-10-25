@@ -180,14 +180,12 @@ function renderMap() {
   if (mapObj._nightfallKey !== key) {
     if (mapLayer) mapLayer.remove(); mapLayer = L.layerGroup().addTo(mapObj);
     const ring = L.circle([h.home.lat,h.home.lng], {radius:h.radius_mi*1609.34,color:"#245dd6",weight:1,dashArray:"4 4",fillOpacity:.03}).addTo(mapLayer);
-    const points = [...(b?.call_first || []).slice(0,6), ...h.familiar_places];
+    const points = [...(b?.call_first || []).slice(0,10), ...h.familiar_places];
     if (points.length) mapObj.fitBounds(L.latLngBounds([[h.home.lat,h.home.lng], ...points.map(p=>[p.lat,p.lng])]).pad(.18), {maxZoom:15});
     L.circleMarker([h.home.lat,h.home.lng], {radius:5,color:"#fff",weight:2,fillColor:"#506078",fillOpacity:1}).addTo(mapLayer).bindPopup("Last confirmed at home");
-    // Pin numbers run highest to lowest priority: familiar places first, then open places to call.
-    const calls = (b?.call_first || []).slice(0,6), familiar = h.familiar_places.filter(p => p.lat != null && p.lng != null);
-    [...familiar.map(p=>[p,"#245dd6"]),...calls.map(p=>[p,"#23764a"])].forEach(([p,color],i) => {
-      L.marker([p.lat,p.lng], {icon:L.divIcon({className:"",html:`<div class="pin" style="background:${color}">${i+1}</div>`,iconSize:[24,24]})}).addTo(mapLayer).bindPopup(`${i+1} · ${esc(p.name)}`);
-    });
+    // Same dots as the setup area map: green for open places to call, blue for familiar places.
+    (b?.call_first || []).slice(0,10).forEach(p=>L.circleMarker([p.lat,p.lng],{radius:6,color:"#fff",weight:2,fillColor:"#23764a",fillOpacity:1}).addTo(mapLayer).bindPopup(esc(p.name)));
+    h.familiar_places.filter(p => p.lat != null && p.lng != null).forEach(p=>L.circleMarker([p.lat,p.lng],{radius:7,color:"#fff",weight:2,fillColor:"#245dd6",fillOpacity:1}).addTo(mapLayer).bindPopup(esc(p.name)));
     mapObj._nightfallKey = key;
   }
   setTimeout(()=>mapObj.invalidateSize(),100);
@@ -374,6 +372,7 @@ function renderRadius(cur) {
   const el = $("pl-rad"); if (el.dataset.cur === String(cur)) return; el.dataset.cur = String(cur);
   el.innerHTML = RADII.map(r => `<button type="button" class="${r === cur ? "on" : ""}" onclick="pickRadius = ${r}; render()">${r} mi</button>`).join("");
 }
+const callPlaceLabel = x => cap(x.category) + (x.hours ? " · " + x.hours : "") + (x.phone ? " · " + x.phone : "");
 function placeRows(list, empty, label) {
   return list.map(x => `<div class="row"><div><span class="k">${esc(x.name)}</span><span class="sub2">${esc(label(x))}</span></div><span class="v">${x.distance_mi} mi</span></div>`).join("") || `<div class="row"><span class="muted">${empty}</span></div>`;
 }
@@ -395,6 +394,6 @@ async function renderArea(st) {
   areaMap.setView([home.lat, home.lng], 14); areaMap.fitBounds(ring.getBounds(), {padding: [8, 8]});
   const open = st.call_first || [];
   open.slice(0, 10).forEach(x => L.circleMarker([x.lat, x.lng], {radius: 6, color: "#fff", weight: 2, fillColor: "#23764a", fillOpacity: 1}).addTo(areaLayer));
-  $("ar-calllist").innerHTML = placeRows(open.slice(0, 6), st.apify === "running" ? "Still searching with Apify…" : "No late-night places found yet", x => cap(x.category) + (x.hours ? " · " + x.hours : "") + (x.phone ? " · " + x.phone : ""));
+  $("ar-calllist").innerHTML = placeRows(open.slice(0, 6), st.apify === "running" ? "Still searching with Apify…" : "No late-night places found yet", callPlaceLabel);
   $("ar-call").textContent = st.open || open.length; setTimeout(() => areaMap.invalidateSize(), 100);
 }

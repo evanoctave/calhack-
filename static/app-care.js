@@ -203,7 +203,7 @@ function renderBriefCards() {
   $("b-confirm-return").hidden = !active;
   $("h-active-search").hidden = !active; $("h-report-missing").hidden = active;
   $("h-search-status").textContent = inc?.acked_by_name ? inc.acked_by_name + " is responding. Return is not yet confirmed." : "The search is still active. Family alerts continue.";
-  $("b-open-places").innerHTML = nearbyCallRows(b?.call_first, b ? undefined : "Nearby places appear after a confirmed exit.");
+  $("b-open-places").innerHTML = placeRows((b?.call_first || []).slice(0, 6), b ? "No late-night places found yet" : "Nearby places appear after a confirmed exit.", callPlaceLabel);
   $("b-source").textContent = "Nearby places · " + (S.places_source === "apify" ? "Apify" : "Saved / sample data");
   if (inc?.state === "RETURNED") {
     if ($("toast").textContent === "Emergency call option available.") $("toast").hidden = true;
