@@ -25,6 +25,7 @@ from nightfall.actions import emit as _emit
 from nightfall.actions import run_actions as _run_actions
 from nightfall.api_app import router as app_router
 from nightfall.api_cam import router as cam_router
+from nightfall.api_care import router as care_router
 from nightfall.api_enroll import router as enroll_router
 from nightfall.api_live import router as live_router
 from nightfall.api_medical import router as medical_router
@@ -294,7 +295,17 @@ async def get_brief(token: str) -> dict[str, Any]:
     b = store.briefs.get(inc_id)
     if b is None:
         raise HTTPException(404, "no brief")
-    return {**b, "viewer": member_id}
+    inc = store.inc if store.inc and store.inc.id == inc_id else None
+    return {
+        **b,
+        "viewer": member_id,
+        "now": store.now().isoformat(),
+        "active": bool(inc and inc.state not in (engine.State.CLOSED, engine.State.RETURNED)),
+        "state": inc.state.value if inc else "CLOSED",
+        "acked_by": inc.acked_by if inc else None,
+        "responder": next((m.name for m in store.hh.tree if inc and m.id == inc.acked_by), ""),
+        "recommendation_due": bool(inc and inc.deadline_at and store.now() >= inc.deadline_at),
+    }
 
 
 async def _sse(channel: str) -> AsyncIterator[str]:
@@ -383,6 +394,7 @@ app.include_router(voice_router)
 app.include_router(cam_router)
 app.include_router(setup_router)
 app.include_router(app_router)
+app.include_router(care_router)
 app.include_router(live_router)
 app.include_router(enroll_router)
 app.include_router(medical_router)

@@ -31,6 +31,9 @@ Built at Cal Hacks 13.0 (UC Berkeley), October 2026.
 ./run.sh check    # gate before every commit
 ```
 
+Caregiver UI: open `/app`. For the Figma scenario demo, open `/app?demo=1` in mock mode.
+UI screen references, new controls, and verification: [docs/UI-INTEGRATION.md](docs/UI-INTEGRATION.md).
+
 Demo knobs: `DOOR_WAIT_S=5 ESCALATION_STEP_S=10 ./run.sh` shortens the waits.
 
 ## Devices

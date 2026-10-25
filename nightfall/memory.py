@@ -29,7 +29,7 @@ def notes_from(hh: Household) -> list[dict[str, Any]]:
         docs.append(
             {
                 "id": f"NT-place-{i}",
-                "text": p["name"],
+                "text": ", ".join(filter(None, (p["name"], p.get("note", "")))),
                 "kind": "familiar_place",
                 "lat": p.get("lat"),
                 "lng": p.get("lng"),
