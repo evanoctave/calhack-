@@ -127,6 +127,11 @@ async function addPlace() {
     $("fa-name").value = ""; $("fa-note").value = ""; $("places-status").textContent = ""; $("familiar-editor").hidden = true; toast("Place added.");
   } catch (error) { $("places-status").textContent = error.message; }
 }
+async function clearEverything() {
+  if (!confirm("Clear all information? This erases the profile, call order, address and places, voice recordings, enrolled faces, medical info and history. It cannot be undone.")) return;
+  try { await requestJSON("/care/clear", {}); try { localStorage.clear(); } catch (e) {} location.hash = "#setup"; location.reload(); }
+  catch (error) { toast(error.message); }
+}
 async function startWatch() { await requestJSON("/arm", {on: true}); await refresh(); go("home"); if (!soundOn) showArm(); }
 async function acknowledgeIncident() {
   if (!incident) return;

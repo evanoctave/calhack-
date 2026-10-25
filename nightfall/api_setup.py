@@ -121,6 +121,17 @@ async def _run_apify(lat: float, lng: float, radius_mi: float) -> None:
     store.hub.publish("dashboard", {"type": "setup", "apify": _status["apify"], "open": _status["open"]})
 
 
+def reset_state() -> None:
+    """Forget the running place search and everything it found (used by Clear all information)."""
+    global _task, _open, _where
+    if _task is not None and not _task.done():
+        _task.cancel()
+    _task, _open, _where = None, [], None
+    _status.update({"apify": "idle", "address": "", "hazards": 0, "open": 0, "error": ""})
+    for key in ("lat", "lng"):
+        _status.pop(key, None)
+
+
 def _save(rows: list[dict[str, Any]]) -> None:
     try:
         CACHE.write_text(json.dumps(rows, indent=1) + "\n")

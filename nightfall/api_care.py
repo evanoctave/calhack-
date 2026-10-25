@@ -143,6 +143,31 @@ async def address_suggest(q: str = "") -> dict:
         return {"suggestions": []}
 
 
+@router.post("/clear")
+async def clear_everything() -> dict:
+    """Erase everything the family entered and start from the blank setup. Cloned voices at Cartesia are not touched."""
+    import json
+    import shutil
+
+    from nightfall import api, api_enroll, api_setup, history, medical
+    from nightfall.store import ROOT, household_filename, household_path
+
+    if household_filename() == "household.json":  # FRESH_START=0 works on the committed demo household
+        raise HTTPException(409, "Clear is not available while running on the demo household (FRESH_START=0).")
+    shutil.copyfile(ROOT / "data" / "household.blank.json", household_path())
+    for target in (api_enroll.FACES, medical.path(), history.FILE, PHOTO):
+        Path(target).unlink(missing_ok=True)
+    for clip in api_app.SAMPLES.glob("*.wav"):
+        clip.unlink(missing_ok=True)
+    (ROOT / "data" / "places.custom.live.json").write_text(json.dumps([]) + "\n")
+    api_setup.reset_state()
+    store = api_app._store()
+    store.voice_source, store.voice_name = "stock", ""
+    await api.reset()
+    store.places = []
+    return {"ok": True}
+
+
 class TestCallIn(BaseModel):
     member_id: str
 

@@ -223,3 +223,41 @@ def test_phone_numbers_normalize_and_old_saved_numbers_load_dialable(tmp_path):
     path = tmp_path / "h.json"
     path.write_text(json.dumps(raw))
     assert load(path).tree[0].phone == "+16262659377"
+
+
+def test_clear_everything_refuses_to_overwrite_the_demo_household(client):
+    before = api.store.hh
+    assert client.post("/care/clear").status_code == 409
+    assert api.store.hh == before
+
+
+def test_clear_everything_wipes_entered_data_in_a_scratch_copy(client, monkeypatch, tmp_path):
+    import shutil
+
+    from nightfall import api_app, api_enroll, history
+    from nightfall import store as store_mod
+
+    data = tmp_path / "data"
+    data.mkdir()
+    shutil.copyfile(api.ROOT / "data" / "household.blank.json", data / "household.blank.json")
+    (data / "household.live.json").write_text((data / "household.blank.json").read_text())
+    for name in ("faces", "history"):
+        (data / f"{name}.json").write_text("[1]")
+    medical, photo, samples = data / "medical.json", tmp_path / "photo", tmp_path / "samples"
+    medical.write_text("{}")
+    photo.write_text("x")
+    samples.mkdir()
+    (samples / "everyday.wav").write_bytes(b"x")
+    monkeypatch.setattr(store_mod, "ROOT", tmp_path)
+    monkeypatch.setattr(store_mod, "household_filename", lambda: "household.live.json")
+    monkeypatch.setattr(store_mod, "household_path", lambda: data / "household.live.json")
+    monkeypatch.setattr(api, "household_path", lambda: data / "household.live.json")
+    monkeypatch.setattr(api_enroll, "FACES", data / "faces.json")
+    monkeypatch.setattr(history, "FILE", data / "history.json")
+    monkeypatch.setattr(api_care, "PHOTO", photo)
+    monkeypatch.setattr(api_app, "SAMPLES", samples)
+    monkeypatch.setenv("MEDICAL_FILE", str(medical))
+    assert client.post("/care/clear").json() == {"ok": True}
+    assert not any(p.exists() for p in (data / "faces.json", data / "history.json", medical, photo))
+    assert list(samples.glob("*.wav")) == [] and api.store.places == []
+    assert api.store.hh.tree == () and api.store.hh.caregiver_name == ""
