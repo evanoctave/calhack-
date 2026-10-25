@@ -36,6 +36,7 @@ from nightfall.api_voice import router as voice_router
 from nightfall.escalation import LADDER
 from nightfall.household import TreeMember, load
 from nightfall.integrations import anthropic_llm, cartesia, twilio
+from nightfall.search import rank
 from nightfall.store import ROOT, Store, household_path
 
 PUBLIC_URL = os.environ.get("PUBLIC_URL") or "http://127.0.0.1:8000"
@@ -87,8 +88,15 @@ class ArmIn(BaseModel):
     on: bool
 
 
-async def _step(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
+async def _step(kind: str, payload: dict[str, Any], *, expected_incident_id: str | None = None) -> dict[str, Any]:
     async with store.lock:
+        if expected_incident_id is not None and (store.inc is None or store.inc.id != expected_incident_id):
+            raise HTTPException(409, "This alert has changed. Refresh before confirming a return.")
+        if kind == "confirm_return" and (
+            store.inc is None
+            or (store.inc.state != engine.State.RETURNED and (store.inc.state, kind) not in engine.TRANSITIONS)
+        ):
+            raise HTTPException(409, "There is no active search to close.")
         done = (
             engine.State.CLOSED,
             engine.State.RETURNED,
@@ -317,6 +325,18 @@ async def get_brief(token: str) -> dict[str, Any]:
     b = store.briefs.get(inc_id)
     if b is None:
         raise HTTPException(404, "no brief")
+    # Scrapers can finish after the exit. Refresh places and opening status while retaining
+    # the incident's original home, radius, and family-provided places.
+    home = b["home"]
+    sections = rank(
+        store.places,
+        (home["lat"], home["lng"]),
+        home["radius_mi"],
+        store.now(),
+        b["familiar"],
+        b["contacts"],
+    )
+    b.update(hazards=sections.hazards, call_first=sections.call_first, places_source=store.places_source())
     inc = store.inc if store.inc and store.inc.id == inc_id else None
     return {
         **b,
@@ -325,6 +345,7 @@ async def get_brief(token: str) -> dict[str, Any]:
         "active": bool(inc and inc.state not in (engine.State.CLOSED, engine.State.RETURNED)),
         "state": inc.state.value if inc else "CLOSED",
         "acked_by": inc.acked_by if inc else None,
+        "returned_by": inc.returned_by if inc else None,
         "responder": next((m.name for m in store.hh.tree if inc and m.id == inc.acked_by), ""),
         "recommendation_due": bool(inc and inc.deadline_at and store.now() >= inc.deadline_at),
     }

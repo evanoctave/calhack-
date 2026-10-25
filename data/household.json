@@ -5,8 +5,8 @@
   "caregiver_name": "Nam",
   "night_start": "21:00",
   "night_end": "06:00",
-  "home_lat": 37.8,
-  "home_lng": -122.44,
+  "home_lat": 37.8029843,
+  "home_lng": -122.4374715,
   "radius_mi": 1.5,
   "meds_opt_in": true,
   "tree": [
@@ -112,5 +112,6 @@
   "doctor": {
     "name": "Dr. Priya Nair, UCSF Memory and Aging Center",
     "phone": "(415) 555-0199"
-  }
+  },
+  "caregiver_relationship": ""
 }

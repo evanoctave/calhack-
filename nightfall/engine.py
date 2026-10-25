@@ -55,6 +55,7 @@ class Incident:
     door_opened_at: datetime | None = None
     exited_at: datetime | None = None
     acked_by: str | None = None
+    returned_by: str | None = None
     lines_spoken: int = 0
     seen_inside: bool = False
     last_line_at: datetime | None = None
@@ -218,6 +219,18 @@ def _person_back_quiet(inc: Incident, ev: Event) -> Transition:
     """Back in frame after the family answered, or while only watching: tell the phones, no ladder to cancel."""
     inc.person_in_frame = True
     return _t(inc, State.RETURNED, ("notify:returned",), "R2", "person back in frame")
+
+
+def _confirm_return(inc: Incident, ev: Event) -> Transition:
+    """A family member confirms a safe return; this makes no claim about camera visibility."""
+    inc.returned_by = str(ev.payload["member_id"])
+    return _t(
+        inc,
+        State.RETURNED,
+        ("cancel_escalation", "log:returned", "notify:returned"),
+        "R4",
+        f"safe return confirmed by {inc.returned_by}",
+    )
 
 
 def _watching_features(inc: Incident, ev: Event) -> Transition:
@@ -399,6 +412,10 @@ TRANSITIONS: Final[dict[tuple[State, str], Handler]] = {
     (State.ACKED, "close"): _close,
     (State.EXHAUSTED, "close"): _close,
     (State.RETURNED, "close"): _close,
+    (State.ESCALATING, "confirm_return"): _confirm_return,
+    (State.ACKED, "confirm_return"): _confirm_return,
+    (State.EXHAUSTED, "confirm_return"): _confirm_return,
+    (State.WATCHING, "confirm_return"): _confirm_return,
 }
 
 EVENT_KINDS: Final[frozenset[str]] = frozenset(

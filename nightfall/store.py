@@ -1,7 +1,6 @@
-"""All mutable demo state in one object so tests can reset it.
+"""Mutable runtime state, initialized from the saved household profile.
 
-Rejected: SQLite tonight; the light demo needs no persistence. docs/DATA-MODEL.md lists the tables
-the core lane adds next.
+Profiles and care-circle contacts live in JSON; active incidents and their tasks stay in memory.
 """
 
 from __future__ import annotations
@@ -26,7 +25,7 @@ PUBLIC_URL = os.environ.get("PUBLIC_URL") or "http://127.0.0.1:8000"
 
 
 def household_filename() -> str:
-    """Fresh start (the default) and FRESH_START=keep work on a gitignored live copy; FRESH_START=0 uses the tracked demo household."""
+    """FRESH_START=1 (default) and =keep use the saved, gitignored household; FRESH_START=0 selects the tracked demo household."""
     return "household.live.json" if os.environ.get("FRESH_START", "1") in ("1", "keep") else "household.json"
 
 
@@ -34,11 +33,10 @@ def household_path() -> Path:
     return ROOT / "data" / household_filename()
 
 
-def start_fresh() -> None:
-    """Every server start begins from the blank template, so the first screen is setup. FRESH_START=keep resumes
-    the saved live household and only starts blank when there is none."""
-    mode = os.environ.get("FRESH_START", "1")
-    if mode == "1" or (mode == "keep" and not household_path().exists()):
+def initialize_household() -> None:
+    """Start setup on the first launch; keep saved profiles and phone contacts on subsequent launches.
+    FRESH_START=keep behaves the same and is accepted for older run scripts."""
+    if os.environ.get("FRESH_START", "1") in ("1", "keep") and not household_path().exists():
         shutil.copyfile(ROOT / "data" / "household.blank.json", household_path())
 
 
@@ -57,7 +55,7 @@ class Store:
     """All mutable demo state."""
 
     def __init__(self) -> None:
-        start_fresh()
+        initialize_household()
         self.hh: Household = load(household_path())
         # Home still at 0,0 means setup has not run; do not show another area's cached places.
         self.places = [] if (self.hh.home_lat, self.hh.home_lng) == (0.0, 0.0) else briefmod.load_places(places_file())

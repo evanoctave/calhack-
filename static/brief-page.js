@@ -22,7 +22,7 @@ async function loadSharedBrief() {
     byId("brief-state").textContent = b.state === "RETURNED" ? "Return confirmed. Pending family calls cancelled." : b.responder ? b.responder + " is responding. Return is not confirmed." : "Current location unknown.";
     byId("brief-radius").textContent = "Within " + b.home.radius_mi + " mi of home";
     byId("brief-hazards").innerHTML = briefRows(b.hazards,p=>p.category + " · " + p.distance_mi + " mi");
-    byId("brief-calls").innerHTML = briefRows(b.call_first,p=>[p.open_now === true ? "Open now" : "Check hours",p.distance_mi+" mi",p.phone ? "Tap to call" : "No phone listed"].join(" · "),true);
+    byId("brief-calls").innerHTML = nearbyCallRows(b.call_first);
     byId("brief-familiar").innerHTML = briefRows(b.familiar,p=>p.note || p.distance_mi+" mi");
     byId("brief-prose").textContent = b.prose;
     byId("brief-notes").innerHTML = (b.habits || []).map(p=>`<p>${esc(p.text)}</p>`).join("");
@@ -30,10 +30,26 @@ async function loadSharedBrief() {
     byId("brief-contacts").innerHTML = briefRows(b.contacts,p=>p.phone || p.note || "",true);
     byId("brief-police").textContent = b.police_report || "No dispatcher details added.";
     byId("brief-source").textContent = "Places · " + (b.places_source === "apify" ? "Apify" : "Saved / sample data") + " · This shared link expires in 24 hours.";
-    byId("brief-app").href = "/app?member="+encodeURIComponent(b.viewer)+"#brief";
+    const home = "/app?member="+encodeURIComponent(b.viewer)+"#home";
+    byId("brief-app").href = home; byId("brief-home").href = home;
     byId("brief-ack").hidden = !!b.acked_by || !b.active;
+    byId("brief-confirm-return").hidden = !b.active || !["ESCALATING", "ACKED", "EXHAUSTED", "WATCHING"].includes(b.state);
     renderSharedMap(b); tickSharedBrief();
   } catch { byId("brief-status").textContent = "Connection interrupted. Reconnecting…"; }
+}
+function prepareBriefHome() {
+  if (!sharedBrief) return;
+  try { sessionStorage.setItem("nf-home-incident", sharedBrief.incident_id); } catch (error) {}
+}
+async function confirmSharedReturn() {
+  if (!sharedBrief) return;
+  byId("brief-confirm-return").disabled = true;
+  try {
+    if (await confirmSafeReturn(sharedBrief.incident_id, sharedBrief.viewer, sharedBrief.person_name)) {
+      prepareBriefHome(); location.assign(byId("brief-app").href);
+    }
+  } catch (error) { byId("brief-status").textContent = error.message; }
+  finally { byId("brief-confirm-return").disabled = false; }
 }
 function showBriefError(status) {
   byId("shared-brief").hidden = true; byId("brief-error").hidden = false;

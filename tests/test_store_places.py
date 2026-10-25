@@ -52,16 +52,52 @@ def test_committed_live_file_is_what_the_app_ships_with(monkeypatch) -> None:
     assert len(s.places) > 20 and {p["source"] for p in s.places} == {"apify"}
 
 
-def test_fresh_start_resets_the_live_household_each_launch(root, monkeypatch) -> None:
+def test_first_launch_creates_blank_live_household(root, monkeypatch) -> None:
     monkeypatch.setenv("FRESH_START", "1")
     shutil.copy(REPO / "data" / "household.blank.json", root / "data" / "household.blank.json")
     live = root / "data" / "household.live.json"
-    live.write_text(json.dumps({"id": "x", "person_name": "Old Person"}))  # left over from a previous run
+    tracked = root / "data" / "household.json"
+    tracked_before = tracked.read_bytes()
     s = store.Store()
     assert s.hh.person_name == "" and s.hh.person_full_name == ""
     assert json.loads(live.read_text())["person_name"] == ""
     assert s.places == []
-    assert not (root / "data" / "household.json").read_text().startswith('{"id": "x"')  # tracked demo untouched
+    assert tracked.read_bytes() == tracked_before
+
+
+def test_restart_preserves_saved_profile_and_call_recipients(root, monkeypatch) -> None:
+    from dataclasses import replace
+
+    from nightfall import api_app
+    from nightfall.household import TreeMember
+
+    monkeypatch.setenv("FRESH_START", "1")
+    monkeypatch.setenv("PHONE_TM_PRIMARY", "+14155550123")
+    monkeypatch.setattr(api_app, "ROOT", root)
+    shutil.copy(REPO / "data" / "household.blank.json", root / "data" / "household.blank.json")
+    first = store.Store()
+    saved = replace(
+        first.hh,
+        person_name="Robert",
+        person_full_name="Robert Example",
+        caregiver_name="Sam",
+        tree=(
+            TreeMember("TM-PRIMARY", "Sam", "+14155550123", 1),
+            TreeMember("TM-INVITED", "Alex", "+14155550124", 2),
+        ),
+    )
+    api_app._persist_household(saved)
+    live = root / "data" / "household.live.json"
+    before = live.read_bytes()
+
+    restarted = store.Store()
+
+    assert restarted.hh == saved
+    assert restarted.hh.members_at(1)[0].phone == "+14155550123"
+    assert restarted.hh.members_at(2)[0].phone == "+14155550124"
+    assert live.read_bytes() == before
+    # Environment-managed numbers stay out of the saved profile.
+    assert json.loads(before)["tree"][0]["phone"] == "web"
 
 
 def test_fresh_start_off_uses_the_tracked_demo(root, monkeypatch) -> None:

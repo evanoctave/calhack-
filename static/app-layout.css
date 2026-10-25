@@ -75,9 +75,8 @@ h1 { font-size: 28px; line-height: 38px; letter-spacing: -.025em; text-wrap: pre
 .leaflet-control-attribution { font-size: 9px !important; }
 .leaflet-container { font-family: var(--font) !important; }
 .brief-check .k { font-size: 18px; line-height: 25px; }
-.brief-call { display: block; }
-.brief-call:hover { background: var(--surface-2); }
-.brief-call .sub2 { color: var(--blue); }
+.place-details { min-width: 0; overflow-wrap: anywhere; }
+.place-phone { display: inline-block; margin-top: 6px; padding: 6px 0; color: var(--blue); font-weight: 600; }
 .disclosure { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 16px; }
 .disclosure summary { cursor: pointer; font-size: 15px; font-weight: 600; min-height: 24px; }
 .disclosure > div { margin-top: 16px; }
@@ -115,6 +114,4 @@ html[data-demo="true"] .demo-only.demo-block:not([hidden]) { display: block !imp
 .legend img { display: inline-block; margin-right: 6px; vertical-align: 1px; }
 html[data-demo="true"] .screen { padding-top: 48px; }
 :root[data-theme="dark"] .leaflet-tile-pane { filter: brightness(.72) contrast(1.08) saturate(.7); }
-.brief-call .cap, .brief-call .k { display: block; }
-.brief-call .k { margin-top: 6px; color: var(--ink); }
 .who .media { border-radius: 9px; }

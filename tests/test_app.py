@@ -156,3 +156,81 @@ def test_profile_save_keeps_the_search_radius(tmp_path, monkeypatch) -> None:
     api_app._persist_household(replace(api.store.hh, radius_mi=3.0))
     saved = json.loads((tmp_path / "data" / "household.json").read_text())
     assert saved["radius_mi"] == 3.0 and "description" in saved and "doctor" in saved
+
+
+def test_person_details_and_later_edits_survive_restarts(tmp_path, monkeypatch) -> None:
+    import shutil
+
+    from nightfall import api_care, store
+
+    (tmp_path / "data").mkdir()
+    shutil.copy(api.ROOT / "data/household.blank.json", tmp_path / "data/household.blank.json")
+    monkeypatch.setenv("FRESH_START", "1")
+    monkeypatch.setattr(store, "ROOT", tmp_path)
+    monkeypatch.setattr(api_app, "ROOT", tmp_path)
+    monkeypatch.setattr(api_care, "PHOTO", tmp_path / "photo")
+    original = {
+        "person_full_name": "Robert Example",
+        "person_name": "Bob",
+        "person_age": 74,
+        "caregiver_name": "Sam",
+        "caregiver_relationship": "Daughter",
+        "description": {"height": "5 ft 9 in", "hair": "Gray", "eyes": "Brown"},
+        "diagnosis": "Dementia",
+        "doctor": {"name": "Dr. Example", "phone": "415-555-0101"},
+    }
+    monkeypatch.setattr(api, "store", store.Store())
+    with TestClient(api.app) as client:
+        member = client.post("/care/members", json={"name": "Sam", "phone": "415-555-0123"}).json()
+        assert client.post("/profile", json=original).status_code == 200
+        image = (api.ROOT / "static/assets/figma/demo-camera.png").read_bytes()
+        photo = client.post("/care/photo", files={"photo": ("portrait.png", image, "image/png")}).json()["photo"]
+
+    updates = {
+        "person_full_name": "Robert Updated",
+        "person_name": "Robert",
+        "person_age": 75,
+        "description": {"height": "5 ft 9 in", "hair": "White", "eyes": "Brown"},
+        "diagnosis": "Updated care notes",
+        "doctor": {"name": "Dr. New", "phone": "415-555-0102"},
+    }
+    cleared = {"person_age": 0, "description": {}, "diagnosis": "", "doctor": {"name": "", "phone": ""}}
+    for expected, edit in (
+        (original, updates),
+        ({**original, **updates}, cleared),
+        ({**original, **updates, **cleared}, None),
+    ):
+        monkeypatch.setattr(api, "store", store.Store())
+        with TestClient(api.app) as client:
+            saved = client.get("/app/state").json()["household"]
+            assert {field: saved[field] for field in expected} == expected
+            assert saved["photo"] == photo
+            assert client.get(photo).content == image
+            assert saved["tree"][0]["id"] == member["member_id"]
+            assert saved["tree"][0]["phone"] == "+14155550123"
+            if edit is not None:
+                assert client.post("/profile", json=edit).status_code == 200
+
+
+def test_failed_profile_save_keeps_previous_file_and_reports_failure(tmp_path, monkeypatch) -> None:
+    from dataclasses import replace
+    from pathlib import Path
+
+    from fastapi import HTTPException
+
+    monkeypatch.setenv("FRESH_START", "1")
+    monkeypatch.setattr(api_app, "ROOT", tmp_path)
+    (tmp_path / "data").mkdir()
+    target = tmp_path / "data/household.live.json"
+    previous = (api.ROOT / "data/household.blank.json").read_bytes()
+    target.write_bytes(previous)
+
+    def fail_replace(self, destination):
+        raise OSError("disk unavailable")
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+    with pytest.raises(HTTPException) as error:
+        api_app._persist_household(replace(api.store.hh, person_name="Changed"))
+    assert error.value.status_code == 500
+    assert target.read_bytes() == previous
+    assert list(target.parent.glob(".household-*")) == []

@@ -34,7 +34,7 @@ def test_build_sections_and_meds() -> None:
     inc = Incident("INC-1")
     inc.exited_at = NOW
     b = brief.build(hh, inc, brief.mock_clothing(), places, [], NOW)
-    assert len(b["hazards"]) == 4 and b["hazards"][0]["name"].startswith("Palace of Fine Arts lagoon")
+    assert len(b["hazards"]) == 4 and any(h["name"].startswith("Palace of Fine Arts lagoon") for h in b["hazards"])
     assert b["call_first"][0]["name"].startswith("Lombard Gas")
     names = [p["name"] for p in b["call_first"]]
     assert names.index("Harbor Pharmacy") > names.index("Bayview Diner")

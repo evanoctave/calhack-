@@ -198,6 +198,37 @@ class TestCallIn(BaseModel):
     member_id: str
 
 
+class ConfirmReturnIn(BaseModel):
+    incident_id: str
+    member_id: str
+
+
+@router.post("/confirm-return")
+async def confirm_return(body: ConfirmReturnIn) -> dict:
+    """A care-circle member explicitly confirms the person is safely back home."""
+    from nightfall import api, engine
+
+    store = api_app._store()
+    if store.hh.member(body.member_id) is None:
+        raise HTTPException(403, "Not a care-circle member.")
+    if store.inc is None or store.inc.id != body.incident_id:
+        raise HTTPException(409, "This alert has changed. Refresh before confirming a return.")
+    if store.inc.state == engine.State.RETURNED:
+        return {"ok": True, "state": "RETURNED", "returned_by": store.inc.returned_by}
+    if store.inc.state not in (
+        engine.State.ESCALATING,
+        engine.State.ACKED,
+        engine.State.EXHAUSTED,
+        engine.State.WATCHING,
+    ):
+        raise HTTPException(409, "There is no active search to close.")
+    result = await api._step("confirm_return", {"member_id": body.member_id}, expected_incident_id=body.incident_id)
+    if result["to"] != "RETURNED":
+        raise HTTPException(409, "This alert has changed. Refresh before confirming a return.")
+    store.quiet_until = store.now() + timedelta(seconds=api.QUIET_AFTER_ACK_S)
+    return {"ok": True, "state": "RETURNED", "returned_by": store.inc.returned_by}
+
+
 @router.post("/test-call")
 async def test_call(body: TestCallIn) -> dict:
     """Ring one care-circle member now with a short test message, through the same Twilio path as a real alert."""

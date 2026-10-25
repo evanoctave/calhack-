@@ -8,6 +8,7 @@ import asyncio
 import json
 import os
 import subprocess
+import tempfile
 import time
 import wave
 from dataclasses import replace
@@ -94,6 +95,8 @@ async def app_state(member: str = "") -> dict[str, Any]:
             "minutes_since_exit": round((now - exited).total_seconds() / 60, 1) if exited else None,
             "deadline_at": inc.deadline_at.isoformat() if inc.deadline_at else None,
             "acked_by": inc.acked_by,
+            "returned_by": inc.returned_by,
+            "returned_by_name": next((m.name for m in hh.tree if m.id == inc.returned_by), None),
             "acked_by_name": next((m.name for m in hh.tree if m.id == inc.acked_by), None),
             "lines_spoken": inc.lines_spoken,
             "last_line": next((text for role, text in reversed(store.history) if role == "system"), ""),
@@ -223,6 +226,7 @@ async def profile(body: ProfileIn) -> dict[str, Any]:
 
 def _persist_household(hh: Any) -> None:
     path = ROOT / "data" / household_filename()
+    pending: Path | None = None
     try:
         d = json.loads(path.read_text())
         d.update(
@@ -252,9 +256,19 @@ def _persist_household(hh: Any) -> None:
                 ],
             }
         )
-        path.write_text(json.dumps(d, indent=2) + "\n")
-    except OSError as e:
-        print(f"household not persisted: {e}")
+        # Replace the previous save only after the complete new profile is on disk.
+        with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, prefix=".household-", delete=False) as output:
+            pending = Path(output.name)
+            output.write(json.dumps(d, indent=2) + "\n")
+            output.flush()
+            os.fsync(output.fileno())
+        pending.replace(path)
+    except (OSError, ValueError) as error:
+        print(f"household not persisted: {type(error).__name__}")
+        raise HTTPException(500, "Could not save care details. Please try again.") from None
+    finally:
+        if pending is not None:
+            pending.unlink(missing_ok=True)
 
 
 @router.post("/voice/samples/{kind}")

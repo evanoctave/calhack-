@@ -209,6 +209,50 @@ def test_test_call_needs_a_dialable_member_and_twilio(client, monkeypatch):
     assert "test call" in client.post("/twiml/test/" + made["member_id"]).text.lower()
 
 
+@pytest.mark.parametrize("acknowledged", [False, True])
+def test_family_can_confirm_safe_return_without_claiming_camera_detection(client, acknowledged):
+    client.post("/care/demo/start")
+    client.post("/care/demo/leave")
+    client.post("/event", json={"kind": "door_close"})
+    inc = api.store.inc
+    body = {"incident_id": inc.id, "member_id": "TM-PRIMARY"}
+    if acknowledged:
+        client.post("/ack", json=body)
+    assert inc.person_in_frame is False
+    assert client.post("/care/confirm-return", json={**body, "member_id": "unknown"}).status_code == 403
+    assert client.post("/care/confirm-return", json={**body, "incident_id": "old"}).status_code == 409
+    # The generic camera-event route cannot bypass care-circle validation.
+    assert client.post("/event", json={"kind": "confirm_return", "payload": body}).status_code == 422
+    assert client.post("/care/confirm-return", json=body).json()["state"] == "RETURNED"
+    assert inc.returned_by == "TM-PRIMARY" and inc.person_in_frame is False
+    assert api.store.runner.live() == 0
+    state = client.get("/app/state").json()["incident"]
+    assert state["returned_by_name"] == api.store.hh.member("TM-PRIMARY").name
+    assert api.store.quiet_until > api.store.now()
+    from nightfall import history
+
+    records = [row for row in history.load() if row["incident_id"] == inc.id]
+    assert len(records) == 1 and records[0]["outcome"] == "returned"
+    transitions = sum(e.get("kind") == "confirm_return" for e in api.store.log)
+    assert client.post("/care/confirm-return", json=body).status_code == 200
+    assert sum(e.get("kind") == "confirm_return" for e in api.store.log) == transitions
+    assert client.post("/event", json={"kind": "person_enter"}).json().get("ignored") == "quiet after family ack"
+
+
+def test_old_return_confirmation_cannot_close_a_new_search(client):
+    client.post("/care/demo/start")
+    client.post("/care/demo/leave")
+    client.post("/event", json={"kind": "door_close"})
+    old_id = api.store.inc.id
+    client.post("/event", json={"kind": "person_back"})
+    client.post("/care/demo/start")
+    new_id = api.store.inc.id
+    assert new_id != old_id
+    response = client.post("/care/confirm-return", json={"incident_id": old_id, "member_id": "TM-PRIMARY"})
+    assert response.status_code == 409
+    assert api.store.inc.id == new_id and api.store.inc.state.value == "CONVERSATION"
+
+
 def test_phone_numbers_normalize_and_old_saved_numbers_load_dialable(tmp_path):
     import json
 

@@ -33,6 +33,11 @@ The browser uses its own incoming-call overlay.
 “I'm on it” acknowledges responsibility and stops the call ladder. It does not report a return.
 The server's `RETURNED` state supplies the separate return confirmation. Opening an SMS brief and answering an agent call remain separate entry points. Timings come from the server, including shortened demo timers.
 
+**Back to night watch** leaves the search active and shows a home card to reopen the brief. Automatic state updates
+respect that choice for the current incident; a new incident can still raise an alert. **Confirm back home** asks
+the caregiver to confirm a safe return, then stops pending calls, records who confirmed, and returns to night watch.
+This family confirmation does not claim the camera saw the person. Both actions are available from a shared brief.
+
 ## Implementation
 
 - `static/app-tokens.css`: Soft Glass values and light/dark appearance.
@@ -47,7 +52,15 @@ Figma decoration and icons are local under `static/assets/figma/`; recorded imag
 The existing Leaflet version and its license are served locally under `static/vendor/leaflet/`.
 Camera images, map markers, and incident facts remain dynamic. Maps are a search reference, not live tracking.
 
-Photos are stored in ignored `out/profile/`. Household persistence saves the photo URL, relationship, contact order, and familiar places. Invitations open `/app?member=<id>`.
+The caregiver brief and shared brief list nearby open places with their distance, address, and visible phone number.
+Tap a number to call. Listings with unconfirmed hours or missing numbers say so; known closed places are excluded
+from this list. Results that finish loading after an exit appear when the brief refreshes.
+
+Photos are stored in ignored `out/profile/`. Household persistence saves the person's name, age, appearance, diagnosis,
+doctor, photo URL, caregiver relationship, contact order, and familiar places to ignored `data/household.live.json`.
+The blank template initializes only a missing live file. Each successful **Save care details** replaces the previous
+details, including cleared fields; restarting loads the latest save. A failed save reports an error and keeps the
+previous file intact. `FRESH_START=0` selects the separate tracked demo household. Invitations open `/app?member=<id>`.
 Recordings use the existing ignored samples directory. The browser submits mono 16 kHz WAV, so recording review/save and concatenation work without FFmpeg. Other uploaded audio formats retain the existing FFmpeg conversion path.
 
 ## API additions
@@ -57,6 +70,7 @@ Recordings use the existing ignored samples directory. The browser submits mono 
 | POST / GET | `/care/photo` | Multipart `photo`, JPEG/PNG/WebP up to 5 MB; GET serves the current image. |
 | PUT | `/care/call-order` | `{member_ids:[...]}` includes every member once; saves order and tiers for subsequent incidents. |
 | POST | `/care/members` | `{name}` creates or reuses a web member and returns `member_id` and `invitation_url`. |
+| POST | `/care/confirm-return` | `{incident_id,member_id}` confirms a safe return for the current search; rejects non-members and stale incidents. |
 | PUT | `/care/places` | `{places:[{name,note?,lat?,lng?}]}`; geocodes new locations before applying changes. |
 | POST | `/care/demo/{scenario}` | Mock only: `start`, `leave`, `return`, `visitor`, `home`, `help`, `other-response`, `deadline`. |
 
@@ -67,6 +81,9 @@ Signed brief responses include incident state, acknowledgment/responder, server 
 
 Run `./run.sh check` for formatting, lint, and Python tests.
 `tests/test_care.py` covers upload round trips and validation, contact order, invitation reuse, atomic place updates, WAV recording without FFmpeg, mock-only controls, persistence, and acknowledgment versus emergency/return states.
+`tests/test_app.py` covers saving, editing, and clearing the monitored person's details across reloads, photo and contact
+retention, and failed writes preserving the previous saved profile. Browser verification also checks these profile
+edits across three full server-process restarts, using an isolated mock server and the real Save care details button.
 
 Browser checks cover light/dark layouts at 390 px and 320 px, polling during edits, a second phone invitation, consent/record/review/save retry, voice creation retry, voice selection, talk/listen/takeover, both return outcomes, a second caregiver's response, maps, and valid/invalid/expired shared briefs.
 Use an isolated mock server with temporary persistence for household details, photos, recordings, medical data, history, and voice settings.
