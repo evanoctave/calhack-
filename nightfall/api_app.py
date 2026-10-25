@@ -238,7 +238,10 @@ def _persist_household(hh: Any) -> None:
                 "home_lat": hh.home_lat,
                 "home_lng": hh.home_lng,
                 "tree": [
-                    {**m.__dict__, "phone": "web"} if os.environ.get(phone_env(m.id)) else m.__dict__ for m in hh.tree
+                    {**m.__dict__, "phone": "web"}
+                    if os.environ.get(phone_env(m.id)) or household_filename() == "household.json"
+                    else m.__dict__
+                    for m in hh.tree
                 ],
             }
         )

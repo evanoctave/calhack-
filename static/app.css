@@ -125,6 +125,7 @@ h1 { font: 700 30px/36px var(--font); margin: 0; letter-spacing: -0.022em; text-
 /* ---------- form ---------- */
 input, select, textarea { width: 100%; font-size: 16px; padding: 12px 14px; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--surface); color: var(--ink); transition: box-shadow var(--t-state) var(--ease), border-color var(--t-state) var(--ease); }
 input::placeholder, textarea::placeholder { color: var(--faint); }
+input::placeholder, textarea::placeholder { font-size: 13px; font-weight: 400; opacity: 0.75; }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--blue); box-shadow: var(--focus); }
 .field { display: block; padding: 11px 16px 12px; position: relative; transition: background var(--t-state) var(--ease); }
 .field + .field::before, .grid2 + .field::before, .field + .grid2::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: 1px solid var(--line); }

@@ -42,7 +42,7 @@ def ra(tmp_path, monkeypatch):
     spec.loader.exec_module(mod)
     (tmp_path / "data").mkdir()
     shutil.copy(REPO / "data" / "household.json", tmp_path / "data" / "household.json")
-    (tmp_path / "data" / "places.marina.json").write_text(json.dumps(FIXTURE))
+    (tmp_path / "data" / "places.sample.json").write_text(json.dumps(FIXTURE))
     monkeypatch.setattr(mod, "ROOT", tmp_path)
     monkeypatch.setattr(os, "environ", {})
     monkeypatch.setattr("sys.argv", ["run_actor.py"])
@@ -50,7 +50,7 @@ def ra(tmp_path, monkeypatch):
 
 
 def _out(ra) -> list[dict]:
-    return json.loads((ra.ROOT / "data" / "places.marina.live.json").read_text())
+    return json.loads((ra.ROOT / "data" / "places.sample.live.json").read_text())
 
 
 def test_load_env_reads_keys_skips_comments_and_keeps_existing(ra, tmp_path) -> None:

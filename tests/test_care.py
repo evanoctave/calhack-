@@ -162,3 +162,48 @@ def test_relationship_and_uploaded_photo_persist(tmp_path, monkeypatch):
     assert persisted["caregiver_relationship"] == "Daughter"
     assert persisted["person_photo"] == "/care/photo?v=example"
     assert persisted["familiar_places"] == list(hh.familiar_places)
+
+
+def test_invitation_keeps_relationship_and_phone(client):
+    assert client.post("/care/members", json={"name": "Uncle Al", "phone": "12"}).status_code == 422
+    made = client.post(
+        "/care/members", json={"name": "Uncle Al", "relationship": "Uncle", "phone": "(415) 555-0123"}
+    ).json()
+    member = next(m for m in api.store.hh.tree if m.id == made["member_id"])
+    assert (member.relationship, member.phone) == ("Uncle", "+14155550123")
+    tree = client.get("/app/state").json()["household"]["tree"]
+    assert next(m for m in tree if m["id"] == made["member_id"])["relationship"] == "Uncle"
+
+
+def test_member_can_be_removed_and_tiers_renumber(client):
+    made = client.post("/care/members", json={"name": "Cousin Pat"}).json()
+    before = len(api.store.hh.tree)
+    assert client.delete("/care/members/nope").status_code == 404
+    assert client.delete("/care/members/" + made["member_id"]).status_code == 200
+    assert len(api.store.hh.tree) == before - 1
+    assert [m.tier for m in api.store.hh.tree] == [min(i + 1, 3) for i in range(before - 1)]
+
+
+def test_address_suggest_needs_a_real_query_and_survives_lookup_failure(client, monkeypatch):
+    assert client.get("/care/address-suggest?q=ab").json() == {"suggestions": []}
+    monkeypatch.setattr(api_care.geocode, "suggest", lambda q: ["1 Main St, Town, Country"])
+    assert client.get("/care/address-suggest?q=1 main").json()["suggestions"] == ["1 Main St, Town, Country"]
+    monkeypatch.setattr(api_care.geocode, "suggest", lambda q: (_ for _ in ()).throw(RuntimeError("down")))
+    assert client.get("/care/address-suggest?q=1 main").json() == {"suggestions": []}
+
+
+def test_test_call_needs_a_dialable_member_and_twilio(client, monkeypatch):
+    from nightfall.integrations import twilio
+
+    assert client.post("/care/test-call", json={"member_id": "nope"}).status_code == 404
+    made = client.post("/care/members", json={"name": "Aunt Bea"}).json()
+    assert client.post("/care/test-call", json={"member_id": made["member_id"]}).status_code == 422
+    client.post("/care/members", json={"name": "Aunt Bea", "phone": "415-555-0123"})
+    monkeypatch.setattr(twilio, "enabled", lambda: False)
+    assert client.post("/care/test-call", json={"member_id": made["member_id"]}).status_code == 409
+    placed = []
+    monkeypatch.setattr(twilio, "enabled", lambda: True)
+    monkeypatch.setattr(twilio, "create_call", lambda to, url: placed.append((to, url)) or "CA1")
+    assert client.post("/care/test-call", json={"member_id": made["member_id"]}).json()["called"] == "Aunt Bea"
+    assert placed[0][0] == "+14155550123" and placed[0][1].endswith("/twiml/test/" + made["member_id"])
+    assert "test call" in client.post("/twiml/test/" + made["member_id"]).text.lower()

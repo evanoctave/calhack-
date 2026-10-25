@@ -1,0 +1,112 @@
+[
+ {
+  "category": "convenience",
+  "name": "Fuel 24:7 - Lombard",
+  "lat": 37.7985302,
+  "lng": -122.4445552,
+  "distance_mi": 0.37,
+  "hours": "24/7",
+  "phone": "(415) 921-1132",
+  "address": "2601 Lombard St, San Francisco, CA 94123",
+  "source": "apify"
+ },
+ {
+  "category": "convenience",
+  "name": "The Hollow Cow Market",
+  "lat": 37.7986279,
+  "lng": -122.4376476,
+  "distance_mi": 0.66,
+  "hours": "08:00-00:00",
+  "phone": "(415) 346-5661",
+  "address": "3165 Steiner St, San Francisco, CA 94123",
+  "source": "apify"
+ },
+ {
+  "category": "convenience",
+  "name": "Chevron",
+  "lat": 37.8007652,
+  "lng": -122.4309557,
+  "distance_mi": 0.96,
+  "hours": "24/7",
+  "phone": "(415) 922-4922",
+  "address": "1790 Lombard St, San Francisco, CA 94123",
+  "source": "apify"
+ },
+ {
+  "category": "convenience",
+  "name": "ExtraMile",
+  "lat": 37.8007748,
+  "lng": -122.4309554,
+  "distance_mi": 0.96,
+  "hours": "24/7",
+  "phone": "(415) 922-4922",
+  "address": "1790 Lombard St, San Francisco, CA 94123",
+  "source": "apify"
+ },
+ {
+  "category": "convenience",
+  "name": "Walgreens",
+  "lat": 37.8003005,
+  "lng": -122.4385285,
+  "distance_mi": 0.57,
+  "hours": "07:00-22:00",
+  "phone": "(415) 567-9320",
+  "address": "2141 Chestnut St, San Francisco, CA 94123",
+  "source": "apify"
+ },
+ {
+  "category": "fuel",
+  "name": "Lombard 76",
+  "lat": 37.7992509,
+  "lng": -122.4424453,
+  "distance_mi": 0.41,
+  "hours": "24/7",
+  "phone": "(415) 931-4040",
+  "address": "2498 Lombard St, San Francisco, CA 94123",
+  "source": "apify"
+ },
+ {
+  "category": "fuel",
+  "name": "Shell",
+  "lat": 37.800617,
+  "lng": -122.4314838,
+  "distance_mi": 0.94,
+  "hours": "24/7",
+  "phone": "(415) 346-8063",
+  "address": "1800 Lombard St, San Francisco, CA 94123",
+  "source": "apify"
+ },
+ {
+  "category": "pharmacy",
+  "name": "Walgreens Pharmacy",
+  "lat": 37.8003726,
+  "lng": -122.4384568,
+  "distance_mi": 0.57,
+  "hours": "09:00-17:00",
+  "phone": "(415) 567-9320",
+  "address": "2141 Chestnut St, San Francisco, CA 94123",
+  "source": "apify"
+ },
+ {
+  "category": "pharmacy",
+  "name": "Safeway Pharmacy",
+  "lat": 37.8044755,
+  "lng": -122.432802,
+  "distance_mi": 0.86,
+  "hours": "09:00-17:00",
+  "phone": "(415) 563-8681",
+  "address": "15 Marina Blvd, San Francisco, CA 94123",
+  "source": "apify"
+ },
+ {
+  "category": "hospital",
+  "name": "UCSF Health-GoHealth Urgent Care",
+  "lat": 37.7990429,
+  "lng": -122.440741,
+  "distance_mi": 0.5,
+  "hours": "08:00-20:00",
+  "phone": "(415) 796-2242",
+  "address": "2395 Lombard St, San Francisco, CA 94123",
+  "source": "apify"
+ }
+]
