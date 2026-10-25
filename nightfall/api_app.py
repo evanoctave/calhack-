@@ -22,7 +22,7 @@ from starlette.datastructures import UploadFile
 from nightfall import llm, voice
 from nightfall.household import phone_env
 from nightfall.integrations import cartesia
-from nightfall.store import ROOT
+from nightfall.store import ROOT, household_filename
 
 router = APIRouter()
 SAMPLES = Path(os.environ.get("SAMPLES_DIR", "out/samples"))
@@ -187,7 +187,7 @@ class ProfileIn(BaseModel):
 
 @router.post("/profile")
 async def profile(body: ProfileIn) -> dict[str, Any]:
-    """Update the care profile; geocodes a new address (hazards only, no Apify spend); persists to data/household.json."""
+    """Update the care profile; geocodes a new address (hazards only, no Apify spend); persists to the household file."""
     store = _store()
     changes = {k: v for k, v in body.model_dump().items() if v is not None and k != "address"}
     if "person_age" in changes and not 0 <= changes["person_age"] <= 120:
@@ -218,7 +218,7 @@ async def profile(body: ProfileIn) -> dict[str, Any]:
 
 
 def _persist_household(hh: Any) -> None:
-    path = ROOT / "data" / "household.json"
+    path = ROOT / "data" / household_filename()
     try:
         d = json.loads(path.read_text())
         d.update(

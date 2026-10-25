@@ -238,7 +238,8 @@ function onEvent(e) {
   $("h-edge").addEventListener("change", () => { try { localStorage.setItem("nf-door-edge-phone", $("h-edge").value); } catch (e) {} });
   document.querySelectorAll("#cam-edge button").forEach(b => b.addEventListener("click", () => { $("h-edge").value = b.dataset.e; $("h-edge").dispatchEvent(new Event("change")); syncEdge(); }));
   syncEdge();
-  try { if (localStorage.getItem("nf-armed")) {} } catch (e) {}
+  // Browsers only allow sound after a tap, so unlock it on the first tap anywhere instead of gating the app.
+  document.addEventListener("pointerdown", () => enableSound(), {once: true});
   show(new URLSearchParams(location.search).has("join") ? "join" : location.hash.slice(1) || (S.household.person_full_name ? "home" : "setup"));
 })();
 

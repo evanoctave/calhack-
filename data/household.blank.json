@@ -1,0 +1,15 @@
+{
+  "id": "HH-1",
+  "person_name": "",
+  "person_photo": "",
+  "caregiver_name": "",
+  "night_start": "21:00",
+  "night_end": "06:00",
+  "home_lat": 0,
+  "home_lng": 0,
+  "radius_mi": 1.5,
+  "meds_opt_in": false,
+  "tree": [
+    { "id": "TM-PRIMARY", "name": "", "phone": "", "tier": 1 }
+  ]
+}

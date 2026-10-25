@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 os.environ["MOCK"] = "1"
+os.environ["FRESH_START"] = "0"  # tests use the tracked demo household
 for key in (
     "ANTHROPIC_API_KEY",
     "CARTESIA_API_KEY",

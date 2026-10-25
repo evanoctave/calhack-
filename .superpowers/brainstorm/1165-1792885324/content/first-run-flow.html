@@ -1,0 +1,61 @@
+<h2>First-time setup: which shape feels right?</h2>
+<p class="subtitle">Both collect the same info. A is one small question group per screen. B is a single scrolling form. (My guess at the content, correct anything.)</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Guided steps, one topic per screen</h3>
+      <p>Progress dots on top, one Continue button, Skip allowed on optional steps.</p>
+      <div style="display:flex;gap:10px;margin-top:12px;overflow-x:auto;padding-bottom:6px">
+
+        <div class="mockup" style="min-width:150px"><div class="mockup-header">1 · You</div><div class="mockup-body" style="font-size:12px">
+          <div style="color:#888">● ○ ○ ○ ○</div>
+          <b>Welcome. Who's looking after someone?</b>
+          <input class="mock-input" placeholder="Your name"><input class="mock-input" placeholder="Phone number">
+          <button class="mock-button">Continue</button></div></div>
+
+        <div class="mockup" style="min-width:150px"><div class="mockup-header">2 · Who</div><div class="mockup-body" style="font-size:12px">
+          <div style="color:#888">○ ● ○ ○ ○</div>
+          <b>Who are you caring for?</b>
+          <input class="mock-input" placeholder="Full name"><input class="mock-input" placeholder="What you call them (Dad)"><input class="mock-input" placeholder="Age">
+          <div class="placeholder" style="height:36px">Add a recent photo</div>
+          <button class="mock-button">Continue</button></div></div>
+
+        <div class="mockup" style="min-width:150px"><div class="mockup-header">3 · Details</div><div class="mockup-body" style="font-size:12px">
+          <div style="color:#888">○ ○ ● ○ ○</div>
+          <b>What would a responder need to know?</b>
+          <input class="mock-input" placeholder="Height / hair / build"><input class="mock-input" placeholder="Conditions, e.g. dementia"><input class="mock-input" placeholder="Medications">
+          <button class="mock-button">Continue</button></div></div>
+
+        <div class="mockup" style="min-width:150px"><div class="mockup-header">4 · Family</div><div class="mockup-body" style="font-size:12px">
+          <div style="color:#888">○ ○ ○ ● ○</div>
+          <b>Who should we call first?</b>
+          <div class="placeholder" style="height:26px">1 · You</div><div class="placeholder" style="height:26px">2 · + Add someone</div>
+          <button class="mock-button">Continue</button></div></div>
+
+        <div class="mockup" style="min-width:150px"><div class="mockup-header">5 · Home</div><div class="mockup-body" style="font-size:12px">
+          <div style="color:#888">○ ○ ○ ○ ●</div>
+          <b>Where do they live?</b>
+          <input class="mock-input" placeholder="Home address">
+          <div class="placeholder" style="height:36px">Search radius 1.5 mi</div>
+          <button class="mock-button">Start night watch</button></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>One scrolling form</h3>
+      <p>All five topics as sections on one page, one Start night watch button at the bottom.</p>
+      <div class="mockup" style="max-width:170px;margin-top:12px"><div class="mockup-header">Set up Nightfall</div><div class="mockup-body" style="font-size:12px">
+        <b>You</b><input class="mock-input" placeholder="Name">
+        <b>Who you care for</b><input class="mock-input" placeholder="Name, age, photo">
+        <b>What responders need</b><input class="mock-input" placeholder="Details, medical">
+        <b>Family to call</b><input class="mock-input" placeholder="Add people">
+        <b>Home</b><input class="mock-input" placeholder="Address">
+        <button class="mock-button">Start night watch</button></div></div>
+    </div>
+  </div>
+</div>
