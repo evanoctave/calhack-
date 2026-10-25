@@ -81,6 +81,18 @@ async def call_order(body: CallOrderIn) -> dict:
     return {"ok": True, "tree": [m.__dict__ for m in tree]}
 
 
+def _e164(raw: str) -> str:
+    """Twilio only dials +country-code numbers: 10 digits or 1 + 10 digits are taken as US, anything else needs a +."""
+    digits = "".join(c for c in raw if c.isdigit())
+    if raw.strip().startswith("+") and 8 <= len(digits) <= 15:
+        return "+" + digits
+    if len(digits) == 10:
+        return "+1" + digits
+    if len(digits) == 11 and digits.startswith("1"):
+        return "+" + digits
+    raise HTTPException(422, "Enter a full phone number. Outside the US, start with + and the country code.")
+
+
 class MemberIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     relationship: str = Field(default="", max_length=60)
@@ -94,8 +106,8 @@ async def add_member(body: MemberIn, request: Request) -> dict:
     if not name:
         raise HTTPException(422, "Enter a name.")
     relationship, phone = body.relationship.strip(), body.phone.strip()
-    if phone and not 7 <= sum(c.isdigit() for c in phone) <= 15:
-        raise HTTPException(422, "Enter a valid phone number.")
+    if phone:
+        phone = _e164(phone)
     existing = next((m for m in store.hh.tree if m.name.casefold() == name.casefold()), None)
     if existing is None:
         existing = TreeMember(

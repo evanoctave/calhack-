@@ -170,7 +170,7 @@ def test_invitation_keeps_relationship_and_phone(client):
         "/care/members", json={"name": "Uncle Al", "relationship": "Uncle", "phone": "(415) 555-0123"}
     ).json()
     member = next(m for m in api.store.hh.tree if m.id == made["member_id"])
-    assert (member.relationship, member.phone) == ("Uncle", "(415) 555-0123")
+    assert (member.relationship, member.phone) == ("Uncle", "+14155550123")
     tree = client.get("/app/state").json()["household"]["tree"]
     assert next(m for m in tree if m["id"] == made["member_id"])["relationship"] == "Uncle"
 
