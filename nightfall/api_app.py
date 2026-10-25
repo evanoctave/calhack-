@@ -67,6 +67,7 @@ async def app_state(member: str = "") -> dict[str, Any]:
             "person_age": hh.person_age,
             "caregiver_name": hh.caregiver_name,
             "caregiver_relationship": hh.caregiver_relationship,
+            "person_relationship": hh.person_relationship,
             "address": hh.address,
             "photo": hh.person_photo,
             "radius_mi": hh.radius_mi,
@@ -179,6 +180,7 @@ class ProfileIn(BaseModel):
     person_age: int | None = None
     caregiver_name: str | None = None
     caregiver_relationship: str | None = None
+    person_relationship: str | None = None
     address: str | None = None
     description: dict[str, str] | None = None
     diagnosis: str | None = None
@@ -227,6 +229,7 @@ def _persist_household(hh: Any) -> None:
                 "person_age": hh.person_age,
                 "caregiver_name": hh.caregiver_name,
                 "caregiver_relationship": hh.caregiver_relationship,
+                "person_relationship": hh.person_relationship,
                 "person_photo": hh.person_photo,
                 "familiar_places": list(hh.familiar_places),
                 "person_name": hh.person_name,

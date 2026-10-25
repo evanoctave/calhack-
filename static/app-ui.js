@@ -1,8 +1,9 @@
 // Caregiver app: hash router, state polling + SSE, screen renderers. Voice/recording lives in app-voice.js.
 let S = null, member = "", incident = null, feedTimer = null, mapObj = null, mapLayer = null, soundOn = false, acked = false;
 function $(id) { return document.getElementById(id); }
+function pickPersonRelation() { const rel = $("p-prel").value, short = $("p-short"); if (rel && rel !== "Other" && (!short.value.trim() || short.dataset.auto === "1")) { short.value = rel; short.dataset.auto = "1"; } careDrafts.add("s-profile"); }
 function go(name) { location.hash = "#" + name; }
-const SCREENS = ["setup", "profile", "medical", "report", "voice", "voices", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "takeover", "brief", "search", "responding", "back", "emergency", "help", "record", "review", "creating", "voice-preview", "join"];
+const SCREENS = ["setup", "profile", "medical", "report", "voice", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "takeover", "brief", "search", "responding", "back", "emergency", "help", "record", "review", "creating", "voice-preview", "join"];
 const navStack = [];
 function show(name) {
   if (name === "respond") name = "call";
@@ -21,7 +22,6 @@ function show(name) {
   if (name === "record") recordConsent();
   if (name === "brief") setTimeout(renderMap, 50);
   if (name === "area") setTimeout(renderArea, 50);
-  if (name === "voices") loadVoices();
   if (name === "medical") loadMedical();
   if (name === "report") loadReport();
   window.scrollTo(0, 0);
@@ -73,7 +73,8 @@ function render() {
   $("p-places").innerHTML = h.familiar_places.map(p => { const [n, ...rest] = p.name.split(", "); return `<div class="row"><div><span class="k">${esc(n)}</span>${rest.length ? `<span class="sub2">${esc(cap(rest.join(", ")))}</span>` : ""}</div></div>`; }).join("") || '<div class="row"><span class="muted">None yet</span></div>';
   renderCallOrder();
   $("p-ladder").textContent = h.tree.length > 1 ? `If ${h.tree[0].name} does not answer in ${S.ladder_step_s} sec, we call ${h.tree[1].name}.` : "";
-  $("v-owner").textContent = h.caregiver_name + "'s voice";
+  $("v-owner").textContent = h.caregiver_name ? h.caregiver_name + "'s voice" : "Your voice";
+  if (document.activeElement !== $("v-name") && !careDrafts.has("v-name")) $("v-name").value = h.caregiver_name || "";
   renderSamples();
   // alert
   const first = h.person_full_name.split(" ")[0] || h.person_name;
@@ -190,7 +191,7 @@ async function saveProfile() {
   const description = {}; ["sex", "height", "weight", "hair", "eyes", "build", "marks"].forEach(k => { description[k] = $("p-" + k).value.trim(); });
   $("profile-status").textContent = "Saving…";
   try {
-    await requestJSON("/profile", {person_full_name: $("p-name").value.trim(), person_name: $("p-short").value.trim(), person_age: $("p-age").value === "" ? undefined : Number($("p-age").value), caregiver_name: $("p-care").value.trim(), caregiver_relationship: $("p-relationship").value.trim(), description, diagnosis: $("p-diag").value.trim(), doctor: {name: $("p-docname").value.trim(), phone: $("p-docphone").value.trim()}});
+    await requestJSON("/profile", {person_full_name: $("p-name").value.trim(), person_name: $("p-short").value.trim(), person_age: $("p-age").value === "" ? undefined : Number($("p-age").value), caregiver_name: $("p-care").value.trim(), caregiver_relationship: $("p-relationship").value.trim(), person_relationship: $("p-prel").value, description, diagnosis: $("p-diag").value.trim(), doctor: {name: $("p-docname").value.trim(), phone: $("p-docphone").value.trim()}});
     careDrafts.delete("s-profile"); await refresh(); $("profile-status").textContent = ""; toast("Care details saved."); go("setup");
   } catch (error) { $("profile-status").textContent = error.message; }
 }
@@ -205,7 +206,7 @@ function enableSound() { if (soundOn) return; soundOn = true; try { const a = $(
 function armPhone() { enableSound(); $("arm").hidden = true; renderCareStatus(); try { localStorage.setItem("nf-armed", "1"); } catch (e) {} }
 function showArm() { $("arm").hidden = false; }
 let rungFor = ""; let lastRingMsg = "";
-function showIncoming(msg) { const who = (S && S.household.person_name) || "Dad"; $("inc-title").textContent = /help button/i.test(msg || "") ? "Help requested at the door" : who + " has left home"; $("inc-ctx").textContent = who + "'s care circle"; $("inc-msg").textContent = msg || ""; $("incoming").hidden = false; }
+function showIncoming(msg) { const who = (S && (S.household.person_name || S.household.person_relationship)) || "They"; $("inc-title").textContent = /help button/i.test(msg || "") ? "Help requested at the door" : who + " has left home"; $("inc-ctx").textContent = who + "'s care circle"; $("inc-msg").textContent = msg || ""; $("incoming").hidden = false; }
 function answerFromOverlay() { $("incoming").hidden = true; answerCall(); }
 function dismissOverlay() { $("incoming").hidden = true; stopRing(); go("alert"); }
 function ringNow(incId, msg) { if (rungFor === incId) return; rungFor = incId; incident = incId; lastRingMsg = msg; startRing(); showIncoming(msg); fillIncoming(); }
@@ -247,13 +248,13 @@ function onEvent(e) {
 function meName() { const m = S.household.tree.find(t => t.id === member); return m ? m.name : S.household.caregiver_name; }
 function mmss(sec) { sec = Math.max(0, Math.round(sec)); return String(Math.floor(sec / 60)).padStart(2, "0") + ":" + String(sec % 60).padStart(2, "0"); }
 function renderFigma() {
-  const h = S.household, inc = S.incident, p = h.person_name || "Dad", first = (h.person_full_name || "").split(" ")[0] || p, me = meName();
+  const h = S.household, inc = S.incident, p = h.person_name || h.person_relationship || "Them", first = (h.person_full_name || "").split(" ")[0] || p, me = meName();
   const tree = h.tree, others = tree.filter(m => m.id !== member).map(m => m.name);
   // setup hub
   $("su-sub").textContent = p + "'s care, in one place.";
   $("su-person").textContent = `${p} (${first})` + (h.person_age ? ", " + h.person_age : "");
   $("su-person2").textContent = [h.caregiver_name, h.caregiver_relationship, "Care details"].filter(Boolean).join(" · ");
-  $("su-voice").textContent = S.voice.source === "clone" ? (S.voice.name || h.caregiver_name) + "'s cloned voice" : S.voice.name ? S.voice.name + (S.voice.source === "mock" ? " · Demo voice" : " · Ready-made voice") : "Record or choose a familiar voice";
+  $("su-voice").textContent = S.voice.source === "clone" ? (S.voice.name || h.caregiver_name) + "'s cloned voice" : S.voice.name ? S.voice.name + (S.voice.source === "mock" ? " · Demo voice" : " · Voice") : "Record or choose a familiar voice";
   $("su-calls").textContent = tree.map((m, i) => (i + 1) + " " + m.name).join(" → ");
   $("su-places").textContent = (h.address || "Home") + " · " + h.radius_mi + " mi";
   const rad = pickRadius ?? h.radius_mi; $("pl-radius").textContent = rad + " mi around home"; renderRadius(rad); $("ar-sub").textContent = (h.address || "Home") + " · " + h.radius_mi + " mi around home";
@@ -342,13 +343,3 @@ async function renderArea(st) {
   $("ar-calllist").innerHTML = placeRows(open.slice(0, 6), st.apify === "running" ? "Still searching with Apify…" : "No late-night places found yet", x => cap(x.category) + (x.hours ? " · " + x.hours : "") + (x.phone ? " · " + x.phone : ""));
   $("ar-haz").textContent = hz.length; $("ar-call").textContent = st.open || open.length; setTimeout(() => areaMap.invalidateSize(), 100);
 }
-let voiceList = [], voiceCatalog = [], voicePick = null, voiceAudio = null, previewStyle = "natural";
-async function loadVoices() {
-  if (!voiceList.length) { try { voiceCatalog = await (await fetch("/samples/index.json")).json(); voiceList = voiceCatalog.filter(v => v.variant === "natural"); if (voicePick === null) { const index = voiceList.findIndex(v=>v.id === S.voice.voice_id); if (index >= 0) voicePick = index; } } catch (e) { voiceList = []; } }
-  $("vl-list").innerHTML = voiceList.map((v, i) => `<div class="row"><div><span class="k">${esc(v.name.replace(" (current)", ""))}</span><span class="sub2">English${voicePick === i ? " · Selected" : ""}</span></div><span class="inline"><a onclick="playVoice(${i})" style="cursor:pointer;font-weight:500">Play</a><a onclick="pickVoice(${i})" style="cursor:pointer;font-weight:600;margin-left:14px">${voicePick === i ? "&#10003;" : "Pick"}</a></span></div>`).join("") || '<div class="row"><span class="muted">No voices available.</span></div>';
-  $("vl-use").disabled = voicePick === null; $("vl-use").textContent = voicePick === null ? "Use this voice" : "Use " + voiceList[voicePick].name.replace(" (current)", "");
-}
-function setPreviewStyle(style) { previewStyle = style; $("vl-natural").classList.toggle("on",style === "natural"); $("vl-warm").classList.toggle("on",style === "warm"); }
-function playVoice(i) { if (voiceAudio) voiceAudio.pause(); const sample = voiceCatalog.find(v=>v.id === voiceList[i].id && v.variant === previewStyle) || voiceList[i]; voiceAudio = new Audio(sample.file); voiceAudio.playbackRate = Number($("vl-speed").value); voiceAudio.play().catch(() => toast("Could not play this preview.")); }
-function pickVoice(i) { voicePick = i; loadVoices(); }
-async function useVoice() { const v = voiceList[voicePick]; if (!v) return; await requestJSON("/voice/select", {voice_id: v.id, name: v.name.replace(" (current)",""), speed: Number($("vl-speed").value), emotion: $("vl-emotion").value}); await refresh(); go("setup"); }

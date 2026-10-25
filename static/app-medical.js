@@ -20,7 +20,7 @@ async function loadMedical() {
   await fetchMedical(); if (!S) await refresh();
   const m = Med.rec, h = S.household, d = h.description || {};
   $("md-sample").hidden = !m.sample;
-  $("md-sub").textContent = "What paramedics and the ER will ask about " + (h.person_name || "Dad") + ".";
+  $("md-sub").textContent = "What paramedics and the ER will ask about " + (h.person_name || h.person_relationship || "them") + ".";
   $("md-name").value = h.person_full_name || ""; $("md-short").value = h.person_name || ""; $("md-dob").value = m.date_of_birth || "";
   $("md-height").value = d.height || ""; $("md-weight").value = d.weight || "";
   for (const [id, k] of Object.entries(MD_FIELDS)) $(id).value = m[k] || "";

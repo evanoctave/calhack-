@@ -29,7 +29,7 @@ document.addEventListener("input", event => {
 function hydrateCareForms() {
   const h = S.household;
   if (!careDrafts.has("s-profile")) {
-    const values = {"p-name": h.person_full_name, "p-short": h.person_name, "p-age": h.person_age || "", "p-care": h.caregiver_name, "p-relationship": h.caregiver_relationship, "p-diag": h.diagnosis, "p-docname": h.doctor?.name, "p-docphone": h.doctor?.phone};
+    const values = {"p-name": h.person_full_name, "p-short": h.person_name, "p-age": h.person_age || "", "p-care": h.caregiver_name, "p-relationship": h.caregiver_relationship, "p-prel": h.person_relationship, "p-diag": h.diagnosis, "p-docname": h.doctor?.name, "p-docphone": h.doctor?.phone};
     for (const key of ["sex", "height", "weight", "hair", "eyes", "build", "marks"]) values["p-" + key] = h.description?.[key];
     for (const [id, value] of Object.entries(values)) $(id).value = value || "";
   }

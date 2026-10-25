@@ -46,6 +46,7 @@ class Household:
     diagnosis: str = ""
     doctor: dict[str, str] = field(default_factory=dict)  # name, phone
     caregiver_relationship: str = ""
+    person_relationship: str = ""
 
     def members_at(self, tier: int) -> list[TreeMember]:
         """Tree members at exactly this tier."""
@@ -106,4 +107,5 @@ def load(path: str | Path) -> Household:
         diagnosis=str(raw.get("diagnosis", "")),
         doctor={k: str(v) for k, v in dict(raw.get("doctor", {})).items()},
         caregiver_relationship=str(raw.get("caregiver_relationship", "")),
+        person_relationship=str(raw.get("person_relationship", "")),
     )

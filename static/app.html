@@ -11,7 +11,7 @@
 <!-- ============ SET UP ============ -->
 
 <section id="s-setup" class="screen">
-  <header class="head"><p class="eyebrow">NIGHTFALL</p><h1>Ready for tonight</h1><p class="sub" id="su-sub">Dad's care, in one place.</p></header>
+  <header class="head"><p class="eyebrow">NIGHTFALL</p><h1>Ready for tonight</h1><p class="sub" id="su-sub">Care, in one place.</p></header>
   <div class="setup-links">
     <button class="setup-link" onclick="go('profile')"><span><b id="su-person">Dad (Robert), 78</b><small id="su-person2">Care details</small></span></button>
     <button class="setup-link" onclick="go('voice')"><span><b>Family voice</b><small id="su-voice">Record or choose a familiar voice</small></span></button>
@@ -24,10 +24,10 @@
 </section>
 
 <section id="s-profile" class="screen">
-  <header class="head"><a class="back" onclick="go('setup')">Setup</a><h1>Who are we caring for?</h1><p class="sub">Start with Dad's details and your relationship.</p></header>
+  <header class="head"><a class="back" onclick="go('setup')">Setup</a><h1>Who are we caring for?</h1><p class="sub">Start with their details and your relationship.</p></header>
   <div class="card pad"><p class="cap">Person you care for</p>
-    <div class="lead mt"><button class="photo-picker" type="button" onclick="document.getElementById('p-photo').click()" aria-label="Add or change profile photo"><span class="avatar" id="pf-avatar"><img src="/assets/figma/camera.svg" alt=""></span></button><input id="p-photo" type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="uploadPhoto(this)"><div class="profile-fields" style="flex:1"><input aria-label="Full name" id="p-name" placeholder="Robert Miller" style="font-weight:600"><div class="inline mt"><input aria-label="Preferred name" id="p-short" placeholder="Dad"><input aria-label="Age" id="p-age" type="number" inputmode="numeric" placeholder="78" style="width:84px"></div></div></div>
-    <p class="cap mt">Use a clear, recent photo to help your family recognize him.</p></div>
+    <div class="lead mt"><button class="photo-picker" type="button" onclick="document.getElementById('p-photo').click()" aria-label="Add or change profile photo"><span class="avatar" id="pf-avatar"><img src="/assets/figma/camera.svg" alt=""></span></button><input id="p-photo" type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="uploadPhoto(this)"><div class="profile-fields" style="flex:1"><input aria-label="Full name" id="p-name" placeholder="Robert Miller" style="font-weight:600"><select aria-label="Their relationship to you" id="p-prel" class="mt" onchange="pickPersonRelation()"><option value="">Their relationship to you</option><option>Dad</option><option>Mom</option><option>Grandpa</option><option>Grandma</option><option>Husband</option><option>Wife</option><option>Brother</option><option>Sister</option><option>Friend</option><option>Other</option></select><div class="inline mt"><input aria-label="Preferred name" id="p-short" placeholder="What you call them"><input aria-label="Age" id="p-age" type="number" inputmode="numeric" placeholder="78" style="width:84px"></div></div></div>
+    <p class="cap mt">Use a clear, recent photo to help your family recognize them.</p></div>
   <div class="card"><label class="field"><span class="lbl">Your name</span><input id="p-care" placeholder="Sarah Miller"></label><label class="field"><span class="lbl">Your relationship</span><input id="p-relationship" placeholder="Daughter, son, neighbor…"></label></div>
   <div class="card"><div class="row"><span class="k">Medications</span></div><div id="pf-meds"></div></div>
   <p class="label">What police ask for</p>
@@ -75,10 +75,10 @@
 <section id="s-voice" class="screen">
   <header class="head"><a class="back" onclick="go('setup')">Setup</a><h1>A familiar AI voice</h1><p class="sub">Record a few samples of your voice.</p></header>
   <div class="topline"><span class="k" id="v-owner">Your voice</span><span class="cap" id="v-count">0 samples</span></div>
+  <div class="card"><label class="field"><span class="lbl">Your name</span><input id="v-name" placeholder="Sarah" autocomplete="given-name" onchange="saveVoiceName()"></label></div>
   <div class="card" id="v-samples"></div>
   <p class="cap">AI uses your samples to create new sentences and choose a reassuring tone.</p>
-  <button class="text-btn" id="v-preview-link" onclick="go('voice-preview')" hidden>Listen to your family AI voice</button>
-  <div class="actions"><button class="btn" onclick="go('voices')">Choose a ready-made voice</button><button class="btn primary" onclick="pickSample('introduction')">Record a voice sample</button><button class="btn" id="v-clone" onclick="cloneVoice()" disabled>Create family AI voice</button></div>
+  <div class="actions"><button class="btn primary" id="v-clone" onclick="cloneVoice()" disabled>Create AI voice</button></div>
 </section>
 <section id="s-record" class="screen">
   <header class="head"><a class="back" onclick="leaveRecording()">Family voice</a><h1>Record a voice sample</h1><p class="sub">Use your usual, comfortable voice.</p></header>
@@ -108,14 +108,6 @@
   <div id="v-ready" class="card pad"><p class="title green" id="v-readyt">Your voice is ready</p><p class="body">Generate a new sentence for a situation at the door.</p>
     <label class="cap" for="v-sit">Situation</label><textarea id="v-sit" class="mt" rows="3">He is at the front door at 2 AM and says he needs to go to work.</textarea><button class="btn mt" onclick="previewVoice()">Generate a preview</button><p class="cap mt" id="v-preview" role="status"></p></div>
   <div class="actions"><button class="btn" onclick="go('voice')">Add another sample</button><button class="btn primary" onclick="go('setup')">Use this voice</button></div>
-</section>
-
-<section id="s-voices" class="screen">
-  <header class="head"><a class="back" onclick="go('voice')">Family voice</a><p class="eyebrow">Voice library</p><h1>Choose a voice</h1><p class="sub">Listen first, then choose the voice Dad hears.</p></header>
-  <div class="card" id="vl-list"><div class="row"><span class="muted">Loading voices…</span></div></div>
-  <p class="label">Preview style</p><div class="seg"><button class="on" id="vl-natural" onclick="setPreviewStyle('natural')">Natural</button><button id="vl-warm" onclick="setPreviewStyle('warm')">Warm</button></div>
-  <div class="card"><label class="field"><span class="lbl">Speed · <output id="vl-speed-label">1.0×</output></span><input id="vl-speed" aria-label="Voice speed" type="range" min="0.6" max="1.5" step="0.05" value="1" oninput="document.getElementById('vl-speed-label').textContent=Number(this.value).toFixed(2)+'×'"></label><label class="field"><span class="lbl">Emotion</span><select id="vl-emotion"><option value="neutral">Neutral</option><option value="calm" selected>Calm</option><option value="happy">Content</option></select></label></div>
-  <div class="actions"><button class="btn primary" id="vl-use" onclick="useVoice()" disabled>Use this voice</button></div>
 </section>
 
 <section id="s-calls" class="screen">
