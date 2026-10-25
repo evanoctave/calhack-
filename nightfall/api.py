@@ -35,7 +35,7 @@ from nightfall.api_voice import router as voice_router
 from nightfall.escalation import LADDER
 from nightfall.household import TreeMember, load
 from nightfall.integrations import anthropic_llm, cartesia, twilio
-from nightfall.store import ROOT, Store
+from nightfall.store import ROOT, Store, household_path
 
 PUBLIC_URL = os.environ.get("PUBLIC_URL") or "http://127.0.0.1:8000"
 CALL_911_S = float(os.environ.get("CALL_911_S", "45"))
@@ -349,7 +349,7 @@ async def reset() -> dict[str, Any]:
     store.takeover_by, store.call_911_sent, store.latest_frame = None, False, b""
     store.clothing.clear()
     store.runner.rings.clear()
-    store.hh = load(ROOT / "data" / "household.json")
+    store.hh = load(household_path())
     from nightfall.store import places_file
 
     store.places = briefmod.load_places(places_file())

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,21 @@ from nightfall.notify import Hub, SseNotifier, TwilioNotifier
 
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC_URL = os.environ.get("PUBLIC_URL") or "http://127.0.0.1:8000"
+
+
+def household_filename() -> str:
+    """Fresh start (the default) works on a gitignored live copy; FRESH_START=0 uses the tracked demo household."""
+    return "household.live.json" if os.environ.get("FRESH_START", "1") == "1" else "household.json"
+
+
+def household_path() -> Path:
+    return ROOT / "data" / household_filename()
+
+
+def start_fresh() -> None:
+    """Every server start begins from the blank template, so the first screen is setup."""
+    if os.environ.get("FRESH_START", "1") == "1":
+        shutil.copyfile(ROOT / "data" / "household.blank.json", household_path())
 
 
 def places_file() -> Path:
@@ -39,8 +55,10 @@ class Store:
     """All mutable demo state."""
 
     def __init__(self) -> None:
-        self.hh: Household = load(ROOT / "data" / "household.json")
-        self.places = briefmod.load_places(places_file())
+        start_fresh()
+        self.hh: Household = load(household_path())
+        # Home still at 0,0 means setup has not run; do not show another area's cached places.
+        self.places = [] if (self.hh.home_lat, self.hh.home_lng) == (0.0, 0.0) else briefmod.load_places(places_file())
         self.memory = Memory(self.hh)
         self.inc: engine.Incident | None = None
         self.log: list[dict[str, Any]] = []

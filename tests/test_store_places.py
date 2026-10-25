@@ -50,3 +50,21 @@ def test_committed_live_file_is_what_the_app_ships_with(monkeypatch) -> None:
         pytest.skip("a setup-page cache on this machine takes precedence over the committed Marina file")
     s = store.Store()
     assert len(s.places) > 20 and {p["source"] for p in s.places} == {"apify"}
+
+
+def test_fresh_start_resets_the_live_household_each_launch(root, monkeypatch) -> None:
+    monkeypatch.setenv("FRESH_START", "1")
+    shutil.copy(REPO / "data" / "household.blank.json", root / "data" / "household.blank.json")
+    live = root / "data" / "household.live.json"
+    live.write_text(json.dumps({"id": "x", "person_name": "Old Person"}))  # left over from a previous run
+    s = store.Store()
+    assert s.hh.person_name == "" and s.hh.person_full_name == ""
+    assert json.loads(live.read_text())["person_name"] == ""
+    assert s.places == []
+    assert not (root / "data" / "household.json").read_text().startswith('{"id": "x"')  # tracked demo untouched
+
+
+def test_fresh_start_off_uses_the_tracked_demo(root, monkeypatch) -> None:
+    monkeypatch.setenv("FRESH_START", "0")
+    assert store.Store().hh.person_name == "Dad"
+    assert not (root / "data" / "household.live.json").exists()
