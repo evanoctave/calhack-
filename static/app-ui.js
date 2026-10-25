@@ -303,6 +303,7 @@ function meName() { const m = S.household.tree.find(t => t.id === member); retur
 function mmss(sec) { sec = Math.max(0, Math.round(sec)); return String(Math.floor(sec / 60)).padStart(2, "0") + ":" + String(sec % 60).padStart(2, "0"); }
 function renderFigma() {
   const h = S.household, inc = S.incident, p = h.person_name || "Them", first = (h.person_full_name || "").split(" ")[0] || p, me = meName();
+  $("r-chips").innerHTML = [`Hi ${p}, I'm here.`, "Please come back inside.", "Let's sit down together."].map(t => `<span class="chip" onclick="sayText(this.textContent)">${esc(t)}</span>`).join("");
   const tree = h.tree, others = tree.filter(m => m.id !== member).map(m => m.name);
   // setup hub
   renderSchedule();

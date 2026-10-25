@@ -200,7 +200,11 @@ async def profile(body: ProfileIn) -> dict[str, Any]:
     if "person_age" in changes and not 0 <= changes["person_age"] <= 120:
         raise HTTPException(422, "age out of range")
     old_name = store.hh.caregiver_name
+    old_spoken = (store.hh.person_name, store.hh.person_full_name, old_name)
     store.hh = replace(store.hh, **changes)
+    if not store.hh.person_name.strip() and store.hh.person_full_name.strip():
+        # "Called" left blank: the voice and the brief use the first name from the form
+        store.hh = replace(store.hh, person_name=store.hh.person_full_name.split()[0])
     if changes.get("caregiver_name") and changes["caregiver_name"] != old_name:
         # the caregiver is also a care-circle member; keep the ring and the call agent on the new name
         tree = [replace(m, name=changes["caregiver_name"]) if m.name == old_name else m for m in store.hh.tree]
@@ -212,6 +216,9 @@ async def profile(body: ProfileIn) -> dict[str, Any]:
         geo = await setup_address(AddressIn(address=body.address.strip(), radius_mi=store.hh.radius_mi, google=False))
         store.hh = replace(store.hh, address=body.address.strip())
     _persist_household(store.hh)
+    if (store.hh.person_name, store.hh.person_full_name, store.hh.caregiver_name) != old_spoken:
+        # the scripted door lines carry these names: re-warm the audio so the first line at 2 AM never waits
+        asyncio.get_running_loop().run_in_executor(None, voice.pre_synthesize, store.hh)
     return {
         "ok": True,
         "household": {
@@ -397,7 +404,7 @@ async def voice_preview(body: PreviewIn) -> dict[str, Any]:
     store = _store()
     hits = [h["text"] for h in await store.memory.search(body.situation, 2)]
     line, source = await asyncio.to_thread(
-        llm.next_line, store.hh, [("system", "Hi Dad, it's me."), ("person", body.situation[:200])], hits
+        llm.next_line, store.hh, [("system", f"Hi {store.hh.person_name}, it's {store.hh.caregiver_name}."), ("person", body.situation[:200])], hits
     )
     return {
         "text": line,

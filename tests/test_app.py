@@ -234,3 +234,20 @@ def test_failed_profile_save_keeps_previous_file_and_reports_failure(tmp_path, m
     assert error.value.status_code == 500
     assert target.read_bytes() == previous
     assert list(target.parent.glob(".household-*")) == []
+
+
+def test_door_voice_lines_use_the_names_from_the_form(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from nightfall import script, voice
+
+    warmed: list = []
+    monkeypatch.setattr(voice, "pre_synthesize", lambda hh: warmed.append(hh.person_name))
+    # "Called" left blank: the first name from the full name is what the voice says
+    client.post("/profile", json={"person_full_name": "Robert Miller", "person_name": "", "caregiver_name": "Sarah"})
+    hh = api_app._store().hh
+    assert hh.person_name == "Robert"
+    assert script.fill(script.SCRIPT["open"], hh).startswith("Hi Robert, it's Sarah.")
+    assert "Miller household" in script.fill(script.SCRIPT["visitor_open"], hh)
+    # a nickname typed in "Called" wins, and the audio is re-warmed with the new names
+    client.post("/profile", json={"person_name": "Bob"})
+    assert script.fill(script.SCRIPT["goodnight"], api_app._store().hh) == "Good night, Bob. I love you."
+    assert warmed

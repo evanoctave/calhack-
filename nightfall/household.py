@@ -103,7 +103,7 @@ def load(path: str | Path) -> Household:
         raise ValueError("radius_mi must be in (0.25, 5]")
     return Household(
         id=raw["id"],
-        person_name=raw["person_name"],
+        person_name=raw["person_name"] or str(raw.get("person_full_name", "")).split(" ")[0],
         person_photo=raw.get("person_photo", ""),
         caregiver_name=raw["caregiver_name"],
         night_start=time.fromisoformat(raw.get("night_start", "21:00")),

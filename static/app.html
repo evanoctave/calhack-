@@ -261,7 +261,7 @@
   <div class="card pad"><button class="rec" id="r-live" onclick="liveToggle('r-live','r-livestat')">Talk live</button>
     <p class="cap mt" id="r-livestat">Talk plays your voice at the door and pauses Nightfall's automatic speech until you stop.</p></div>
   <div class="card pad"><p class="k" style="font-weight:600;margin:0 0 6px">Say in the family AI voice</p>
-    <div class="chips"><span class="chip" onclick="sayText(this.textContent)">Hi Dad, I'm here.</span><span class="chip" onclick="sayText(this.textContent)">Please come back inside.</span><span class="chip" onclick="sayText(this.textContent)">Let's sit down together.</span></div></div>
+    <div class="chips" id="r-chips"></div></div>
   <span id="r-tostat" hidden></span>
   <div class="actions"><button class="btn primary" onclick="backToApp()">Back</button></div>
 </section>
