@@ -2,7 +2,7 @@
 let S = null, member = "", incident = null, feedTimer = null, mapObj = null, mapLayer = null, soundOn = false, acked = false;
 function $(id) { return document.getElementById(id); }
 function go(name) { location.hash = "#" + name; }
-const SCREENS = ["setup", "profile", "medical", "report", "voice", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "takeover", "brief", "search", "responding", "back", "emergency", "help", "record", "review", "creating", "voice-preview", "join"];
+const SCREENS = ["setup", "profile", "medical", "report", "missing", "voice", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "takeover", "brief", "search", "responding", "back", "emergency", "help", "record", "review", "creating", "voice-preview", "join"];
 const navStack = [];
 // An invitation link (/app?member=ID) opens the family view: alerts, the door and the report, but not the care setup.
 const FAMILY_VIEW = new URLSearchParams(location.search).has("member");
@@ -28,6 +28,7 @@ function show(name) {
   if (name === "area") setTimeout(renderArea, 50);
   if (name === "medical") loadMedical();
   if (name === "report") loadReport();
+  if (name === "missing") loadMissing();
   window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", () => show(location.hash.slice(1) || "home"));
@@ -190,6 +191,30 @@ function renderMap() {
   }
   setTimeout(()=>mapObj.invalidateSize(),100);
 }
+function missingScript() {
+  const h = S.household, d = h.description || {}, inc = S.incident;
+  if (inc && inc.police_report) return inc.police_report;
+  const looks = [d.sex, d.height, /^\d+$/.test(d.weight || "") ? d.weight + " lbs" : d.weight, d.hair && d.hair + " hair", d.eyes && d.eyes + " eyes", d.build, d.marks].filter(Boolean).join(", ");
+  const doctor = h.doctor && h.doctor.name ? ` Doctor: ${h.doctor.name} ${h.doctor.phone || ""}.`.replace(/ \./, ".") : "";
+  const places = (h.familiar_places || []).map(p => p.name.split(", ")[0]).join("; ");
+  const time = $("ms-time").value.trim(), wear = $("ms-wear").value.trim();
+  return `Missing and at risk. ${h.person_full_name || h.person_name || "Name not added"}, age ${h.person_age || "unknown"}${looks ? ", " + looks : ""}. ` +
+    `${h.diagnosis || "Has dementia"}. Last seen at home, ${h.address || "home address on file"}, ${time ? "at " + time : "time not set"}. ` +
+    `Wearing ${wear || "unknown"}. On foot.${doctor}${places ? " Familiar places: " + places + "." : ""} ` +
+    `Reporting: ${h.caregiver_name || "family member"}.`;
+}
+function renderMissingScript() { $("ms-script").textContent = missingScript(); }
+async function loadMissing() {
+  const h = S.household, name = h.person_name || (h.person_full_name || "").split(" ")[0];
+  $("ms-title").textContent = name ? `${name} is missing` : "Report missing";
+  $("ms-copied").textContent = ""; renderMissingScript();
+  $("ms-familiar").innerHTML = (h.familiar_places || []).map(p => `<div class="row"><div><span class="k">${esc(p.name.split(", ")[0])}</span>${p.note ? `<span class="sub2">${esc(p.note)}</span>` : ""}</div></div>`).join("") || '<div class="row"><span class="muted">None added</span></div>';
+  try {
+    const st = await requestJSON("/setup/status", undefined, "GET"), rows = (st.call_first || []).slice(0, 8);
+    $("ms-places").innerHTML = rows.map(p => `<div class="row"><div><span class="k">${esc(p.name)}</span><span class="sub2">${p.distance_mi} mi${p.open_now === true ? " · open now" : ""}</span></div><span class="v">${p.phone ? `<a href="tel:${esc(p.phone.replace(/[^\d+]/g, ""))}">${esc(p.phone)}</a>` : ""}</span></div>`).join("") || '<div class="row"><span class="muted">No places found yet. Add the home address under Home &amp; nearby places.</span></div>';
+  } catch (error) { $("ms-places").innerHTML = '<div class="row"><span class="muted">Could not load nearby places.</span></div>'; }
+}
+function copyMissing() { (navigator.clipboard ? navigator.clipboard.writeText($("ms-script").textContent) : Promise.reject()).then(() => { $("ms-copied").textContent = "copied"; }).catch(() => { $("ms-copied").textContent = "select and copy"; }); }
 function copyPolice() { const t = $("b-police").textContent; (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { $("b-copied").textContent = "copied"; }).catch(() => { $("b-copied").textContent = "select and copy"; }); }
 async function saveProfile() {
   const description = {}; ["sex", "height", "weight", "hair", "eyes", "build", "marks"].forEach(k => { description[k] = $("p-" + k).value.trim(); });
