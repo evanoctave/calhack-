@@ -83,7 +83,7 @@ setInterval(() => { tick(); renderPlan(); }, 250);
 function showSpeak(who, text) { $("speakwho").textContent = who; $("speaktxt").textContent = text; $("speak").classList.add("on"); clearTimeout(showSpeak.t); showSpeak.t = setTimeout(() => $("speak").classList.remove("on"), 9000); }
 function tele(event, detail) { fetch("/door/telemetry", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({event, detail: String(detail || "")})}).catch(() => {}); }
 const Cur = {audio: null, src: null, live: false};
-const Out = {ctx: null, started: false, line: ""};
+const Out = {ctx: null, started: false, line: "", t0: 0};
 const ARM_DELAY_MS = 5000;  // one AudioContext, unlocked by the Start tap; Chrome never autoplay-blocks it after that
 function cutAudio(reason) { if (Cur.src) { try { Cur.src.onended = null; Cur.src.stop(); } catch (err) {} Cur.src = null; } if (Cur.audio) { try { Cur.audio.pause(); Cur.audio.currentTime = 0; } catch (err) {} Cur.audio = null; } try { speechSynthesis.cancel(); } catch (err) {} $("speak").classList.remove("on"); tele("audio_cut", reason || ""); }
 async function playAtDoor(e) {
@@ -100,11 +100,11 @@ async function playAtDoor(e) {
       const buf = await Out.ctx.decodeAudioData(await blob.arrayBuffer());
       const src = Out.ctx.createBufferSource(); src.buffer = buf; src.connect(Out.ctx.destination); Cur.src = src;
       src.onended = () => { if (Cur.src === src) Cur.src = null; tele("audio_ended", e.url); };
-      src.start(); audioOk = true; tele("audio_playing", e.url + " " + Math.round(blob.size / 1024) + "KB ctx");
+      src.start(); Out.t0 = Date.now(); audioOk = true; tele("audio_playing", e.url + " " + Math.round(blob.size / 1024) + "KB ctx");
       return;
     }
     const a = new Audio(URL.createObjectURL(blob)); a.volume = 1; Cur.audio = a;
-    a.onplay = () => { audioOk = true; tele("audio_playing", e.url + " " + Math.round(blob.size / 1024) + "KB"); };
+    a.onplay = () => { Out.t0 = Date.now(); audioOk = true; tele("audio_playing", e.url + " " + Math.round(blob.size / 1024) + "KB"); };
     a.onended = () => tele("audio_ended", e.url);
     await a.play();
   } catch (err) {
@@ -134,9 +134,13 @@ async function sos() { await post("/event", {kind: "sos"}); showSpeak("Nightfall
 // person talks; the door's own voice picked up by the mic is ignored as echo (word overlap with the line).
 const Ear = {rec: null, on: false};
 const words = t => (t.toLowerCase().match(/[a-z']+/g) || []);
+// Speech recognition mishears its own echo (Mum/Mom), and the first fragments are short, so while a line is playing:
+// ignore the first second, ignore fragments under three words, and match words loosely.
+const near = (a, b) => a === b || (a.length > 2 && b.length > 2 && a.slice(0, 2) === b.slice(0, 2) && Math.abs(a.length - b.length) < 3);
 function isEcho(heard) {
   const h = words(heard); if (!h.length || !Out.line || !(Cur.src || Cur.audio)) return false;
-  const line = new Set(words(Out.line)); return h.filter(w => line.has(w)).length / h.length > 0.6;
+  if (Date.now() - Out.t0 < 1200 || h.length < 3) return true;
+  const line = words(Out.line); return h.filter(w => line.some(l => near(w, l))).length / h.length >= 0.5;
 }
 function earStart() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR || Ear.on) return;

@@ -18,13 +18,43 @@ from nightfall.integrations import anthropic_llm
 from nightfall.script import BANNED, SCRIPT, fill, validate
 
 PERSONA_SYSTEM: Final = (
-    "You speak as {caregiver}, the adult child of {person}, who has memory loss and is at the front "
-    "door in the middle of the night. Write exactly one short spoken line (under 120 characters) that "
+    "You speak as {caregiver}{relationship}, through the door speaker, to {person}, who has memory loss and is "
+    "at the front door in the middle of the night. {address} You are not physically there: never offer to "
+    "hold, take, lead or walk with them. Write exactly one short spoken line (under 120 characters) that "
     "gently turns them back toward bed. Warm, concrete, present tense. Never argue, never correct, never "
     "mention memory, illness, confusion or the word 'no'. Do not invent objects, pets, people, food, weather "
     "or places; you may only reference what appears in the notes provided or in the conversation. Never "
     "mention medicine. No digits except a clock time. Reply with the line only."
 )
+_KIN: Final = re.compile(
+    r"\b(mum|mummy|mom|mommy|mama|mother|dad|daddy|papa|father|grandma|grandpa|granny|nana|nan|auntie|uncle)\b",
+    re.IGNORECASE,
+)
+_PHYSICAL: Final = re.compile(
+    r"\b(take|hold|grab|grasp) (my|your) (arm|hand)|\b(walk|come)(ing)? (back )?(with|to) me\b|\bwalk (you )?back\b",
+    re.IGNORECASE,
+)
+
+
+def persona_prompt(hh: Household) -> str:
+    """The system prompt, filled only from the care form: no guessing a parent's name or relationship."""
+    person = hh.person_name.strip() or "the person"
+    return PERSONA_SYSTEM.format(
+        caregiver=hh.caregiver_name.strip() or "their caregiver",
+        relationship=f", {person}'s {hh.caregiver_relationship.strip()}" if hh.caregiver_relationship.strip() else "",
+        person=person,
+        address=(
+            f"Call them only '{hh.person_name.strip()}'; never Mum, Mom, Dad or any other name."
+            if hh.person_name.strip()
+            else "Do not call them by any name or title."
+        ),
+    )
+
+
+def _wrong_address(hh: Household, line: str) -> bool:
+    """A kin word (Mum, Dad...) that is not part of the name on the form, or an offer to hold or walk with them."""
+    own = {w.lower() for w in re.findall(r"[A-Za-z]+", f"{hh.person_name} {hh.person_full_name}")}
+    return any(m.group(1).lower() not in own for m in _KIN.finditer(line)) or bool(_PHYSICAL.search(line))
 VISION_SYSTEM: Final = (
     "You describe clothing in a single still frame for a missing-person notice. Return JSON only with keys "
     "top_color, top_type, bottom_color, bottom_type, footwear, confidence (0-1). Allowed values: colors {colors}; "
@@ -72,7 +102,7 @@ def next_line(hh: Household, history: Sequence[tuple[str, str]], hits: Sequence[
         convo = "\n".join(f"{'You' if s == 'system' else hh.person_name}: {t}" for s, t in history[-4:])
         mem = ("Places they know: " + "; ".join(hits)) if hits else ""
         out = anthropic_llm.complete(
-            PERSONA_SYSTEM.format(caregiver=hh.caregiver_name, person=hh.person_name),
+            persona_prompt(hh),
             f"{mem}\nConversation so far:\n{convo}\nNext line:",
             max_tokens=600,
         )
@@ -83,6 +113,8 @@ def next_line(hh: Household, history: Sequence[tuple[str, str]], hits: Sequence[
         ok, why = validate(line)
         if ok and _mentions_medication(hh, line):
             ok, why = False, "medication named"
+        if ok and _wrong_address(hh, line):
+            ok, why = False, "wrong name or offer to hold or walk"
         if ok:
             return line, "anthropic"
         print(f"llm line replaced: {why}")

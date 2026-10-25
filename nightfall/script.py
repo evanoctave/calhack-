@@ -29,7 +29,11 @@ def fill(template: str, hh: Household) -> str:
     family = (
         hh.person_full_name.split()[-1] if hh.person_full_name and " " in hh.person_full_name else hh.caregiver_name
     )
-    return template.format(person=hh.person_name, caregiver=hh.caregiver_name, family=family)
+    text = template.format(person=hh.person_name.strip(), caregiver=hh.caregiver_name.strip(), family=family.strip())
+    # a name still missing from the form must not leave "Hi , it's ." in the audio
+    text = re.sub(r"\s+,", ",", text).replace("it's .", "it's me.")
+    text = re.sub(r",\s*\.", ".", text)
+    return re.sub(r"\bthe\s+household", "the household", text)
 
 
 def validate(line: str) -> tuple[bool, str]:

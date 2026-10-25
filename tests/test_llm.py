@@ -44,3 +44,17 @@ def test_describe_clothing_mock_and_garbage(monkeypatch) -> None:
     )
     c = llm.describe_clothing(b"\xff\xd8")
     assert c == {**c, "top_color": "unknown", "top_type": "hoodie", "footwear": "unknown", "source": "anthropic"}
+
+
+def test_persona_prompt_uses_only_the_form_and_wrong_address_is_caught() -> None:
+    from dataclasses import replace
+
+    hh = replace(load("data/household.json"), person_name="Bob", person_full_name="Bob Miller", caregiver_name="Sarah")
+    hh = replace(hh, caregiver_relationship="daughter")
+    prompt = llm.persona_prompt(hh)
+    assert "Sarah, Bob's daughter" in prompt and "only 'Bob'" in prompt and "adult child" not in prompt
+    assert llm._wrong_address(hh, "Here, Mum, take my arm and we'll walk back.")
+    assert llm._wrong_address(hh, "Let's go, Dad, nice and slow.")
+    assert not llm._wrong_address(hh, "It's still dark out, Bob. Let's go back to bed.")
+    # a name that really is "Dad" on the form is fine
+    assert not llm._wrong_address(replace(hh, person_name="Dad"), "Come back inside, Dad.")
