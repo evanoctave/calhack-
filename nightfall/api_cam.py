@@ -57,7 +57,8 @@ async def cam_frame(request: Request) -> dict[str, Any]:
 async def cam_latest() -> Response:
     store = _store()
     if not store.latest_frame or time.time() - store.latest_frame_at > 10:
-        raise HTTPException(404, "no live frame")
+        # No frame yet is normal before the door starts; 204 keeps phone consoles free of 404 noise.
+        return Response(status_code=204, headers={"Cache-Control": "no-store"})
     return Response(
         content=store.latest_frame,
         media_type="image/jpeg",

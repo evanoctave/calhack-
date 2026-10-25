@@ -21,7 +21,7 @@ def client(monkeypatch):
 
 
 def test_frame_relay_and_takeover(client: TestClient) -> None:
-    assert client.get("/cam/latest.jpg").status_code == 404
+    assert client.get("/cam/latest.jpg").status_code == 204  # no frame yet: empty, not an error
     r = client.post("/cam/frame", files={"f": ("f.jpg", io.BytesIO(b"\xff\xd8abc"), "image/jpeg")})
     assert r.json()["ok"]
     assert client.get("/cam/latest.jpg").content == b"\xff\xd8abc"

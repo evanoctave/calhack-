@@ -121,7 +121,7 @@ function render() {
   $("sr-radius").textContent = "Reference search area · " + h.radius_mi + "-mile radius"; $("sr-src").textContent = S.places_source === "apify" ? "Live data" : "Demo";
   $("sr-last").textContent = "Last confirmed at home · " + (inc && inc.exited_at ? hhmm(inc.exited_at) : "—");
   $("sr-notes").innerHTML = [...h.notes.map(n => n.text), h.medications.length ? "Medications: " + h.medications.map(m => (m.name + " " + m.dose).trim()).join("; ") : "Medication information not added."].map(t => `<div class="row"><span class="k" style="font-weight:400">${esc(t)}</span></div>`).join("");
-  $("sr-contacts").innerHTML = h.contacts.map(ct => `<div class="row"><span class="k">${esc(ct.name)}</span><span class="v">${ct.phone ? `<a href="tel:${esc(ct.phone.replace(/[^\d+]/g, ""))}">${esc(ct.phone)}</a>` : esc(ct.note || "")}</span></div>`).join("");
+  $("sr-contacts").innerHTML = h.contacts.map(ct => `<div class="row"><span class="k">${esc(ct.name)}</span><span class="v">${ct.phone ? `<a href="tel:${esc(ct.phone.replace(/[^\d+]/g, ""))}">${esc(ct.phone)}</a>` : esc(ct.note || "")}</span></div>`).join("") || '<div class="row"><span class="muted">No contacts added yet.</span></div>';
   $("sr-911").hidden = !S.call_911 || !inc || ["RETURNED","CLOSED"].includes(inc.state); $("r-911").hidden = $("sr-911").hidden;
   $("r-sub").textContent = S.live_by ? "You are live through the door." : S.takeover_by ? "You are speaking through the door." : "Nightfall is talking to " + first + " at the door.";
   const mon = []; if (inc) { if (inc.state === "CONVERSATION") mon.push(inc.person_in_frame ? first + " is at the door, in view" : first + " heading out"); if (inc.exited_at) mon.push("Out of view " + (inc.minutes_since_exit < 1 ? "under a minute" : Math.round(inc.minutes_since_exit) + " min")); if (S.rings.length) mon.push("Family tier " + S.rings[S.rings.length - 1].tier + " called"); if (S.call_911) mon.push("911 option shown"); if (inc.state === "RETURNED") mon.push("Back inside, all clear"); if (inc.clothing_line) mon.push("Wearing: " + inc.clothing_line); }
@@ -168,15 +168,20 @@ async function loadBrief(link) {
   if (briefLoaded === link) return; briefLoaded = link;
   const r = await fetch("/brief/" + link.split("#")[1]); if (!r.ok) { briefLoaded = ""; return; }
   const b = await r.json(); if (b.incident_id !== incident) return; window.B = b; renderBriefCards();
-  $("sr-fam").innerHTML = b.familiar.map(p => `<div class="row"><div><span class="k">${esc(p.name)}</span><span class="sub2">${p.distance_mi} mi · family-provided</span></div></div>`).join("");
+  $("sr-fam").innerHTML = b.familiar.map(p => `<div class="row"><div><span class="k">${esc(p.name)}</span><span class="sub2">${p.distance_mi} mi · family-provided</span></div></div>`).join("") || '<div class="row"><span class="muted">No familiar places added yet. Add them under Home &amp; nearby places.</span></div>';
   $("sr-haz").innerHTML = b.hazards.slice(0, 5).map(p => `<div class="row"><span class="k">${esc(p.name)}</span><span class="v danger">${p.distance_mi} mi</span></div>`).join("") || '<div class="row"><span class="muted">none in radius</span></div>';
   $("sr-call").innerHTML = nearbyCallRows(b.call_first);
   if ($("s-search").classList.contains("on")) renderMap();
 }
 function tok(name) { const el = document.createElement("i"); el.style.color = `var(${name})`; document.body.appendChild(el); const c = getComputedStyle(el).color; el.remove(); return c; }
+function mapPlaceholder(id, text) {
+  const el = $(id); if (!el || el.dataset.placeholder === text) return; el.dataset.placeholder = text;
+  el.innerHTML = `<div class="map-empty"><span>${esc(text)}</span></div>`;
+}
 function renderMap() {
   if (!window.L || !S) return;
   const h = S.household, b = window.B;
+  if (!h.home || (!h.home.lat && !h.home.lng)) { mapPlaceholder("map", "Add the home address in Care settings to see the search map."); return; }
   if (!mapObj) { mapObj = L.map("map", {zoomControl: false, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false}).setView([h.home.lat,h.home.lng],14); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution: '© OpenStreetMap'}).addTo(mapObj); }
   const key = JSON.stringify([h.home, h.radius_mi, b?.hazards, b?.call_first, h.familiar_places]);
   if (mapObj._nightfallKey !== key) {
@@ -319,6 +324,8 @@ function renderFigma() {
   $("w-title").textContent = "Will " + p + " come back?"; $("w-until").textContent = "Until " + (tree[0] ? tree[0].name : "the family") + " is called";
   // alert: call order with live status
   $("a-title").textContent = inc && inc.exited_at ? p + " has left home" : inc && inc.state === "CONVERSATION" ? p + " is at the door" : "No active alert";
+  const quiet = !(inc && (inc.exited_at || inc.state === "CONVERSATION"));
+  $("a-eyebrow").textContent = quiet ? "All quiet" : "Needs your attention"; $("a-eyebrow").classList.toggle("red", !quiet); $("a-card").classList.toggle("alarm", !quiet);
   $("a-nop2").textContent = `No return after ${S.door_wait_s} seconds`;
   const rungIds = S.rings.flatMap(r => r.member_ids), latest = S.rings.length ? S.rings[S.rings.length - 1].member_ids : [];
   $("a-order").innerHTML = tree.map((m, i) => { const ringing = latest.includes(m.id) && !(inc && inc.acked_by), done = rungIds.includes(m.id) && !ringing;
@@ -328,6 +335,10 @@ function renderFigma() {
   // brief + search
   $("b-name").textContent = inc?.exited_at ? p + " left home" : "No active alert"; $("b-seen").textContent = "Last seen " + (inc && inc.exited_at ? hhmm(inc.exited_at) : "—") + " · Front entrance";
   $("b-radius").textContent = "Within " + h.radius_mi + " mi of home"; $("sr-radius").textContent = h.radius_mi + " mi around home";
+  if (!window.B) { const soon = (t) => `<div class="row"><span class="muted">${t}</span></div>`;
+    $("sr-haz").innerHTML = soon("Hazards near home are ranked the moment an exit is confirmed.");
+    $("sr-fam").innerHTML = soon(h.familiar_places.length ? h.familiar_places.map(p => esc(p.name)).join(" · ") : "No familiar places added yet. Add them under Home &amp; nearby places.");
+    $("sr-call").innerHTML = soon("Open places to call appear after a confirmed exit."); }
   if (window.B && window.B.hazards[0]) $("b-first").textContent = window.B.hazards[0].name;
   const dl = inc && inc.deadline_at ? (new Date(inc.deadline_at).getTime() - (Date.now() + serverOffset)) / 1000 : null;
   $("sr-rec").hidden = dl === null || !!inc?.emergency?.recommendation_due; if (dl !== null) $("sr-rect").textContent = "Emergency recommendation in " + mmss(dl);
@@ -380,6 +391,7 @@ async function findPlaces() {
 }
 async function renderArea(st) {
   if (!window.L || (areaSearching && !st)) return; st = st || await (await fetch("/setup/status")).json(); const home = st.home || S.household.home;
+  if (!home || (!home.lat && !home.lng)) { mapPlaceholder("area-map", "Enter the home address above to map hazards and open places."); return; }
   if (!areaMap) { areaMap = L.map("area-map", {zoomControl: false, attributionControl: true, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false}).setView([home.lat,home.lng],14); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution:"© OpenStreetMap"}).addTo(areaMap); }
   if (areaLayer) areaLayer.remove(); areaLayer = L.layerGroup().addTo(areaMap); const ring = L.circle([home.lat, home.lng], {radius: home.radius_mi * 1609.34, color: "#245dd6", weight: 1, dashArray: "4 4", fillOpacity: .04}).addTo(areaLayer);
   areaMap.setView([home.lat, home.lng], 14); areaMap.fitBounds(ring.getBounds(), {padding: [8, 8]});

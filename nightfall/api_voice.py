@@ -228,10 +228,30 @@ async def voice_current() -> dict[str, Any]:
     }
 
 
+# 0.1 s of 16 kHz mono silence: the door plays it once on start to unlock audio output in the browser.
+_SILENCE = (
+    b"RIFF"
+    + (36 + 3200).to_bytes(4, "little")
+    + b"WAVEfmt "
+    + (16).to_bytes(4, "little")
+    + (1).to_bytes(2, "little")
+    + (1).to_bytes(2, "little")
+    + (16000).to_bytes(4, "little")
+    + (32000).to_bytes(4, "little")
+    + (2).to_bytes(2, "little")
+    + (16).to_bytes(2, "little")
+    + b"data"
+    + (3200).to_bytes(4, "little")
+    + bytes(3200)
+)
+
+
 @router.get("/voice/{name}")
-async def voice_file(name: str) -> FileResponse:
+async def voice_file(name: str) -> Response:
     if not name.endswith(".wav") or "/" in name or ".." in name:
         raise HTTPException(404, "no")
+    if name == "silence.wav":
+        return Response(_SILENCE, media_type="audio/wav", headers={"Cache-Control": "max-age=86400"})
     path = voice.OUT / name
     if not path.exists():
         raise HTTPException(404, "no")

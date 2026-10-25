@@ -8,7 +8,12 @@ set -euo pipefail
 cd "$(dirname "$0")"
 if [ ! -d .venv ]; then python3 -m venv .venv && .venv/bin/pip install -q -r requirements.txt; fi
 PY=.venv/bin/python
-[ -f .env ] && set -a && . ./.env && set +a
+# .env fills in anything not already set; variables given on the command line win (MOCK=1 ./run.sh).
+if [ -f .env ]; then
+  _keep=$(for k in $(compgen -e); do declare -p "$k"; done)
+  set -a; . ./.env; set +a
+  eval "$_keep"; unset _keep
+fi
 export MOCK="${MOCK:-1}" PYTHONUNBUFFERED=1
 PORT="${PORT:-8000}"
 
