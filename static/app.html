@@ -168,7 +168,7 @@
 <section id="s-home" class="screen">
   <header class="head"><a class="back owner-only" onclick="if (navStack.length > 1) history.back(); else go('setup')">Back</a><p class="eyebrow" id="h-greet">Good evening</p><h1 id="h-title">Night watch is on</h1></header>
   <div id="h-notice" class="card pad ok" hidden><p class="title green" id="h-noticet">Back inside</p><p class="body" id="h-notices"></p></div>
-  <div id="h-active-search" class="card pad alarm" hidden><p class="title">Search still active</p><p class="body" id="h-search-status"></p><button class="btn mt" onclick="openBrief()">Reopen search brief</button></div>
+  <div id="h-active-search" class="card pad alarm" hidden><p class="title">Search still active</p><p class="body" id="h-search-status"></p><button class="btn mt" onclick="openBrief()">Search Brief</button></div>
   <div id="h-cd" class="banner" hidden><b id="h-cdt">Out of view</b><div id="h-cds" class="small"></div></div>
   <div class="media"><img id="h-feed" class="feed-live" alt="Front door camera" style="display:none"><div class="ph" id="h-door"></div></div>
   <p class="media-cap"><span id="h-cam">Front entrance</span> · <span id="h-feedcap">Waiting for camera</span></p>
@@ -176,7 +176,7 @@
   <button class="btn" onclick="go('missing')">Report missing</button>
   <button class="btn owner-only" onclick="go('setup')">Nightfall setup</button>
   <div class="ready-line" id="h-readiness"></div>
-  <details class="disclosure"><summary>Tonight &amp; morning report</summary><div><button class="btn" onclick="go('report')">Morning report</button><span class="cap" id="h-report">How last night went</span><button class="text-btn" onclick="go('talk')">Open door camera and talk</button></div></details>
+  <details class="disclosure"><summary>Tonight &amp; morning report</summary><div><button class="btn" onclick="go('report')">Morning report</button><span class="cap" id="h-report">How last night went</span><button class="text-btn" onclick="go('talk')">Talk to camera</button></div></details>
   <p class="cap demo-only" id="h-demo"></p>
   <div class="actions"><button class="btn primary demo-only" onclick="testAlert()">Try the night scenario</button><button class="btn demo-only" onclick="document.getElementById('scenarios').showModal()">Other scenarios</button><button class="btn primary" id="home-live-action" onclick="go('talk')">Open door camera</button></div>
 </section>
