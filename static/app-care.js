@@ -201,7 +201,7 @@ function renderBriefCards() {
   const b = window.B, inc = S.incident;
   const active = !!inc?.exited_at && ["ESCALATING", "ACKED", "EXHAUSTED", "WATCHING"].includes(inc.state);
   $("b-confirm-return").hidden = !active;
-  $("h-active-search").hidden = !active;
+  $("h-active-search").hidden = !active; $("h-report-missing").hidden = active;
   $("h-search-status").textContent = inc?.acked_by_name ? inc.acked_by_name + " is responding. Return is not yet confirmed." : "The search is still active. Family alerts continue.";
   $("b-open-places").innerHTML = nearbyCallRows(b?.call_first, b ? undefined : "Nearby places appear after a confirmed exit.");
   $("b-source").textContent = "Nearby places · " + (S.places_source === "apify" ? "Apify" : "Saved / sample data");
