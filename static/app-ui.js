@@ -168,7 +168,6 @@ async function loadBrief(link) {
   const r = await fetch("/brief/" + link.split("#")[1]); if (!r.ok) { briefLoaded = ""; return; }
   const b = await r.json(); if (b.incident_id !== incident) return; window.B = b; renderBriefCards();
   $("sr-fam").innerHTML = b.familiar.map(p => `<div class="row"><div><span class="k">${esc(p.name)}</span><span class="sub2">${p.distance_mi} mi · family-provided</span></div></div>`).join("");
-  $("sr-haz").innerHTML = b.hazards.slice(0, 5).map(p => `<div class="row"><span class="k">${esc(p.name)}</span><span class="v danger">${p.distance_mi} mi</span></div>`).join("") || '<div class="row"><span class="muted">none in radius</span></div>';
   $("sr-call").innerHTML = nearbyCallRows(b.call_first);
   if ($("s-search").classList.contains("on")) renderMap();
 }
@@ -177,16 +176,16 @@ function renderMap() {
   if (!window.L || !S) return;
   const h = S.household, b = window.B;
   if (!mapObj) { mapObj = L.map("map", {zoomControl: false, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false}).setView([h.home.lat,h.home.lng],14); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution: '© OpenStreetMap'}).addTo(mapObj); }
-  const key = JSON.stringify([h.home, h.radius_mi, b?.hazards, b?.call_first, h.familiar_places]);
+  const key = JSON.stringify([h.home, h.radius_mi, b?.call_first, h.familiar_places]);
   if (mapObj._nightfallKey !== key) {
     if (mapLayer) mapLayer.remove(); mapLayer = L.layerGroup().addTo(mapObj);
     const ring = L.circle([h.home.lat,h.home.lng], {radius:h.radius_mi*1609.34,color:"#245dd6",weight:1,dashArray:"4 4",fillOpacity:.03}).addTo(mapLayer);
-    const points = [...(b?.hazards || []).slice(0,6), ...(b?.call_first || []).slice(0,6), ...h.familiar_places];
+    const points = [...(b?.call_first || []).slice(0,6), ...h.familiar_places];
     if (points.length) mapObj.fitBounds(L.latLngBounds([[h.home.lat,h.home.lng], ...points.map(p=>[p.lat,p.lng])]).pad(.18), {maxZoom:15});
     L.circleMarker([h.home.lat,h.home.lng], {radius:5,color:"#fff",weight:2,fillColor:"#506078",fillOpacity:1}).addTo(mapLayer).bindPopup("Last confirmed at home");
-    // Pin numbers run highest to lowest priority: hazards to check, then familiar places, then open places to call.
-    const hazards = (b?.hazards || []).slice(0,6), calls = (b?.call_first || []).slice(0,6), familiar = h.familiar_places.filter(p => p.lat != null && p.lng != null);
-    [...hazards.map(p=>[p,"#b52b38"]),...familiar.map(p=>[p,"#245dd6"]),...calls.map(p=>[p,"#23764a"])].forEach(([p,color],i) => {
+    // Pin numbers run highest to lowest priority: familiar places first, then open places to call.
+    const calls = (b?.call_first || []).slice(0,6), familiar = h.familiar_places.filter(p => p.lat != null && p.lng != null);
+    [...familiar.map(p=>[p,"#245dd6"]),...calls.map(p=>[p,"#23764a"])].forEach(([p,color],i) => {
       L.marker([p.lat,p.lng], {icon:L.divIcon({className:"",html:`<div class="pin" style="background:${color}">${i+1}</div>`,iconSize:[24,24]})}).addTo(mapLayer).bindPopup(`${i+1} · ${esc(p.name)}`);
     });
     mapObj._nightfallKey = key;
@@ -327,7 +326,6 @@ function renderFigma() {
   // brief + search
   $("b-name").textContent = inc?.exited_at ? p + " left home" : "No active alert"; $("b-seen").textContent = "Last seen " + (inc && inc.exited_at ? hhmm(inc.exited_at) : "—") + " · Front entrance";
   $("b-radius").textContent = "Within " + h.radius_mi + " mi of home"; $("sr-radius").textContent = h.radius_mi + " mi around home";
-  if (window.B && window.B.hazards[0]) $("b-first").textContent = window.B.hazards[0].name;
   const dl = inc && inc.deadline_at ? (new Date(inc.deadline_at).getTime() - (Date.now() + serverOffset)) / 1000 : null;
   $("sr-rec").hidden = dl === null || !!inc?.emergency?.recommendation_due; if (dl !== null) $("sr-rect").textContent = "Emergency recommendation in " + mmss(dl);
   // responding, help, emergency
@@ -358,7 +356,7 @@ function autoRoute() {
 function syncEdge() { const v = $("h-edge").value || "far"; document.querySelectorAll("#cam-edge button").forEach(b => b.classList.toggle("on", b.dataset.e === v)); }
 function endCall() { try { stopAgentCall(); } catch (e) {} go(S && S.incident && S.incident.acked_by === member ? "responding" : "alert"); }
 let areaMap = null, areaLayer = null, areaPoll = null, pickRadius = null, areaSearching = false;
-const RADII = [0.5, 1, 1.5, 2, 3], HAZ_LABEL = {water: "Water", rail: "Rail line", motorway: "Highway", construction: "Construction"};
+const RADII = [0.5, 1, 1.5, 2, 3];
 function renderRadius(cur) {
   const el = $("pl-rad"); if (el.dataset.cur === String(cur)) return; el.dataset.cur = String(cur);
   el.innerHTML = RADII.map(r => `<button type="button" class="${r === cur ? "on" : ""}" onclick="pickRadius = ${r}; render()">${r} mi</button>`).join("");
@@ -373,7 +371,7 @@ async function findPlaces() {
   try {
     await requestJSON("/setup/address",{address,radius_mi:pickRadius ?? S.household.radius_mi,google:true});
     await requestJSON("/profile",{}); pickRadius = null; careDrafts.delete("s-places"); areaSearching = false; await refresh();
-    const update = async()=>{ const status = await requestJSON("/setup/status",undefined,"GET"); await renderArea(status); const mapping = ""; if (status.apify !== "running" && !status.hazards_pending) { clearInterval(areaPoll); $("ar-status").textContent = status.apify === "done" ? "Nearby places are ready." : "Open-late places are unavailable; try again later."; } else if (status.apify === "running") $("ar-status").textContent = "Finding places open late…" + mapping; else $("ar-status").textContent = "Nearby places are ready." + mapping; };
+    const update = async()=>{ const status = await requestJSON("/setup/status",undefined,"GET"); await renderArea(status); const mapping = ""; if (status.apify !== "running") { clearInterval(areaPoll); $("ar-status").textContent = status.apify === "done" ? "Nearby places are ready." : "Open-late places are unavailable; try again later."; } else if (status.apify === "running") $("ar-status").textContent = "Finding places open late…" + mapping; else $("ar-status").textContent = "Nearby places are ready." + mapping; };
     areaPoll = setInterval(()=>update().catch(()=>{ $("ar-status").textContent="Search interrupted. Go back and try again."; clearInterval(areaPoll); }),2000); await update();
   } catch(error) { areaSearching = false; $("ar-status").textContent = "Search unavailable: " + error.message; }
 }
@@ -382,10 +380,8 @@ async function renderArea(st) {
   if (!areaMap) { areaMap = L.map("area-map", {zoomControl: false, attributionControl: true, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false}).setView([home.lat,home.lng],14); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution:"© OpenStreetMap"}).addTo(areaMap); }
   if (areaLayer) areaLayer.remove(); areaLayer = L.layerGroup().addTo(areaMap); const ring = L.circle([home.lat, home.lng], {radius: home.radius_mi * 1609.34, color: "#245dd6", weight: 1, dashArray: "4 4", fillOpacity: .04}).addTo(areaLayer);
   areaMap.setView([home.lat, home.lng], 14); areaMap.fitBounds(ring.getBounds(), {padding: [8, 8]});
-  const hz = st.hazards_ranked || [], open = st.call_first || [];
-  hz.slice(0, 6).forEach((x, i) => L.marker([x.lat, x.lng], {icon: L.divIcon({className: "", html: `<div class="pin" style="background:#b52b38">${i + 1}</div>`, iconSize: [22, 22]})}).addTo(areaLayer));
+  const open = st.call_first || [];
   open.slice(0, 10).forEach(x => L.circleMarker([x.lat, x.lng], {radius: 6, color: "#fff", weight: 2, fillColor: "#23764a", fillOpacity: 1}).addTo(areaLayer));
-  $("ar-hazlist").innerHTML = placeRows(hz.slice(0, 8), st.apify === "running" ? "Still searching with Apify…" : "No water, rail, highways or construction found in this radius", x => HAZ_LABEL[x.category] || x.category);
   $("ar-calllist").innerHTML = placeRows(open.slice(0, 6), st.apify === "running" ? "Still searching with Apify…" : "No late-night places found yet", x => cap(x.category) + (x.hours ? " · " + x.hours : "") + (x.phone ? " · " + x.phone : ""));
-  $("ar-haz").textContent = hz.length; $("ar-call").textContent = st.open || open.length; setTimeout(() => areaMap.invalidateSize(), 100);
+  $("ar-call").textContent = st.open || open.length; setTimeout(() => areaMap.invalidateSize(), 100);
 }

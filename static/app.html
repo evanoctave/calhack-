@@ -140,10 +140,8 @@
 <section id="s-area" class="screen">
   <header class="head"><a class="back" onclick="go('places')">Home and places</a><h1>Know the area first</h1><p class="sub" id="ar-sub">Your home · 1.5 mi around home</p></header>
   <div id="area-map"></div>
-  <div class="card"><div class="row" hidden><div><span class="k">Places to check first</span><span class="sub2">Water, rail, highways, construction</span></div><span class="v blue" id="ar-haz">0</span></div>
-    <div class="row"><div><span class="k">Places to call</span><span class="sub2">Open late or open now</span></div><span class="v blue" id="ar-call">0</span></div></div>
+  <div class="card"><div class="row"><div><span class="k">Places to call</span><span class="sub2">Open late or open now</span></div><span class="v blue" id="ar-call">0</span></div></div>
   <p class="label" hidden>Dangerous places, nearest first</p>
-  <div class="card" id="ar-hazlist" hidden><div class="row"><span class="muted">Searching…</span></div></div>
   <p class="label">Open late nearby</p>
   <div class="card" id="ar-calllist"><div class="row"><span class="muted">Searching…</span></div></div>
   <p class="cap">Familiar places stay separate from nearby risks. This map is a search reference.</p>
@@ -275,10 +273,10 @@
   <div class="who"><div class="media" id="b-hero"><div class="ph"></div></div><div><p class="title" style="font:600 18px/25px var(--font);margin:0" id="b-wear">See photo</p><p class="cap" id="b-wear2"></p><p class="cap" id="b-conf">AI-described · Check the photo.</p></div></div>
   <div><p class="title" style="font:600 20px/27px var(--font);margin:0">Where to look first</p><p class="cap" id="b-radius">Within 1.5 mi of home</p></div>
   <div id="map"></div>
-  <div class="legend"><span><img src="/assets/figma/legend-hazard.svg" alt="">Hazards</span><span><img src="/assets/figma/legend-familiar.svg" alt="">Familiar</span><span><img src="/assets/figma/legend-call.svg" alt="">Call first</span></div><p class="cap">Pins are numbered from highest to lowest priority.</p>
+  <div class="legend"><span><img src="/assets/figma/legend-familiar.svg" alt="">Familiar</span><span><img src="/assets/figma/legend-call.svg" alt="">Call first</span></div><p class="cap">Pins are numbered from highest to lowest priority.</p>
   <p class="credit" id="b-source">Nearby places</p>
   <p class="cap">Nearby places, not Dad's live location.</p>
-  <div class="card brief-check"><div class="row"><div><span class="sub2" style="margin:0">Check first</span><span class="k" id="b-first">Finding nearby hazards…</span><span class="sub2" id="b-first-detail"></span></div></div></div><p class="label">Nearby open places &amp; phone numbers</p><div class="card" id="b-open-places"></div><button class="btn" onclick="go('search')">More places &amp; care notes</button>
+  <p class="label">Nearby open places &amp; phone numbers</p><div class="card" id="b-open-places"></div><button class="btn" onclick="go('search')">More places &amp; care notes</button>
   <div class="card pad alarm"><p class="eyebrow red caps"><img class="status-icon" src="/assets/figma/alert.svg" alt=""><span id="em-tag">Emergency option available</span></p><p class="title" id="em-title">Need emergency help?</p><p class="cap" id="em-sub">Since the confirmed exit</p><p class="big-num red" id="em-clock">00:45</p><p class="body" id="em-line">You can choose to call 911 now.</p><p class="body">You decide. Nightfall does not call 911 on its own.</p><a class="btn danger mt" href="tel:911">Call 911</a><button class="btn demo-only mt" onclick="runDemo('deadline')">Demo · 15 minutes pass</button></div>
   <details class="disclosure"><summary>Read this to the dispatcher</summary><div><p class="mt" id="b-police" style="margin-bottom:0"></p>
     <div class="inline mt"><button class="btn small" onclick="copyPolice()">Copy</button><a class="btn small" href="tel:911" style="color:var(--red)">Call 911</a><span class="cap" id="b-copied"></span></div></div></details>
@@ -292,7 +290,6 @@
   <div class="card pad alarm" id="sr-rec"><p class="title red" style="font-size:16px" id="sr-rect">Emergency recommendation in 12:40</p><p class="body">You can choose to call 911 sooner.</p></div>
   <div id="sr-911" class="banner" hidden>Out of view and not found. <a href="tel:911" style="color:inherit;text-decoration:underline">Call 911</a>. You decide; Nightfall never dials.</div>
   <p class="cap" id="sr-last">Last confirmed at home · 2:03 AM</p>
-  <p class="label">Check first</p><div class="card" id="sr-haz"></div>
   <p class="label">Familiar places</p><div class="card" id="sr-fam"></div>
   <p class="label">Call first · open now</p><div class="card" id="sr-call"></div>
   <p class="label">Wander history</p><div class="card" id="sr-history"></div>
