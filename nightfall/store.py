@@ -26,8 +26,8 @@ PUBLIC_URL = os.environ.get("PUBLIC_URL") or "http://127.0.0.1:8000"
 
 
 def household_filename() -> str:
-    """Fresh start (the default) works on a gitignored live copy; FRESH_START=0 uses the tracked demo household."""
-    return "household.live.json" if os.environ.get("FRESH_START", "1") == "1" else "household.json"
+    """Fresh start (the default) and FRESH_START=keep work on a gitignored live copy; FRESH_START=0 uses the tracked demo household."""
+    return "household.live.json" if os.environ.get("FRESH_START", "1") in ("1", "keep") else "household.json"
 
 
 def household_path() -> Path:
@@ -35,8 +35,10 @@ def household_path() -> Path:
 
 
 def start_fresh() -> None:
-    """Every server start begins from the blank template, so the first screen is setup."""
-    if os.environ.get("FRESH_START", "1") == "1":
+    """Every server start begins from the blank template, so the first screen is setup. FRESH_START=keep resumes
+    the saved live household and only starts blank when there is none."""
+    mode = os.environ.get("FRESH_START", "1")
+    if mode == "1" or (mode == "keep" and not household_path().exists()):
         shutil.copyfile(ROOT / "data" / "household.blank.json", household_path())
 
 
