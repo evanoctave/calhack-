@@ -170,7 +170,7 @@
 <section id="s-home" class="screen">
   <header class="head"><a class="back owner-only" onclick="if (navStack.length > 1) history.back(); else go('setup')">Back</a><p class="eyebrow" id="h-greet">Good evening</p><h1 id="h-title">Night watch is on</h1></header>
   <div id="h-notice" class="card pad ok" hidden><p class="title green" id="h-noticet">Back inside</p><p class="body" id="h-notices"></p></div>
-  <div id="h-active-search" class="card pad alarm" hidden><p class="title">Search still active</p><p class="body" id="h-search-status"></p><button class="btn mt" onclick="openBrief()">Reopen search brief</button><button class="btn ok mt" data-confirm-return onclick="confirmPersonHome()">Confirm back home</button></div>
+  <div id="h-active-search" class="card pad alarm" hidden><p class="title">Search still active</p><p class="body" id="h-search-status"></p><button class="btn mt" onclick="openBrief()">Reopen search brief</button></div>
   <div id="h-cd" class="banner" hidden><b id="h-cdt">Out of view</b><div id="h-cds" class="small"></div></div>
   <div class="media"><img id="h-feed" class="feed-live" alt="Front door camera" style="display:none"><div class="ph" id="h-door"></div></div>
   <p class="media-cap"><span id="h-cam">Front entrance</span> · <span id="h-feedcap">Waiting for camera</span></p>
@@ -282,8 +282,8 @@
   <details class="disclosure"><summary>Read this to the dispatcher</summary><div><p class="mt" id="b-police" style="margin-bottom:0"></p>
     <div class="inline mt"><button class="btn small" onclick="copyPolice()">Copy</button><a class="btn small" href="tel:911" style="color:var(--red)">Call 911</a><span class="cap" id="b-copied"></span></div></div></details>
   <p class="cap">Backup contact: <span id="b-backup">Mike</span></p>
-  <div id="b-responding" class="card pad ok" hidden><p class="title green">You're on it</p><p class="body">Other phones stopped ringing.</p></div>
-  <div class="actions"><button class="btn primary" id="b-respond" onclick="acknowledgeIncident()">I’m on it</button><button class="btn" id="b-response-status" onclick="go('responding')" hidden>View response status</button><button class="btn ok" id="b-confirm-return" data-confirm-return onclick="confirmPersonHome()" hidden>Confirm back home</button><button class="btn" onclick="backToNightWatch()">Back to night watch</button></div>
+  <div id="b-responding" class="card pad ok" hidden><p class="title green">You're on it</p><p class="body">Other phones stopped ringing.</p><p class="body" id="b-return">Return not yet confirmed.</p></div>
+  <div class="actions"><button class="btn primary" id="b-respond" onclick="acknowledgeIncident()">I’m on it</button><button class="btn ok" id="b-confirm-return" data-confirm-return onclick="confirmPersonHome()" hidden>Confirm back home</button></div>
 </section>
 
 <section id="s-search" class="screen">

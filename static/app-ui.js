@@ -114,7 +114,7 @@ function render() {
   $("b-wear2").textContent = c && !pending && c.confidence >= 0.4 ? [c.bottom_color, c.bottom_type, c.footwear].filter(value=>value && value !== "unknown").join(" ") : "";
   $("b-backup").textContent = (h.tree.find(m => m.id !== member) || h.tree[0] || {}).name || "—";
   $("b-conf").textContent = c && !pending && c.source !== "mock" ? `Clothing is AI-described (${Math.round(c.confidence * 100)}% confidence). Verify against the image.` : c?.source === "mock" ? "Demo description · Check the photo." : "Clothing is AI-described. Verify against the image.";
-  acked = !!(inc && inc.acked_by); $("b-respond").hidden = acked || !inc || inc.state === "RETURNED"; $("b-responding").hidden = !acked; $("b-response-status").hidden = !acked;
+  acked = !!(inc && inc.acked_by); $("b-respond").hidden = acked || !inc || inc.state === "RETURNED"; $("b-responding").hidden = !acked;
   if (acked) $("b-responding").querySelector(".title").textContent = inc.acked_by_name + " is responding";
   // search
   $("sr-radius").textContent = "Reference search area · " + h.radius_mi + "-mile radius"; $("sr-src").textContent = S.places_source === "apify" ? "Live data" : "Demo";
@@ -332,7 +332,7 @@ function renderFigma() {
   $("sr-rec").hidden = dl === null || !!inc?.emergency?.recommendation_due; if (dl !== null) $("sr-rect").textContent = "Emergency recommendation in " + mmss(dl);
   // responding, help, emergency
   const responder = inc?.acked_by_name || me; $("rs-who").textContent = responder + " · Responding"; $("rs-stopped").textContent = "Other care-circle calls stopped.";
-  $("rs-return").textContent = inc && inc.state === "RETURNED" ? p + " is back inside." : p + "'s return is not yet confirmed.";
+  $("rs-return").textContent = $("b-return").textContent = inc && inc.state === "RETURNED" ? p + " is back inside." : p + "'s return is not yet confirmed.";
   $("hp-who").textContent = tree.map(m => m.name).join(" · ");
   if (inc && inc.exited_at) { const since = (Date.now() + serverOffset - new Date(inc.exited_at).getTime()) / 1000, late = !!inc.emergency?.recommendation_due;
     $("em-clock").textContent = mmss(since); $("em-sub").textContent = (since < 120 ? Math.round(since) + " seconds" : Math.round(since / 60) + " minutes") + " since the confirmed exit";
