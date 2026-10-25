@@ -30,6 +30,8 @@ FOUND: Final = re.compile(
     r"\b(got (him|her)|found (him|her|them)|i have (him|her)|(he|she)'?s (here|home|safe|with me|back))\b",
     re.IGNORECASE,
 )
+NO: Final = re.compile(r"\b(no|nope|can'?t|cannot|not (here|able|present|home)|unable|busy)\b", re.IGNORECASE)
+YES: Final = re.compile(r"\b(yes|yeah|yep|yup|sure|okay|ok|i am|i can|present)\b", re.IGNORECASE)
 REPEAT: Final = re.compile(r"\b(repeat|again|say that|what did you say)\b", re.IGNORECASE)
 HAZARDS: Final = re.compile(
     r"\b(hazard|danger|creek|water|rail|track|freeway|highway|where (should|do) i (look|go|start))\b", re.IGNORECASE
@@ -72,7 +74,8 @@ def opening(hh: Household, brief: dict[str, Any], member_name: str) -> str:
     t = brief["last_seen_hhmm"]
     return (
         f"{member_name}, Nightfall alert. {hh.person_name or 'Your family member'} left home at {t}. "
-        f"{_wearing(hh, brief)} Say I'm on my way to stop the other calls, or ask where to look."
+        f"{_wearing(hh, brief)} Open your Nightfall app for more details and to file a report. "
+        "Say yes if you are present and can help."
     )
 
 
@@ -113,6 +116,18 @@ def handle(hh: Household, brief: dict[str, Any], member_name: str, text: str) ->
         if any(p.search(rest_text) for p in (HAZARDS, CLOTHES, MEDS, CALLS)):
             return Reply(f"{say} {handle(hh, brief, member_name, rest_text).say}", "responding", False, True)
         return Reply(f"{say} Say found them when they're safe, or ask me anything.", "responding", False, True)
+    if NO.search(t):
+        return Reply("Okay. We will keep calling the rest of the family. Goodbye.", "declined", True)
+    if YES.search(t) and not any(p.search(t) for p in (HAZARDS, CLOTHES, MEDS, CALLS, REPEAT)):
+        first = brief["hazards"][0] if brief["hazards"] else None
+        where = f" Check {first['name']} first, {first['distance_mi']} miles from home." if first else ""
+        return Reply(
+            f"Thank you. I've told the family you're on it, so the other calls stop.{where} "
+            "Open your Nightfall app to file a report. Say found them when they're safe, or ask where to look.",
+            "responding",
+            False,
+            True,
+        )
     if REPEAT.search(t):
         return Reply(opening(hh, brief, member_name), "repeat")
     if HAZARDS.search(t) and not brief["hazards"]:
