@@ -23,19 +23,19 @@ The prototype uses a laptop as the door device and a mobile browser as the careg
 
 ## Tech Stack
 
-| Layer | Technologies |
-| --- | --- |
-| Backend | Python, FastAPI, Uvicorn, asyncio, Pydantic, HTTPX |
-| Frontend | HTML, CSS, vanilla JavaScript; no frontend build step |
-| Camera and face detection | TensorFlow.js, COCO-SSD, MediaPipe, face-api.js |
-| Live updates and media | Server-Sent Events, WebSockets, browser camera/microphone APIs, Web Audio |
-| Maps and location data | Leaflet, OpenStreetMap, Nominatim, Overpass |
-| AI and voice | Anthropic Claude, Cartesia speech synthesis, transcription, and voice cloning |
-| Calls and messaging | Twilio Voice, TwiML, SMS |
-| Place discovery | Apify Google Maps Scraper; a separate Node.js Apify Actor |
-| Care-note retrieval | Moss semantic search with a local TF-IDF fallback |
-| Storage | Local JSON files, cached media, and signed brief links |
-| Testing and quality | pytest, pytest-asyncio, FastAPI TestClient, Ruff |
+| Layer                     | Technologies                                                              |
+| ------------------------- | ------------------------------------------------------------------------- |
+| Backend                   | Python, FastAPI, Uvicorn, asyncio, Pydantic, HTTPX                        |
+| Frontend                  | HTML, CSS, vanilla JavaScript; no frontend build step                     |
+| Camera and face detection | TensorFlow.js, COCO-SSD, MediaPipe, face-api.js                           |
+| Live updates and media    | Server-Sent Events, WebSockets, browser camera/microphone APIs, Web Audio |
+| Maps and location data    | Leaflet, OpenStreetMap, Nominatim, Overpass                               |
+| AI and voice              | Cartesia speech synthesis, transcription, and voice cloning               |
+| Calls and messaging       | Twilio Voice, TwiML, SMS                                                  |
+| Place discovery           | Apify Google Maps Scraper; a separate Node.js Apify Actor                 |
+| Care-note retrieval       | Moss semantic search with a local TF-IDF fallback                         |
+| Storage                   | Local JSON files, cached media, and signed brief links                    |
+| Testing and quality       | pytest, pytest-asyncio, FastAPI TestClient, Ruff                          |
 
 ## How It Works
 
@@ -110,12 +110,12 @@ The example configuration uses `MOCK=1` and empty service credentials, so you ca
 
 ### App Pages
 
-| Page | Local URL | Purpose |
-| --- | --- | --- |
-| Caregiver app | [localhost:8000/app](http://localhost:8000/app) | Setup, night watch, alerts, briefs, and care settings |
-| Door device | [localhost:8000](http://localhost:8000/) | Laptop camera, speaker, microphone, and help button |
-| Admin dashboard | [localhost:8000/dashboard.html](http://localhost:8000/dashboard.html) | Event log and simulation controls |
-| Mock scenarios | [localhost:8000/app?demo=1](http://localhost:8000/app?demo=1) | Simulated caregiver flows when `MOCK=1` |
+| Page            | Local URL                                                             | Purpose                                               |
+| --------------- | --------------------------------------------------------------------- | ----------------------------------------------------- |
+| Caregiver app   | [localhost:8000/app](http://localhost:8000/app)                       | Setup, night watch, alerts, briefs, and care settings |
+| Door device     | [localhost:8000](http://localhost:8000/)                              | Laptop camera, speaker, microphone, and help button   |
+| Admin dashboard | [localhost:8000/dashboard.html](http://localhost:8000/dashboard.html) | Event log and simulation controls                     |
+| Mock scenarios  | [localhost:8000/app?demo=1](http://localhost:8000/app?demo=1)         | Simulated caregiver flows when `MOCK=1`               |
 
 A mobile browser opening `/` is redirected to the caregiver app.
 
@@ -133,19 +133,19 @@ Profile edits replace the previous saved details. Returning from a brief to nigh
 
 `run.sh` loads `.env` before starting the app. Restart the server after changing service settings.
 
-| Variable | Purpose |
-| --- | --- |
-| `MOCK` | `1` selects mock behavior for voice, reasoning, calls, and care-note retrieval; `0` enables configured live adapters |
-| `ANTHROPIC_API_KEY` | Claude conversation, clothing descriptions, and call-agent answers |
-| `CARTESIA_API_KEY`, `CARTESIA_VOICE_ID` | Speech synthesis and transcription; voice cloning uses the Cartesia API |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` | Outbound calls and SMS |
-| `PUBLIC_URL` | Public server base URL for Twilio callbacks and shared links |
-| `APIFY_TOKEN` | Nearby-business searches |
-| `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY` | Optional semantic retrieval over care notes; add these to `.env` to use Moss |
-| `BRIEF_SECRET` | Signing secret for shared brief links |
-| `DOOR_WAIT_S`, `ESCALATION_STEP_S` | Exit delay and time between call tiers |
-| `FRESH_START` | Defaults to `1`, which creates the live household on first launch and preserves it afterward; `0` selects the tracked demo household |
-| `PLACES_FILE` | Optional override for the places JSON file |
+| Variable                                                 | Purpose                                                                                                                              |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `MOCK`                                                   | `1` selects mock behavior for voice, reasoning, calls, and care-note retrieval; `0` enables configured live adapters                 |
+| `ANTHROPIC_API_KEY`                                      | Claude conversation, clothing descriptions, and call-agent answers                                                                   |
+| `CARTESIA_API_KEY`, `CARTESIA_VOICE_ID`                  | Speech synthesis and transcription; voice cloning uses the Cartesia API                                                              |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` | Outbound calls and SMS                                                                                                               |
+| `PUBLIC_URL`                                             | Public server base URL for Twilio callbacks and shared links                                                                         |
+| `APIFY_TOKEN`                                            | Nearby-business searches                                                                                                             |
+| `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY`                    | Optional semantic retrieval over care notes; add these to `.env` to use Moss                                                         |
+| `BRIEF_SECRET`                                           | Signing secret for shared brief links                                                                                                |
+| `DOOR_WAIT_S`, `ESCALATION_STEP_S`                       | Exit delay and time between call tiers                                                                                               |
+| `FRESH_START`                                            | Defaults to `1`, which creates the live household on first launch and preserves it afterward; `0` selects the tracked demo household |
+| `PLACES_FILE`                                            | Optional override for the places JSON file                                                                                           |
 
 Missing credentials use the relevant fallback where supported. `/health` reports which integrations are running in mock mode. Moss requires project credentials; `MOSS_API_KEY` alone does not enable it.
 
@@ -174,15 +174,15 @@ Tests cover incident transitions, escalation cancellation, signed links, profile
 
 ### Local Data
 
-| Path | Contents |
-| --- | --- |
-| `data/household.live.json` | Saved profile, care-circle contacts, home location, and familiar places; ignored by Git |
-| `data/household.json` | Tracked demo household selected with `FRESH_START=0` |
-| `data/places.custom.live.json` | Places found through address setup |
-| `data/faces.json` | Locally saved face descriptors; ignored by Git |
-| `data/history.json` | Saved incident outcomes; ignored by Git |
-| `data/medical.json` | Medical record; ignored by Git |
-| `out/` | Profile photos, voice samples, and other generated media; ignored by Git |
+| Path                           | Contents                                                                                |
+| ------------------------------ | --------------------------------------------------------------------------------------- |
+| `data/household.live.json`     | Saved profile, care-circle contacts, home location, and familiar places; ignored by Git |
+| `data/household.json`          | Tracked demo household selected with `FRESH_START=0`                                    |
+| `data/places.custom.live.json` | Places found through address setup                                                      |
+| `data/faces.json`              | Locally saved face descriptors; ignored by Git                                          |
+| `data/history.json`            | Saved incident outcomes; ignored by Git                                                 |
+| `data/medical.json`            | Medical record; ignored by Git                                                          |
+| `out/`                         | Profile photos, voice samples, and other generated media; ignored by Git                |
 
 Keep API credentials in the ignored `.env` file and personal profile data out of commits.
 
@@ -203,4 +203,4 @@ Keep API credentials in the ignored `.env` file and personal profile data out of
 
 ## Author
 
-Nam Do
+Nam Do, Evan Barreau, Ethan Ikenhga, Jun Kim
