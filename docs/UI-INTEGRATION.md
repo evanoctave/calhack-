@@ -47,6 +47,10 @@ Figma decoration and icons are local under `static/assets/figma/`; recorded imag
 The existing Leaflet version and its license are served locally under `static/vendor/leaflet/`.
 Camera images, map markers, and incident facts remain dynamic. Maps are a search reference, not live tracking.
 
+The caregiver brief and shared brief list nearby open places with their distance, address, and visible phone number.
+Tap a number to call. Listings with unconfirmed hours or missing numbers say so; known closed places are excluded
+from this list. Results that finish loading after an exit appear when the brief refreshes.
+
 Photos are stored in ignored `out/profile/`. Household persistence saves the person's name, age, appearance, diagnosis,
 doctor, photo URL, caregiver relationship, contact order, and familiar places to ignored `data/household.live.json`.
 The blank template initializes only a missing live file. Each successful **Save care details** replaces the previous

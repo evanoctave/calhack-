@@ -22,7 +22,7 @@ async function loadSharedBrief() {
     byId("brief-state").textContent = b.state === "RETURNED" ? "Return confirmed. Pending family calls cancelled." : b.responder ? b.responder + " is responding. Return is not confirmed." : "Current location unknown.";
     byId("brief-radius").textContent = "Within " + b.home.radius_mi + " mi of home";
     byId("brief-hazards").innerHTML = briefRows(b.hazards,p=>p.category + " · " + p.distance_mi + " mi");
-    byId("brief-calls").innerHTML = briefRows(b.call_first,p=>[p.open_now === true ? "Open now" : "Check hours",p.distance_mi+" mi",p.phone ? "Tap to call" : "No phone listed"].join(" · "),true);
+    byId("brief-calls").innerHTML = nearbyCallRows(b.call_first);
     byId("brief-familiar").innerHTML = briefRows(b.familiar,p=>p.note || p.distance_mi+" mi");
     byId("brief-prose").textContent = b.prose;
     byId("brief-notes").innerHTML = (b.habits || []).map(p=>`<p>${esc(p.text)}</p>`).join("");

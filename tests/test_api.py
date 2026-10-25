@@ -36,3 +36,42 @@ def test_moment(client: TestClient) -> None:
 
 def test_unknown_event_422(client: TestClient) -> None:
     assert client.post("/event", json={"kind": "explode"}).status_code == 422
+
+
+def test_brief_includes_places_and_numbers_that_arrive_after_exit(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setattr(api.store, "places", [])
+    for kind in ("person_enter", "person_lost", "door_close"):
+        client.post("/event", json={"kind": kind})
+    incident_id = api.store.inc.id
+    link = api.store.link(incident_id, "TM-PRIMARY")
+    url = "/brief/" + link.split("#")[1]
+    assert client.get(url).json()["call_first"] == []
+
+    home = api.store.hh
+    api.store.places = [
+        {
+            "name": "Nearby Market",
+            "category": "convenience",
+            "lat": home.home_lat,
+            "lng": home.home_lng,
+            "hours": "24/7",
+            "phone": "+1 415 555 0123",
+            "source": "apify",
+        },
+        {
+            "name": "Nearby Pharmacy",
+            "category": "pharmacy",
+            "lat": home.home_lat,
+            "lng": home.home_lng,
+            "hours": "",
+            "phone": "",
+            "source": "apify",
+        },
+    ]
+    brief = client.get(url).json()
+    assert brief["call_first"][0]["name"] == "Nearby Market"
+    assert brief["call_first"][0]["phone"] == "+1 415 555 0123"
+    assert brief["call_first"][0]["open_now"] is True
+    assert brief["call_first"][1]["open_now"] is None
+    assert brief["places_source"] == "apify"
+    assert api.store.briefs[incident_id]["call_first"] == brief["call_first"]

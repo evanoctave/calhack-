@@ -30,7 +30,10 @@ async function resolveMember() {
   const params = new URLSearchParams(location.search);
   const explicit = params.get("member"); if (explicit) { member = explicit; return; }
   const want = (params.get("me") || "").trim();
-  if (!want) { member = "TM-PRIMARY"; return; }
+  if (!want) {
+    const tree = S?.household.tree || (await requestJSON("/state", undefined, "GET")).household.tree;
+    member = tree.find(m => m.tier === 1)?.id || "TM-PRIMARY"; return;
+  }
   let id = ""; try { id = localStorage.getItem("nf-member-" + want) || ""; } catch (e) {}
   const st = await (await fetch("/state")).json();
   if (!st.household.tree.some(m => m.id === id)) { const r = await post("/tree", {name: want, phone: "web", tier: 1}); id = r.member_id; try { localStorage.setItem("nf-member-" + want, id); } catch (e) {} }
@@ -161,7 +164,7 @@ async function loadBrief(link) {
   const b = await r.json(); if (b.incident_id !== incident) return; window.B = b; renderBriefCards();
   $("sr-fam").innerHTML = b.familiar.map(p => `<div class="row"><div><span class="k">${esc(p.name)}</span><span class="sub2">${p.distance_mi} mi · family-provided</span></div></div>`).join("");
   $("sr-haz").innerHTML = b.hazards.slice(0, 5).map(p => `<div class="row"><span class="k">${esc(p.name)}</span><span class="v danger">${p.distance_mi} mi</span></div>`).join("") || '<div class="row"><span class="muted">none in radius</span></div>';
-  $("sr-call").innerHTML = b.call_first.slice(0, 5).map(p => `<div class="row"><div><span class="k">${esc(p.name)}</span><span class="sub2">${p.distance_mi} mi${p.open_now === true ? " · open" : ""}</span></div><span class="v">${p.phone ? `<a href="tel:${esc(p.phone.replace(/[^\d+]/g, ""))}">${esc(p.phone)}</a>` : ""}</span></div>`).join("");
+  $("sr-call").innerHTML = nearbyCallRows(b.call_first);
   if ($("s-search").classList.contains("on")) renderMap();
 }
 function tok(name) { const el = document.createElement("i"); el.style.color = `var(${name})`; document.body.appendChild(el); const c = getComputedStyle(el).color; el.remove(); return c; }
