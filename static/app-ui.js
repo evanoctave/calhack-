@@ -4,13 +4,18 @@ function $(id) { return document.getElementById(id); }
 function go(name) { location.hash = "#" + name; }
 const SCREENS = ["setup", "profile", "medical", "report", "voice", "calls", "places", "area", "camera", "home", "door", "wait", "alert", "call", "talk", "takeover", "brief", "search", "responding", "back", "emergency", "help", "record", "review", "creating", "voice-preview", "join"];
 const navStack = [];
+// An invitation link (/app?member=ID) opens the family view: alerts, the door and the report, but not the care setup.
+const FAMILY_VIEW = new URLSearchParams(location.search).has("member");
+const OWNER_ONLY = ["setup", "profile", "medical", "voice", "voice-preview", "record", "review", "creating", "calls", "places", "area", "camera"];
+document.documentElement.dataset.role = FAMILY_VIEW ? "family" : "owner";
 function show(name) {
   if (name === "respond") name = "call";
   if (name !== "call" && typeof stopAgentCall === "function") stopAgentCall();
   if (!["record","takeover"].includes(name) && typeof Recorder !== "undefined" && Recorder.rec?.state === "recording") { Recorder.rec._discard = true; Recorder.rec.stop(); releaseSampleMic(); }
   if (!["talk","takeover"].includes(name) && typeof Listen !== "undefined" && Listen.on) listenStop();
   if (!["talk","takeover"].includes(name) && typeof Live !== "undefined" && Live.on) { liveStop(); $("r-live").classList.remove("on"); $("r-live").textContent = "Talk live"; }
-  if (!SCREENS.includes(name)) name = "home";
+  if (!SCREENS.includes(name) || (FAMILY_VIEW && OWNER_ONLY.includes(name))) name = "home";
+  if (location.hash.slice(1) !== name && name === "home") history.replaceState(null, "", "#home");
   // direction for the slide: back if this is the screen before the current one, none on first paint
   const back = navStack.length > 1 && navStack[navStack.length - 2] === name;
   if (back) navStack.pop(); else if (navStack[navStack.length - 1] !== name) navStack.push(name);
